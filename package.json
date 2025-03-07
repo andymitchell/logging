@@ -1,0 +1,51 @@
+{
+  "name": "@andyrmitchell/logging",
+  "version": "0.0.1",
+  "description": "",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build_release": "npm run build_prepare && np",
+    "build": "tsup",
+    "pkglint": "./build/publint_pipeable.sh",
+    "build_prepare": "npm run build && npm run pkglint",
+    "prepublishOnly": "npm run build_prepare",
+    "test": "vitest",
+    "test:watch": "vitest --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/andymitchell/logging.git"
+  },
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=19.0.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "fake-indexeddb": "^6.0.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.7"
+  },
+  "dependencies": {
+    "@andyrmitchell/objects": "^0.7.12",
+    "@andyrmitchell/utils": "^0.12.0"
+  }
+}
