@@ -1,4 +1,4 @@
-import type { WhereFilterDefinition } from "@andyrmitchell/objects";
+import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import type { LogEntry } from "./raw-storage/types.ts";
 
 export type MinimumContext = Record<string, any>;

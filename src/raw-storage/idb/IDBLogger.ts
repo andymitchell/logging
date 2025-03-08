@@ -1,4 +1,4 @@
-import { WhereFilter, type WhereFilterDefinition } from "@andyrmitchell/objects";
+import {  matchJavascriptObject, type WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import type { LoggerOptions, MinimumContext } from "../../types.ts";
 import { BaseLogger } from "../BaseLogger.js";
 import type { IRawLogger, LogEntry } from "../types.ts";
@@ -89,7 +89,7 @@ export class IDBLogger<T extends MinimumContext = MinimumContext> extends BaseLo
             request.onsuccess = (event) => {
                 let entries = (event.target as IDBRequest).result as LogEntry<T>[];
                 // TODO Filter IndexedDb properly
-                entries = filter? entries.filter(x => WhereFilter.matchJavascriptObject(x, filter)) : entries;
+                entries = filter? entries.filter(x => matchJavascriptObject(x, filter)) : entries;
                 resolve(entries);
             };
 

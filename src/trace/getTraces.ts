@@ -1,4 +1,4 @@
-import type { WhereFilterDefinition } from "@andyrmitchell/objects";
+import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import type { IRawLogger, LogEntry } from "../raw-storage/types.ts";
 import type { SpanContext } from "./types.ts";
 import type { MinimumContext } from "../types.ts";
@@ -58,7 +58,8 @@ export async function getCommonTraces<T extends MinimumContext = MinimumContext>
             }
             break;
         default:
-            
+            const _exhaustiveCheck:never = traceName;
+            _exhaustiveCheck satisfies never;
             break;
     }
 

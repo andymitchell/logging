@@ -3,7 +3,7 @@
 import { cloneDeepScalarValues } from "@andyrmitchell/utils/deep-clone-scalar-values";
 import type { LoggerOptions, MinimumContext } from "../types.ts";
 import type { AcceptLogEntry, IRawLogger, LogEntry } from "./types.ts";
-import type { WhereFilterDefinition } from "@andyrmitchell/objects";
+import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 
 
 

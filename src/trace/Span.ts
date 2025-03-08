@@ -2,7 +2,7 @@
 import { uuidV4 } from "@andyrmitchell/utils/uid";
 import type { IRawLogger, LogEntry } from "../raw-storage/types.ts";
 
-import type { WhereFilterDefinition } from "@andyrmitchell/objects";
+import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import type { MinimumContext } from "../types.ts";
 import type { ISpan, SpanContext, TraceId } from "./types.ts";
 

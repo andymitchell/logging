@@ -1,12 +1,18 @@
 import { defineConfig } from "tsup";
  
 export default defineConfig({
-  entry: ["src/index.ts"],
+  entry: {
+
+    'index': "src/index.ts",
+    'index-browser': 'src/index-browser.ts',
+    'index-node': 'src/index-node.ts',
+    'index-get-traces': 'src/index-get-traces.ts',
+  },
   publicDir: false,
   clean: true,
   minify: false,
   target: ['esnext'],
-  external: ["@electric-sql/pglite", "@libsql/client", "better-sqlite3", "drizzle-kit", "drizzle-orm", "postgres"],
+  external: [],
   format: ['esm'], 
   dts: true
 });

@@ -1,7 +1,7 @@
 
 import type { DeepSerializable } from "@andyrmitchell/utils/deep-clone-scalar-values";
 import { type MinimumContext } from "../types.ts";
-import type { WhereFilterDefinition } from "@andyrmitchell/objects";
+import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 
 
 
