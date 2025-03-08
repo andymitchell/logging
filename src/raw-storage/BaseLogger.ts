@@ -38,7 +38,7 @@ export class BaseLogger<T extends MinimumContext = MinimumContext> implements IR
         await this.commitEntry(logEntry);
 
         if( this.logToConsole && logEntry.type!=='event') {
-            console.log(`[Auth Log ${this.dbNamespace}] ${logEntry.message}`, logEntry.context);
+            console.log(`[Log ${this.dbNamespace}] ${logEntry.message}`, logEntry.context);
         }
     }
 

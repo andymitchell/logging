@@ -144,7 +144,7 @@ describe('Span Integration Tests', () => {
         span.end();
 
         const result = await span.get({'type': 'info', message: 'abc1'});
-        console.log(result);
+        
         
         expect(result.length).toBe(1);
         const item = result[0]!;
