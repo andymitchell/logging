@@ -6,14 +6,11 @@ import { Span } from "./trace/Span.ts";
 import { Trace } from "./trace/Trace.ts";
 import type { ILogger, LoggerOptions } from "./types.ts";
 
-import { getTraces, getCommonTraces } from "./trace/getTraces.ts";
 
 export {
     Trace,
     Span,
-    Logger,
-    getTraces,
-    getCommonTraces
+    Logger
 
 }
 
