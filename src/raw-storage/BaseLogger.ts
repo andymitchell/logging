@@ -3,6 +3,7 @@
 import { cloneDeepScalarValues } from "@andyrmitchell/utils/deep-clone-scalar-values";
 import type { LoggerOptions, MinimumContext } from "../types.ts";
 import type { AcceptLogEntry, IRawLogger, LogEntry } from "./types.ts";
+import type { WhereFilterDefinition } from "@andyrmitchell/objects";
 
 
 
@@ -62,7 +63,7 @@ export class BaseLogger<T extends MinimumContext = MinimumContext> implements IR
     }
 
 
-    public async getAll(): Promise<any[]> {
+    public async get(filter?:WhereFilterDefinition<LogEntry<T>>): Promise<LogEntry<T>[]> {
         throw new Error("Method not implemented");
     }
 

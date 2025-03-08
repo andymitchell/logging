@@ -1,6 +1,7 @@
 
 import type { DeepSerializable } from "@andyrmitchell/utils/deep-clone-scalar-values";
 import { type MinimumContext } from "../types.ts";
+import type { WhereFilterDefinition } from "@andyrmitchell/objects";
 
 
 
@@ -74,8 +75,8 @@ export interface IRawLogger<T extends MinimumContext = MinimumContext> {
     add(entry:AcceptLogEntry<T>):Promise<void>;
 
     /**
-     * Retrieve all entries from the data store
+     * Retrieve entries from the data store
      */
-    getAll(): Promise<LogEntry<T>[]>;
+    get(filter?:WhereFilterDefinition<LogEntry<T>>): Promise<LogEntry<T>[]>;
 
 }

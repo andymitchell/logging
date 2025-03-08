@@ -26,7 +26,7 @@ export async function commonRawLoggerTests(generate:(options?:LoggerOptions) => 
             });
                 
     
-            const all = await logger.getAll();
+            const all = await logger.get();
     
     
             // Check values
@@ -54,7 +54,7 @@ export async function commonRawLoggerTests(generate:(options?:LoggerOptions) => 
                 }
             });
     
-            const all = await logger.getAll();
+            const all = await logger.get();
     
             const entry = all[0]!;
     
@@ -83,7 +83,7 @@ export async function commonRawLoggerTests(generate:(options?:LoggerOptions) => 
                 }
             });
     
-            const all = await logger.getAll();
+            const all = await logger.get();
     
             const entry = all[0]!;
     

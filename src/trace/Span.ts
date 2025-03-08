@@ -1,8 +1,10 @@
 
 import { uuidV4 } from "@andyrmitchell/utils/uid";
-import type { IRawLogger, LogEntry } from "./raw-storage/types.ts";
-import type { ISpan, MinimumContext, SpanContext, TraceId } from "./types.ts";
-import { WhereFilter, type WhereFilterDefinition } from "@andyrmitchell/objects";
+import type { IRawLogger, LogEntry } from "../raw-storage/types.ts";
+
+import type { WhereFilterDefinition } from "@andyrmitchell/objects";
+import type { MinimumContext } from "../types.ts";
+import type { ISpan, SpanContext, TraceId } from "./types.ts";
 
 /**
  * A span represents a unit of work or operation. Spans track specific operations that a request makes, painting a picture of what happened during the time in which that operation was executed.
@@ -72,12 +74,8 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
         })
     }
 
-    async getAll(): Promise<LogEntry<SpanContext<T>>[]> {
-        return await this.storage.getAll();
-    }
-
-    async getAllFilter(filter:WhereFilterDefinition): Promise<any[]> {
-        return (await this.getAll()).filter(x => WhereFilter.matchJavascriptObject(x, filter));
+    async get(filter?:WhereFilterDefinition<LogEntry<SpanContext<T>>>): Promise<LogEntry<SpanContext<T>>[]> {
+        return await this.storage.get(filter);
     }
 
     
@@ -96,5 +94,9 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
                 name: 'span_end'
             }
         })
+    }
+
+    getId() {
+        return this.traceId.id;
     }
 }

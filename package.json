@@ -45,7 +45,7 @@
     "vitest": "^3.0.7"
   },
   "dependencies": {
-    "@andyrmitchell/objects": "^0.7.12",
+    "@andyrmitchell/objects": "^0.7.13",
     "@andyrmitchell/utils": "^0.12.0"
   }
 }

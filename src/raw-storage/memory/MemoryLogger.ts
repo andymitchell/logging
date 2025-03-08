@@ -1,10 +1,11 @@
-import type { LoggerOptions } from "../../types.ts";
+import { WhereFilter, type WhereFilterDefinition } from "@andyrmitchell/objects";
+import type { LoggerOptions, MinimumContext } from "../../types.ts";
 import { BaseLogger } from "../BaseLogger.ts";
 import type { LogEntry, IRawLogger } from "../types.ts";
 
 
 
-export class MemoryLogger extends BaseLogger implements IRawLogger {
+export class MemoryLogger<T extends MinimumContext = MinimumContext> extends BaseLogger<T> implements IRawLogger<T> {
 
     #log:LogEntry[]
     
@@ -25,7 +26,8 @@ export class MemoryLogger extends BaseLogger implements IRawLogger {
     }
 
 
-    public override async getAll(): Promise<LogEntry[]> {
-        return JSON.parse(JSON.stringify(this.#log));
+    public override async get(filter?: WhereFilterDefinition<LogEntry<T>>): Promise<LogEntry<T>[]> {
+        const entries = JSON.parse(JSON.stringify(this.#log)) as LogEntry<T>[];
+        return filter? entries.filter(x => WhereFilter.matchJavascriptObject(x, filter)) : entries;
     }
 }

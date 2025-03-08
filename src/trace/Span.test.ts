@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { Span } from './Span.ts';
-import type { IRawLogger } from './raw-storage/types.ts';
-import type { MinimumContext } from './types.ts';
+import type { IRawLogger } from '../raw-storage/types.ts';
+import type { MinimumContext } from '../types.ts';
+import { WhereFilter, type WhereFilterDefinition } from '@andyrmitchell/objects';
 
 /**
  * A fake implementation of IRawLogger to be used in tests.
- * It records every log entry in an array and can be configured to fail on add() or getAll().
+ * It records every log entry in an array and can be configured to fail on add() or get().
  */
 class FakeRawLogger<T extends MinimumContext = any> implements IRawLogger<T> {
     logs: any[] = [];
@@ -21,9 +22,12 @@ class FakeRawLogger<T extends MinimumContext = any> implements IRawLogger<T> {
         this.logs.push(logEntry);
     }
 
-    async getAll(): Promise<any[]> {
+    async get(filter?:WhereFilterDefinition): Promise<any[]> {
         if (this.shouldFailGetAll) {
-            throw new Error("getAll failure");
+            throw new Error("get failure");
+        }
+        if( filter ) {
+            return this.logs.filter(x => WhereFilter.matchJavascriptObject(x, filter));
         }
         return this.logs;
     }
@@ -76,11 +80,11 @@ describe('Span Integration Tests', () => {
         expect(errorLog.context.external).toEqual({ critical: true });
     });
 
-    it('should retrieve all log entries via getAll()', async () => {
+    it('should retrieve all log entries via get()', async () => {
         const fakeLogger = new FakeRawLogger();
         const span = new Span(fakeLogger);
         await span.log("test log", { data: 123 });
-        const allLogs = await span.getAll();
+        const allLogs = await span.get();
         // Expect two log entries: one from the span_start event and one from the info log.
         expect(allLogs.length).toBe(2);
         expect(allLogs[0]!.type).toBe('event');
@@ -121,6 +125,35 @@ describe('Span Integration Tests', () => {
         expect(endLog.event.name).toBe('span_end');
     });
 
+    it('get will return everything', async () => {
+        const fakeLogger = new FakeRawLogger();
+        const span = new Span(fakeLogger);
+        span.log("abc1");
+        span.end();
+
+        const result = await span.get();
+        
+        expect(result.length).toBe(3);
+        
+    });
+
+    it.only('get will filter', async () => {
+        const fakeLogger = new FakeRawLogger();
+        const span = new Span(fakeLogger);
+        span.log("abc1");
+        span.end();
+
+        const result = await span.get({'type': 'info', message: 'abc1'});
+        console.log(result);
+        
+        expect(result.length).toBe(1);
+        const item = result[0]!;
+        expect(item.type).toBe('info'); if( item.type!=='info' ) throw new Error("noop");
+        expect(item.message).toBe('abc1');
+
+        
+    });
+
     describe('Failure Scenarios', () => {
 
         it('should propagate errors when storage.add fails', async () => {
@@ -137,11 +170,11 @@ describe('Span Integration Tests', () => {
 
         });
 
-        it('should propagate errors when storage.getAll fails', async () => {
+        it('should propagate errors when storage.get fails', async () => {
             const fakeLogger = new FakeRawLogger();
             const span = new Span(fakeLogger);
             fakeLogger.shouldFailGetAll = true;
-            await expect(span.getAll()).rejects.toThrow("getAll failure");
+            await expect(span.get()).rejects.toThrow("get failure");
         });
 
     });

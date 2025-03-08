@@ -1,11 +1,12 @@
-import type { LoggerOptions } from "../../types.ts";
+import { WhereFilter, type WhereFilterDefinition } from "@andyrmitchell/objects";
+import type { LoggerOptions, MinimumContext } from "../../types.ts";
 import { BaseLogger } from "../BaseLogger.js";
 import type { IRawLogger, LogEntry } from "../types.ts";
 
 
 
 
-export class IDBLogger extends BaseLogger implements IRawLogger {
+export class IDBLogger<T extends MinimumContext = MinimumContext> extends BaseLogger<T> implements IRawLogger<T> {
     #dbPromise: Promise<IDBDatabase>;
     
 
@@ -78,7 +79,7 @@ export class IDBLogger extends BaseLogger implements IRawLogger {
     }
 
 
-    public override async getAll(): Promise<LogEntry[]> {
+    public override async get(filter?: WhereFilterDefinition<LogEntry<T>>): Promise<LogEntry<T>[]> {
         return new Promise(async (resolve, reject) => {
             const db = await this.#dbPromise;
             const transaction = db.transaction('logs', 'readonly');
@@ -86,7 +87,10 @@ export class IDBLogger extends BaseLogger implements IRawLogger {
             const request = store.getAll();
 
             request.onsuccess = (event) => {
-                resolve((event.target as IDBRequest).result);
+                let entries = (event.target as IDBRequest).result as LogEntry<T>[];
+                // TODO Filter IndexedDb properly
+                entries = filter? entries.filter(x => WhereFilter.matchJavascriptObject(x, filter)) : entries;
+                resolve(entries);
             };
 
             request.onerror = (event) => {
