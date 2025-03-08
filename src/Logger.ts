@@ -1,4 +1,5 @@
 
+import type { WhereFilterDefinition } from "@andyrmitchell/objects";
 import type { IRawLogger, LogEntry } from "./raw-storage/types.ts";
 import type { ILogger, MinimumContext} from "./types.ts";
 
@@ -41,8 +42,8 @@ export class Logger<T extends MinimumContext = MinimumContext> implements ILogge
         })
     }
 
-    async getAll(): Promise<LogEntry<T>[]> {
-        return await this.storage.getAll();
+    async get(filter?:WhereFilterDefinition): Promise<LogEntry<T>[]> {
+        return await this.storage.get(filter);
     }
 
 }

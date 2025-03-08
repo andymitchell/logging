@@ -16,9 +16,9 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
     
 
     protected traceId: Readonly<TraceId>;
-    protected storage:IRawLogger<SpanContext<T>>;
+    protected storage:IRawLogger<T, SpanContext>;
 
-    constructor(storage:IRawLogger<any>, parent_id?: string) {
+    constructor(storage:IRawLogger<any, any>, parent_id?: string) {
         this.storage = storage;
 
         this.traceId = {
@@ -30,7 +30,7 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
         // Record the start time for accurate tracking
         this.storage.add({
             type: 'event',
-            context: this.#expandContext(),
+            meta: this.#getMeta(),
             event: {
                 name: 'span_start'
             }
@@ -43,9 +43,8 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
      * @param context 
      * @returns 
      */
-    #expandContext(context?:T): SpanContext<T> {
+    #getMeta(): SpanContext {
         return {
-            external: context,
             trace: this.traceId
         }
     }
@@ -54,7 +53,8 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
         await this.storage.add({
             type: 'info',
             message,
-            context: this.#expandContext(context)
+            context, 
+            meta: this.#getMeta()
         })
     }
 
@@ -62,7 +62,8 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
         await this.storage.add({
             type: 'warn',
             message,
-            context: this.#expandContext(context)
+            context, 
+            meta: this.#getMeta()
         })
     }
 
@@ -70,11 +71,12 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
         await this.storage.add({
             type: 'error',
             message,
-            context: this.#expandContext(context)
+            context, 
+            meta: this.#getMeta()
         })
     }
 
-    async get(filter?:WhereFilterDefinition<LogEntry<SpanContext<T>>>): Promise<LogEntry<SpanContext<T>>[]> {
+    async get(filter?:WhereFilterDefinition<LogEntry<T, SpanContext>>): Promise<LogEntry<T, SpanContext>[]> {
         return await this.storage.get(filter);
     }
 
@@ -89,7 +91,7 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
 
         await this.storage.add({
             type: 'event',
-            context: this.#expandContext(),
+            meta: this.#getMeta(),
             event: {
                 name: 'span_end'
             }

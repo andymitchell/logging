@@ -1,6 +1,9 @@
-import type { IRawLogger } from "./raw-storage/types.ts";
+
+import type { IRawLogger } from "../index-browser.ts";
+import type { MinimumContext } from "../types.ts";
 import { Span } from "./Span.ts";
-import type { ISpan, MinimumContext } from "./types.ts";
+import type { ISpan } from "./types.ts";
+
 
 
 /**

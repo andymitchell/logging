@@ -1,7 +1,7 @@
 import type { ILogger, MinimumContext } from "../types.ts"
 
 
-export interface ISpan<T extends MinimumContext = MinimumContext> extends ILogger<T, SpanContext<T>> {
+export interface ISpan<T extends MinimumContext = MinimumContext> extends ILogger<T, SpanContext> {
 
     /**
      * Create a child span with a link back to this as the parent 
@@ -27,7 +27,6 @@ export type TraceId = {
     parent_id?: string
 }
 
-export type SpanContext<T extends MinimumContext = MinimumContext> = {
-    external?: T,
+export type SpanContext= {
     trace: TraceId
 }

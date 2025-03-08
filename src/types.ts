@@ -3,7 +3,7 @@ import type { LogEntry } from "./raw-storage/types.ts";
 
 export type MinimumContext = Record<string, any>;
 
-export interface ILogger<T extends MinimumContext = MinimumContext, RT extends MinimumContext = T> {
+export interface ILogger<T extends MinimumContext = MinimumContext, M extends MinimumContext = MinimumContext> {
 
     log(message: string, context?: T): Promise<void>,
 
@@ -11,7 +11,7 @@ export interface ILogger<T extends MinimumContext = MinimumContext, RT extends M
     
     error(message: string, context?: T): Promise<void>
 
-    get(filter?:WhereFilterDefinition<LogEntry<RT>>): Promise<LogEntry<RT>[]>;
+    get(filter?:WhereFilterDefinition<LogEntry<T, M>>): Promise<LogEntry<T, M>[]>;
 
 }
 
