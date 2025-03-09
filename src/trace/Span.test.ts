@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Span } from './Span.ts';
-import type { IRawLogger, LogEntry } from '../raw-storage/types.ts';
+import type { IRawLogger } from '../raw-storage/types.ts';
 import type { MinimumContext } from '../types.ts';
 import { WhereFilter, type WhereFilterDefinition } from '@andyrmitchell/objects';
 import type { SpanContext } from './types.ts';

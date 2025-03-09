@@ -5,6 +5,7 @@ import type { IRawLogger } from "./raw-storage/types.ts";
 
 import { Span } from "./trace/Span.ts";
 import { Trace } from "./trace/Trace.ts";
+import type { ISpan } from "./trace/types.ts";
 import type { ILogger, LoggerOptions } from "./types.ts";
 
 export {
@@ -23,5 +24,6 @@ export {
 export type {
     IRawLogger,
     ILogger,
-    LoggerOptions
+    LoggerOptions,
+    ISpan
 }
