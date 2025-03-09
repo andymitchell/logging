@@ -1,14 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { Span } from './Span.ts';
-import type { IRawLogger } from '../raw-storage/types.ts';
+import type { IRawLogger, LogEntry } from '../raw-storage/types.ts';
 import type { MinimumContext } from '../types.ts';
 import { WhereFilter, type WhereFilterDefinition } from '@andyrmitchell/objects';
+import type { SpanContext } from './types.ts';
 
 /**
  * A fake implementation of IRawLogger to be used in tests.
  * It records every log entry in an array and can be configured to fail on add() or get().
  */
-class FakeRawLogger<T extends MinimumContext = any> implements IRawLogger<T> {
+class FakeRawLogger<T extends MinimumContext = any> implements IRawLogger<T, SpanContext> {
     logs: any[] = [];
     shouldFailAdd = false;
     shouldFailGetAll = false;
@@ -40,11 +41,11 @@ describe('Span Integration Tests', () => {
         // When a span is created, its constructor should record a span_start event.
         new Span(fakeLogger);
         expect(fakeLogger.logs.length).toBe(1);
-        const startLog = fakeLogger.logs[0];
+        const startLog = fakeLogger.logs[0]!;
         expect(startLog.type).toBe('event');
         expect(startLog.event.name).toBe('span_start');
-        expect(startLog.context).toHaveProperty('trace');
-        expect(startLog.context.trace.id).toBeTruthy();
+        expect(startLog.meta).toHaveProperty('trace');
+        expect(startLog.meta.trace.id).toBeTruthy();
     });
 
     it('should log an info message with the correct context', async () => {
@@ -56,9 +57,9 @@ describe('Span Integration Tests', () => {
         const infoLog = fakeLogger.logs[1];
         expect(infoLog.type).toBe('info');
         expect(infoLog.message).toBe('info message');
-        expect(infoLog.context.external).toEqual({ test: "value" });
+        expect(infoLog.context).toEqual({ test: "value" });
         // Verify that the log entry uses the same trace id as the span's start event.
-        expect(infoLog.context.trace.id).toBe(fakeLogger.logs[0].context.trace.id);
+        expect(infoLog.meta.trace.id).toBe(fakeLogger.logs[0].meta.trace.id);
     });
 
     it('should log warn and error messages correctly', async () => {
@@ -72,12 +73,12 @@ describe('Span Integration Tests', () => {
         const warnLog = fakeLogger.logs[1];
         expect(warnLog.type).toBe('warn');
         expect(warnLog.message).toBe('warn message');
-        expect(warnLog.context.external).toEqual({ level: "moderate" });
+        expect(warnLog.context).toEqual({ level: "moderate" });
 
         const errorLog = fakeLogger.logs[2];
         expect(errorLog.type).toBe('error');
         expect(errorLog.message).toBe('error message');
-        expect(errorLog.context.external).toEqual({ critical: true });
+        expect(errorLog.context).toEqual({ critical: true });
     });
 
     it('should retrieve all log entries via get()', async () => {
@@ -95,7 +96,7 @@ describe('Span Integration Tests', () => {
         const fakeLogger = new FakeRawLogger();
         const parentSpan = new Span(fakeLogger);
         // Get the parent's trace id from its span_start event.
-        const parentTraceId = fakeLogger.logs[0].context.trace.id;
+        const parentTraceId = fakeLogger.logs[0].meta.trace.id;
 
         // Create a child span.
         const childSpan = parentSpan.startSpan("child span");
@@ -104,14 +105,14 @@ describe('Span Integration Tests', () => {
         const childStartLog = fakeLogger.logs[1];
         expect(childStartLog.type).toBe('event');
         expect(childStartLog.event.name).toBe('span_start');
-        expect(childStartLog.context.trace.parent_id).toBe(parentTraceId);
+        expect(childStartLog.meta.trace.parent_id).toBe(parentTraceId);
 
         // Further logging from the child span should continue to include the parent's id.
         await childSpan.log("child log");
         const childLog = fakeLogger.logs[2];
         expect(childLog.type).toBe('info');
         expect(childLog.message).toBe('child log');
-        expect(childLog.context.trace.parent_id).toBe(parentTraceId);
+        expect(childLog.meta.trace.parent_id).toBe(parentTraceId);
     });
 
     it('should record a span_end event when end() is called', () => {
@@ -137,7 +138,7 @@ describe('Span Integration Tests', () => {
         
     });
 
-    it.only('get will filter', async () => {
+    it('get will filter', async () => {
         const fakeLogger = new FakeRawLogger();
         const span = new Span(fakeLogger);
         span.log("abc1");
