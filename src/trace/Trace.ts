@@ -15,8 +15,8 @@ export class Trace<T extends MinimumContext = MinimumContext> extends Span<T> im
 
     
 
-    constructor(storage:IRawLogger<any>) {
-        super(storage);
+    constructor(storage:IRawLogger<any>, name?: string, context?: T) {
+        super(storage, undefined, name, context);
         
     }
 
