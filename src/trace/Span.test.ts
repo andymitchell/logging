@@ -115,6 +115,24 @@ describe('Span Integration Tests', () => {
         expect(childLog.meta.trace.parent_id).toBe(parentTraceId);
     });
 
+    it('should create a child span with name and context set', async () => {
+        const fakeLogger = new FakeRawLogger();
+        const parentSpan = new Span(fakeLogger);
+        // Get the parent's trace id from its span_start event.
+        const parentTraceId = fakeLogger.logs[0].meta.trace.id;
+
+        // Create a child span.
+        const childSpan = parentSpan.startSpan("child span", {did: 'abc1'});
+        // The child span's constructor should immediately record its own span_start event.
+        expect(fakeLogger.logs.length).toBe(2);
+        const childStartLog = fakeLogger.logs[1];
+        expect(childStartLog.type).toBe('event');
+        expect(childStartLog.event.name).toBe('span_start');
+        expect(childStartLog.meta.name).toBe('child span');
+        expect(childStartLog.context.did).toBe('abc1');
+        
+    });
+
     it('should record a span_end event when end() is called', () => {
         const fakeLogger = new FakeRawLogger();
         const span = new Span(fakeLogger);
@@ -155,6 +173,8 @@ describe('Span Integration Tests', () => {
         
     });
 
+
+
     describe('Failure Scenarios', () => {
 
         it('should propagate errors when storage.add fails', async () => {
@@ -164,10 +184,10 @@ describe('Span Integration Tests', () => {
             fakeLogger.shouldFailAdd = true;
 
             
-            expect(span.log("fail message", {})).rejects.toThrowError('add failure')
-            expect(span.warn("fail message", {})).rejects.toThrowError('add failure')
-            expect(span.error("fail message", {})).rejects.toThrowError('add failure')
-            expect(span.end()).rejects.toThrowError('add failure')
+            await expect(span.log("fail message", {})).rejects.toThrowError('add failure')
+            await expect(span.warn("fail message", {})).rejects.toThrowError('add failure')
+            await expect(span.error("fail message", {})).rejects.toThrowError('add failure')
+            await expect(span.end()).rejects.toThrowError('add failure')
 
         });
 

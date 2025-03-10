@@ -8,7 +8,7 @@ export interface ISpan<T extends MinimumContext = MinimumContext> extends ILogge
      * @param name 
      * @returns 
      */
-    startSpan(name?: string):ISpan
+    startSpan(name?: string, context?: T):ISpan
 
     /**
      * Adds a final timestamp for duration logging. 
@@ -28,5 +28,6 @@ export type TraceId = {
 }
 
 export type SpanContext= {
-    trace: TraceId
+    trace: TraceId,
+    name?: string
 }

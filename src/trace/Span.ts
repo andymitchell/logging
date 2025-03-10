@@ -18,7 +18,7 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
     protected traceId: Readonly<TraceId>;
     protected storage:IRawLogger<T, SpanContext>;
 
-    constructor(storage:IRawLogger<any, any>, parent_id?: string) {
+    constructor(storage:IRawLogger<any, any>, parent_id?: string, info?: {meta?: Partial<SpanContext>, context?: T}) {
         this.storage = storage;
 
         this.traceId = {
@@ -30,7 +30,11 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
         // Record the start time for accurate tracking
         this.storage.add({
             type: 'event',
-            meta: this.#getMeta(),
+            meta: {
+                ...this.#getMeta(),
+                ...info?.meta
+            },
+            context: info?.context,
             event: {
                 name: 'span_start'
             }
@@ -81,9 +85,9 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
     }
 
     
-    startSpan(name?: string): ISpan<T> {
+    startSpan(name?: string, context?: T): ISpan<T> {
 
-        return new Span<T>(this.storage, this.traceId.id);
+        return new Span<T>(this.storage, this.traceId.id, {meta: {name}, context});
         
     }
 
