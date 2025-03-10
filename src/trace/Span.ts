@@ -85,9 +85,9 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
     }
 
     
-    startSpan(name?: string, context?: T): ISpan<T> {
+    startSpan<CT extends MinimumContext = T>(name?: string, context?: CT): ISpan<CT> {
 
-        return new Span<T>(this.storage, this.traceId.id, name, context);
+        return new Span<CT>(this.storage, this.traceId.id, name, context);
         
     }
 
