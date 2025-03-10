@@ -8,7 +8,7 @@ export interface ISpan<T extends MinimumContext = MinimumContext> extends ILogge
      * @param name 
      * @returns 
      */
-    startSpan(name?: string, context?: T):ISpan
+    startSpan<CT extends MinimumContext = T>(name?: string, context?: CT): ISpan<CT>;
 
     /**
      * Adds a final timestamp for duration logging. 
