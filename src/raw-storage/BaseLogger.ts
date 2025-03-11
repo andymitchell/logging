@@ -11,12 +11,14 @@ import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter"
 export class BaseLogger<T extends MinimumContext = MinimumContext> implements IRawLogger<T> {
     protected includeStackTrace: Required<LoggerOptions>['include_stack_trace'];
     protected logToConsole:boolean;
+    protected permitDangerousContextProperties: boolean;
     protected dbNamespace:string;
 
     constructor(dbNamespace:string, options?: LoggerOptions) {
         const safeOptions = Object.assign({}, DEFAULT_LOGGER_OPTIONS, options);
         this.includeStackTrace = safeOptions.include_stack_trace;
         this.logToConsole = safeOptions.log_to_console;
+        this.permitDangerousContextProperties = safeOptions.permit_dangerous_context_properties;
         this.dbNamespace = dbNamespace;
 
     }
@@ -30,7 +32,8 @@ export class BaseLogger<T extends MinimumContext = MinimumContext> implements IR
             timestamp: Date.now(),
             context: acceptEntry.context? cloneDeepScalarValues(
                     acceptEntry.context,
-                    true
+                    true,
+                    this.permitDangerousContextProperties
             ) : undefined,
             stack_trace: stackTrace,
         }
@@ -77,5 +80,6 @@ const DEFAULT_LOGGER_OPTIONS:Required<LoggerOptions> = {
         error: true,
         event: false
     },
-    log_to_console: false
+    log_to_console: false,
+    permit_dangerous_context_properties: false
 }

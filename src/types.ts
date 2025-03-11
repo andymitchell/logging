@@ -25,5 +25,10 @@ export interface LoggerOptions {
         error: boolean;
         event: boolean;
     };
-    log_to_console?:boolean
+    log_to_console?:boolean,
+
+    /**
+     * Allow context properties that are prefixed with '_dangerous' to not be stripped of sensitive data. Useful to allow some tracking IDs through. Never allow any auth tokens through. 
+     */
+    permit_dangerous_context_properties?: boolean
 }

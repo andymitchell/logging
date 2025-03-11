@@ -21,7 +21,7 @@ export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLo
     // Extract trace ids: 
     const traceEntries:TraceEntries<T> = {};
     for( const entry of matches ) {
-        const traceId = entry.meta?.trace.id;
+        const traceId = entry.meta?.trace.top_id;
         if( traceId && !traceEntries[traceId] ) {
             traceEntries[traceId] = [];
         }
@@ -30,14 +30,14 @@ export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLo
     // Find all entries for each trace
     const traceFilter:WhereFilterDefinition<LogEntry<{}, SpanContext>> = {
         OR: Object.keys(traceEntries).map(x => ({
-            'meta.trace.id': x
+            'meta.trace.top_id': x
         }))
     }
 
     // Add each entry to its corresponding trace array 
     const allTracesEntries = await typedRawLogger.get(traceFilter);
     for( const entry of allTracesEntries ) {
-        const traceId = entry.meta?.trace.id;
+        const traceId = entry.meta?.trace.top_id;
         const entries = traceId && traceEntries[traceId];
         if( entries ) {
             entries.push(entry as LogEntry<T, SpanContext>);

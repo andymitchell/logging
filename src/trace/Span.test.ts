@@ -94,13 +94,14 @@ describe('Span Integration Tests', () => {
 
     describe('child span', () => {
 
-        
 
-        it('should create a child span with the parent id set correctly', async () => {
+        it('should create a child span with the parent id and top id set correctly', async () => {
             const fakeLogger = new FakeRawLogger();
             const parentSpan = new Span(fakeLogger);
             // Get the parent's trace id from its span_start event.
             const parentTraceId = fakeLogger.logs[0].meta.trace.id;
+            // Even the top level has a top_id set 
+            expect(fakeLogger.logs[0].meta.trace.top_id).toBe(parentTraceId);
 
             // Create a child span.
             const childSpan = parentSpan.startSpan("child span");
@@ -110,6 +111,7 @@ describe('Span Integration Tests', () => {
             expect(childStartLog.type).toBe('event');
             expect(childStartLog.event.name).toBe('span_start');
             expect(childStartLog.meta.trace.parent_id).toBe(parentTraceId);
+            expect(childStartLog.meta.trace.top_id).toBe(parentTraceId);
 
             // Further logging from the child span should continue to include the parent's id.
             await childSpan.log("child log");
@@ -117,6 +119,14 @@ describe('Span Integration Tests', () => {
             expect(childLog.type).toBe('info');
             expect(childLog.message).toBe('child log');
             expect(childLog.meta.trace.parent_id).toBe(parentTraceId);
+            expect(childLog.meta.trace.top_id).toBe(parentTraceId);
+
+            // A next generation should keep same top id
+            const grandChildSpan = childSpan.startSpan("grandchild span");
+            const grandChildStartLog = fakeLogger.logs[3];
+            expect(grandChildStartLog.type).toBe('event');
+            expect(grandChildStartLog.meta.trace.parent_id).toBe(childLog.meta.trace.id);
+            expect(grandChildStartLog.meta.trace.top_id).toBe(parentTraceId);
         });
 
         it('should create a child span with name and context set', async () => {

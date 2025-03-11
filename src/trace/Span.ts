@@ -18,12 +18,14 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
     protected traceId: Readonly<TraceId>;
     protected storage:IRawLogger<T, SpanContext>;
 
-    constructor(storage:IRawLogger<any, any>, parent_id?: string, name?: string, context?: T) {
+    constructor(storage:IRawLogger<any, any>, parent?: {parent_id?: string, top_id?: string}, name?: string, context?: T) {
         this.storage = storage;
 
+        const id = uuidV4();
         this.traceId = {
-            id: uuidV4(),
-            parent_id
+            id,
+            parent_id: parent?.parent_id,
+            top_id: parent?.top_id ?? id
         }
 
 
@@ -87,7 +89,15 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
     
     startSpan<CT extends MinimumContext = T>(name?: string, context?: CT): ISpan<CT> {
 
-        return new Span<CT>(this.storage, this.traceId.id, name, context);
+        return new Span<CT>(
+            this.storage, 
+            {
+                parent_id: this.traceId.id, 
+                top_id: this.traceId.top_id ?? this.traceId.id
+            }, 
+            name, 
+            context
+        );
         
     }
 

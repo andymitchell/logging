@@ -61,6 +61,6 @@
     },
     "dependencies": {
         "@andyrmitchell/objects": "^0.7.14",
-        "@andyrmitchell/utils": "^0.13.1"
+        "@andyrmitchell/utils": "^0.13.2"
     }
 }
