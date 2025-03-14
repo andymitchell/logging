@@ -7,12 +7,15 @@ export default defineConfig({
     'index-browser': 'src/index-browser.ts',
     'index-node': 'src/index-node.ts',
     'index-get-traces': 'src/index-get-traces.ts',
+    'index-schemas': 'src/index-schemas.ts',
   },
   publicDir: false,
   clean: true,
   minify: false,
   target: ['esnext'],
-  external: [],
+  external: [
+    'zod'
+  ],
   format: ['esm'], 
   dts: true
 });
