@@ -2,7 +2,8 @@
 import type {  LogEntry } from "../raw-storage/types.ts";
 import type { ILogger, MinimumContext } from "../types.ts"
 
-export type TraceEntries<T extends MinimumContext = MinimumContext> = Record<string, LogEntry<T, SpanMeta>[]>;
+type TraceEntry<T extends MinimumContext = MinimumContext> = LogEntry<T, SpanMeta>;
+export type TraceEntries<T extends MinimumContext = MinimumContext> = Record<string, TraceEntry<T>[]>;
 
 
 export interface ISpan<T extends MinimumContext = MinimumContext> extends ILogger<T, SpanMeta> {
