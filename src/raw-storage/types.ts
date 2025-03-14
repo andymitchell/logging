@@ -5,6 +5,7 @@ import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter"
 
 
 
+
 export type BaseLogEntry<T extends MinimumContext = MinimumContext, M extends MinimumContext = MinimumContext> = {
     timestamp: number,
     /**
