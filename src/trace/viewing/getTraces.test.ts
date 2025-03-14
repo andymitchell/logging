@@ -1,6 +1,6 @@
-import { MemoryLogger } from "../raw-storage/memory/MemoryLogger.ts";
+import { MemoryLogger } from "../../raw-storage/memory/MemoryLogger.ts";
 import { getTraces } from "./getTraces.ts";
-import { Trace } from "./Trace.ts";
+import { Trace } from "../Trace.ts";
 
 
 describe('get-all', () => {

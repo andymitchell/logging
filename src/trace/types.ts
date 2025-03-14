@@ -1,8 +1,12 @@
+
+import type {  LogEntry } from "../raw-storage/types.ts";
 import type { ILogger, MinimumContext } from "../types.ts"
 
+export type TraceEntries<T extends MinimumContext = MinimumContext> = Record<string, LogEntry<T, SpanContext>[]>;
 
 
 export interface ISpan<T extends MinimumContext = MinimumContext> extends ILogger<T, SpanContext> {
+
 
     /**
      * Create a child span with a link back to this as the parent 

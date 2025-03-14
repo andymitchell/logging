@@ -1,22 +1,22 @@
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
-import type { IRawLogger, LogEntry } from "../raw-storage/types.ts";
-import type { SpanContext } from "./types.ts";
-import type { MinimumContext } from "../types.ts";
+import type { IRawLogger, LogEntry } from "../../raw-storage/types.ts";
+import type { SpanContext, TraceEntries } from "../types.ts";
+import type { MinimumContext } from "../../types.ts";
+import type { TraceEntryFilter } from "./types.ts";
 
-type TraceEntries<T extends MinimumContext = MinimumContext> = Record<string, LogEntry<T, SpanContext>[]>;
 
 /**
  * Retrieve all entries for traces that have at least one entry matching the criteria.
  * @param rawLogger The storage of the entries
- * @param filter 
+ * @param traceEntryFilter 
  * @returns A record, with trace ids as the key, containing an array of all entries 
  */
-export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLogger<any, any>, filter?:WhereFilterDefinition<LogEntry<T, SpanContext>>): Promise<TraceEntries<T>> {
+export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLogger<any, any>, traceEntryFilter?:TraceEntryFilter<T>): Promise<TraceEntries<T>> {
 
     const typedRawLogger = rawLogger as IRawLogger<{}, SpanContext>
 
     // Find all matching items for the filter
-    const matches = await typedRawLogger.get(filter);
+    const matches = await typedRawLogger.get(traceEntryFilter);
 
     // Extract trace ids: 
     const traceEntries:TraceEntries<T> = {};

@@ -1,11 +1,14 @@
 
-import { getTraces, getCommonTraces } from "./trace/getTraces.ts";
 
+import { TraceViewer } from "./trace/viewing/TraceViewer.ts";
+import type { ITraceViewer, TraceEntryFilter } from "./trace/viewing/types.ts";
 
-export {
-    
-    getTraces,
-    getCommonTraces
+export {    
+    TraceViewer
+}
 
+export type {
+    ITraceViewer,
+    TraceEntryFilter
 }
 

@@ -28,7 +28,7 @@ export interface LoggerOptions {
     log_to_console?:boolean,
 
     /**
-     * Allow context properties that are prefixed with '_dangerous' to not be stripped of sensitive data. Useful to allow some tracking IDs through. Never allow any auth tokens through. 
+     * Allow context properties that are prefixed with '_dangerous' to not be stripped of sensitive data. Useful to allow some tracking IDs through.
      */
     permit_dangerous_context_properties?: boolean
 }

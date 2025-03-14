@@ -4,7 +4,8 @@ import type { IRawLogger, LogEntry } from "../raw-storage/types.ts";
 
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import type { MinimumContext } from "../types.ts";
-import type { ISpan, SpanContext, TraceId } from "./types.ts";
+import type { ISpan, SpanContext,  TraceId } from "./types.ts";
+
 
 /**
  * A span represents a unit of work or operation. Spans track specific operations that a request makes, painting a picture of what happened during the time in which that operation was executed.
@@ -17,6 +18,7 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
 
     protected traceId: Readonly<TraceId>;
     protected storage:IRawLogger<T, SpanContext>;
+
 
     constructor(storage:IRawLogger<any, any>, parent?: {parent_id?: string, top_id?: string}, name?: string, context?: T) {
         this.storage = storage;
