@@ -1,6 +1,6 @@
 {
     "name": "@andyrmitchell/logging",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "description": "",
     "type": "module",
     "sideEffects": false,
@@ -66,7 +66,6 @@
     "dependencies": {
         "@andyrmitchell/objects": "^0.7.14",
         "@andyrmitchell/utils": "^0.13.2"
-        
     },
     "peerDependencies": {
         "zod": "^3.24.2"
