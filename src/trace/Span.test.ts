@@ -3,13 +3,13 @@ import { Span } from './Span.ts';
 import type { IRawLogger } from '../raw-storage/types.ts';
 import type { MinimumContext } from '../types.ts';
 import { WhereFilter, type WhereFilterDefinition } from '@andyrmitchell/objects';
-import type { SpanContext } from './types.ts';
+import type { SpanMeta } from './types.ts';
 
 /**
  * A fake implementation of IRawLogger to be used in tests.
  * It records every log entry in an array and can be configured to fail on add() or get().
  */
-class FakeRawLogger<T extends MinimumContext = any> implements IRawLogger<T, SpanContext> {
+class FakeRawLogger<T extends MinimumContext = any> implements IRawLogger<T, SpanMeta> {
     logs: any[] = [];
     shouldFailAdd = false;
     shouldFailGetAll = false;

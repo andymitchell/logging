@@ -1,6 +1,6 @@
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import type { IRawLogger, LogEntry } from "../../raw-storage/types.ts";
-import type { SpanContext, TraceEntries } from "../types.ts";
+import type { SpanMeta, TraceEntries } from "../types.ts";
 import type { MinimumContext } from "../../types.ts";
 import type { TraceEntryFilter } from "./types.ts";
 
@@ -13,7 +13,7 @@ import type { TraceEntryFilter } from "./types.ts";
  */
 export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLogger<any, any>, traceEntryFilter?:TraceEntryFilter<T>): Promise<TraceEntries<T>> {
 
-    const typedRawLogger = rawLogger as IRawLogger<{}, SpanContext>
+    const typedRawLogger = rawLogger as IRawLogger<{}, SpanMeta>
 
     // Find all matching items for the filter
     const matches = await typedRawLogger.get(traceEntryFilter);
@@ -28,7 +28,7 @@ export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLo
     }
 
     // Find all entries for each trace
-    const traceFilter:WhereFilterDefinition<LogEntry<{}, SpanContext>> = {
+    const traceFilter:WhereFilterDefinition<LogEntry<{}, SpanMeta>> = {
         OR: Object.keys(traceEntries).map(x => ({
             'meta.trace.top_id': x
         }))
@@ -40,7 +40,7 @@ export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLo
         const traceId = entry.meta?.trace.top_id;
         const entries = traceId && traceEntries[traceId];
         if( entries ) {
-            entries.push(entry as LogEntry<T, SpanContext>);
+            entries.push(entry as LogEntry<T, SpanMeta>);
         }
     }
 
@@ -49,8 +49,8 @@ export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLo
 }
 
 type CommonTraceName = 'has_error';
-export async function getCommonTraces<T extends MinimumContext = MinimumContext>(rawLogger:IRawLogger<any, SpanContext>, traceName: CommonTraceName):Promise<TraceEntries<T>> {
-    let filter:WhereFilterDefinition<LogEntry<any, SpanContext>> | undefined;
+export async function getCommonTraces<T extends MinimumContext = MinimumContext>(rawLogger:IRawLogger<any, SpanMeta>, traceName: CommonTraceName):Promise<TraceEntries<T>> {
+    let filter:WhereFilterDefinition<LogEntry<any, SpanMeta>> | undefined;
     switch(traceName) {
         case 'has_error':
             filter = {

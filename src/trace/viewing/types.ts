@@ -1,12 +1,12 @@
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import type { LogEntry } from "../../raw-storage/types.ts";
-import type { SpanContext, TraceEntries } from "../types.ts";
+import type { SpanMeta, TraceEntries } from "../types.ts";
 import type { MinimumContext } from "../../types.ts";
 
 /**
  * Definition for matching a log entry in a trace
  */
-export type TraceEntryFilter<T extends MinimumContext = any> = WhereFilterDefinition<LogEntry<T, SpanContext>>;
+export type TraceEntryFilter<T extends MinimumContext = any> = WhereFilterDefinition<LogEntry<T, SpanMeta>>;
 
 export interface ITraceViewer {
     /**

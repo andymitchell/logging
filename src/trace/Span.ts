@@ -4,7 +4,7 @@ import type { IRawLogger, LogEntry } from "../raw-storage/types.ts";
 
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import type { MinimumContext } from "../types.ts";
-import type { ISpan, SpanContext,  TraceId } from "./types.ts";
+import type { ISpan, SpanMeta,  TraceId } from "./types.ts";
 
 
 /**
@@ -17,7 +17,7 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
     
 
     protected traceId: Readonly<TraceId>;
-    protected storage:IRawLogger<T, SpanContext>;
+    protected storage:IRawLogger<T, SpanMeta>;
 
 
     constructor(storage:IRawLogger<any, any>, parent?: {parent_id?: string, top_id?: string}, name?: string, context?: T) {
@@ -47,11 +47,11 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
     }
 
     /**
-     * Convert the externally provided context into our SpanContext
+     * Convert the externally provided context into our SpanMeta
      * @param context 
      * @returns 
      */
-    #getMeta(): SpanContext {
+    #getMeta(): SpanMeta {
         return {
             trace: this.traceId
         }
@@ -84,7 +84,7 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
         })
     }
 
-    async get(filter?:WhereFilterDefinition<LogEntry<T, SpanContext>>): Promise<LogEntry<T, SpanContext>[]> {
+    async get(filter?:WhereFilterDefinition<LogEntry<T, SpanMeta>>): Promise<LogEntry<T, SpanMeta>[]> {
         return await this.storage.get(filter);
     }
 
