@@ -1,17 +1,18 @@
-import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
+import { matchJavascriptObject, type WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import type { IRawLogger, LogEntry } from "../../raw-storage/types.ts";
-import type { SpanMeta, TraceResults } from "../types.ts";
+import type { SpanMeta, TraceResult, TraceResults } from "../types.ts";
 import type { MinimumContext } from "../../types.ts";
 import type { TraceEntryFilter } from "./types.ts";
 
 
 /**
- * Retrieve all entries for traces that have at least one entry matching the criteria.
+ * Retrieve traces and all their entries
  * @param rawLogger The storage of the entries
- * @param traceEntryFilter 
- * @returns A record, with trace ids as the key, containing an array of all entries 
+ * @param traceEntryFilter Optional. At least one entry in the trace must match this filter for the trace to be included.
+ * @param traceResultFilter Optional. Filter the final trace results (e.g. timestamp).
+ * @returns A record, with trace ids as the key, containing an array of all entries in the trace (and an optional 'matches' list of entries just matching the traceEntryFilter)
  */
-export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLogger<any, any>, traceEntryFilter?:TraceEntryFilter<T>): Promise<TraceResults<T>> {
+export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLogger<any, any>, traceEntryFilter?:TraceEntryFilter<T>, traceResultFilter?: WhereFilterDefinition<TraceResult<T>>): Promise<TraceResults<T>> {
 
     const typedRawLogger = rawLogger as IRawLogger<{}, SpanMeta>
 
@@ -37,14 +38,14 @@ export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLo
     }
 
     // Find all entries for each trace
-    const traceFilter:WhereFilterDefinition<LogEntry<{}, SpanMeta>> = {
+    const tracesFilter:WhereFilterDefinition<LogEntry<{}, SpanMeta>> = {
         OR: Object.keys(traceEntries).map(x => ({
             'meta.trace.top_id': x
         }))
     }
 
     // Add each entry to its corresponding trace results object, in the 'all' array 
-    const allTracesEntries = await typedRawLogger.get(traceFilter);
+    const allTracesEntries = await typedRawLogger.get(tracesFilter);
     for( const entry of allTracesEntries ) {
         const traceId = entry.meta?.trace.top_id;
         const entries = traceId && traceEntries[traceId];
@@ -56,6 +57,15 @@ export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLo
                 // Set the top level data
                 entries.id = entry.meta?.trace.id;
                 entries.timestamp = entry.timestamp;
+            }
+        }
+    }
+
+    // Filter the final results
+    if( traceResultFilter ) {
+        for( const key in traceEntries ) {
+            if( !matchJavascriptObject(traceEntries[key]!, traceResultFilter) ) {
+                delete traceEntries[key];
             }
         }
     }

@@ -1,6 +1,7 @@
 import { MemoryLogger } from "../../raw-storage/memory/MemoryLogger.ts";
 import { getTraces } from "./getTraces.ts";
 import { Trace } from "../Trace.ts";
+import { sleep } from "@andyrmitchell/utils";
 
 
 describe('get-all', () => {
@@ -117,6 +118,29 @@ describe('filtering', () => {
         
     
     
+    })
+})
+
+describe('filtering final traces', () => {
+
+    it('filter traces on the timestamp', async () => {
+
+        
+        const rawLogger = new MemoryLogger('');
+        
+        const trace1 = new Trace(rawLogger);
+        trace1.log('abc1');
+
+        await sleep(3);
+
+        const afterTs = Date.now()-1;
+        
+        const trace2 = new Trace(rawLogger);
+        trace2.log('def');
+
+        
+        const traces = await getTraces(rawLogger, undefined, {timestamp: {'gt': afterTs}});
+        expect(Object.keys(traces)).toEqual([trace2.getId()]);
     })
 })
 

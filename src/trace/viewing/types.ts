@@ -1,6 +1,6 @@
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import type { LogEntry } from "../../raw-storage/types.ts";
-import type { SpanMeta, TraceResults } from "../types.ts";
+import type { SpanMeta, TraceResult, TraceResults } from "../types.ts";
 import type { MinimumContext } from "../../types.ts";
 
 /**
@@ -10,11 +10,14 @@ export type TraceEntryFilter<T extends MinimumContext = any> = WhereFilterDefini
 
 
 export interface ITraceViewer {
+    
     /**
-     * Retrieve all entries for traces that have at least one entry matching the criteria.
-     * @param traceFilter If any entry matches this, return the entire trace around it. If undefined, return all traces.
-     * @returns A record, with trace ids as the key, containing an array of all entries 
+     * Retrieve traces and all their entries
+     * @param rawLogger The storage of the entries
+     * @param traceEntryFilter Optional. At least one entry in the trace must match this filter for the trace to be included.
+     * @param traceResultFilter Optional. Filter the final trace results (e.g. timestamp).
+     * @returns A record, with trace ids as the key, containing an array of all entries in the trace (and an optional 'matches' list of entries just matching the traceEntryFilter)
      */
-    getTraces<T extends MinimumContext = any>(traceEntryFilter?:TraceEntryFilter<T>): Promise<TraceResults<T>>;
+    getTraces<T extends MinimumContext = any>(traceEntryFilter?:TraceEntryFilter<T>, traceResultFilter?: WhereFilterDefinition<TraceResult<T>>): Promise<TraceResults<T>>;
 }
 
