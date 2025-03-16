@@ -17,6 +17,8 @@ export const SpanMetaSchema = z.object({
 
 export function createTraceResultsSchema(context?:z.RecordType<any, any>) {
     return z.record(z.object({
+        id: z.string(),
+        timestamp: z.number(),
         all: z.array(createLogEntrySchema(context, SpanMetaSchema)),
         matches: z.array(createLogEntrySchema(context, SpanMetaSchema)),
     }));

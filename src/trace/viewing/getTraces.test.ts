@@ -15,7 +15,11 @@ describe('get-all', () => {
         
         expect(traces[trace1.getId()]?.all.some(x => x.type==='info' && x.message==='abc1')).toBe(true)
         expect(traces[trace1.getId()]?.matches.length).toBe(0);
-    
+        
+        // Check the trace result id is the same as the first entry
+        expect(traces[trace1.getId()]?.id).toBe(traces[trace1.getId()]?.all[0]?.meta?.trace.id);
+        expect(traces[trace1.getId()]?.id).toBe(traces[trace1.getId()]?.all[0]?.meta?.trace.top_id);
+        expect(traces[trace1.getId()]?.timestamp).toBe(traces[trace1.getId()]?.all[0]?.timestamp);
     
     })
 
@@ -37,6 +41,22 @@ describe('get-all', () => {
         
 
 
+    })
+
+    it('logging twice will still use the correct trace id in the results', async () => {
+
+        const rawLogger = new MemoryLogger('');
+    
+        const trace1 = new Trace(rawLogger);
+        trace1.log('abc1');
+        trace1.log('def2');
+        
+        const traces = await getTraces(rawLogger);
+        
+        expect(traces[trace1.getId()]?.id).toBe(traces[trace1.getId()]?.all[0]?.meta?.trace.id);
+        expect(traces[trace1.getId()]?.id).toBe(traces[trace1.getId()]?.all[0]?.meta?.trace.top_id);
+        expect(traces[trace1.getId()]?.timestamp).toBe(traces[trace1.getId()]?.all[0]?.timestamp);
+    
     })
 
 })
@@ -125,6 +145,10 @@ describe('handles child traces', () => {
         const trace1Entries = traces[trace1.getId()]!;
         expect(trace1Entries.all.map(x => x.type==='info'? x.message : undefined).filter(x => !!x)).toEqual(['abc1', 'abc1.child1', 'abc1.child1.child2'])
     
+        // Check trace id is the same as the first entry
+        expect(traces[trace1.getId()]?.id).toBe(traces[trace1.getId()]?.all[0]?.meta?.trace.id);
+        expect(traces[trace1.getId()]?.id).toBe(traces[trace1.getId()]?.all[0]?.meta?.trace.top_id);
+        expect(traces[trace1.getId()]?.timestamp).toBe(traces[trace1.getId()]?.all[0]?.timestamp);
     
     })
 })

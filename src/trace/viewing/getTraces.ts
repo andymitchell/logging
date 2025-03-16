@@ -28,7 +28,7 @@ export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLo
     for( const entry of matches ) {
         const traceId = entry.meta?.trace.top_id;
         if( traceId && !traceEntries[traceId] ) {
-            traceEntries[traceId] = {all: [], matches: []};
+            traceEntries[traceId] = {id: '', timestamp: -1, all: [], matches: []};
             if( traceEntryFilter ) {
                 // Record filter matches
                 traceEntries[traceId].matches.push(entry as LogEntry<T, SpanMeta>);
@@ -50,6 +50,13 @@ export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLo
         const entries = traceId && traceEntries[traceId];
         if( entries ) {
             entries.all.push(entry as LogEntry<T, SpanMeta>);
+
+            
+            if( !entries.id && entry.meta?.trace.id ) {
+                // Set the top level data
+                entries.id = entry.meta?.trace.id;
+                entries.timestamp = entry.timestamp;
+            }
         }
     }
 

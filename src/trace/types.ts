@@ -43,6 +43,9 @@ export type SpanMeta= {
 
 export type TraceEntry<T extends MinimumContext = MinimumContext> = LogEntry<T, SpanMeta>;
 export type TraceResult<T extends MinimumContext = any> = {
+    id: string, 
+    timestamp: number,
+
     /**
      * Every log entry for the trace
      */
