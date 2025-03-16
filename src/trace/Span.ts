@@ -53,6 +53,7 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
      */
     #getMeta(): SpanMeta {
         return {
+            type: 'span',
             trace: this.traceId
         }
     }

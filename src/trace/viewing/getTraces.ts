@@ -1,6 +1,6 @@
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import type { IRawLogger, LogEntry } from "../../raw-storage/types.ts";
-import type { SpanMeta, TraceEntries } from "../types.ts";
+import type { SpanMeta, TraceResults } from "../types.ts";
 import type { MinimumContext } from "../../types.ts";
 import type { TraceEntryFilter } from "./types.ts";
 
@@ -11,19 +11,28 @@ import type { TraceEntryFilter } from "./types.ts";
  * @param traceEntryFilter 
  * @returns A record, with trace ids as the key, containing an array of all entries 
  */
-export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLogger<any, any>, traceEntryFilter?:TraceEntryFilter<T>): Promise<TraceEntries<T>> {
+export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLogger<any, any>, traceEntryFilter?:TraceEntryFilter<T>): Promise<TraceResults<T>> {
 
     const typedRawLogger = rawLogger as IRawLogger<{}, SpanMeta>
 
+    // Lock results to just span entries in the log 
+    const lockedTraceEntryFilter:TraceEntryFilter = traceEntryFilter? {...traceEntryFilter, 'meta.type': 'span'} : {'meta.type': 'span'};
+    
+
     // Find all matching items for the filter
-    const matches = await typedRawLogger.get(traceEntryFilter);
+    const matches = await typedRawLogger.get(lockedTraceEntryFilter);
+    // TODO Filter to span entries only (as it's as LogEntry<T, SpanMeta>)
 
     // Extract trace ids: 
-    const traceEntries:TraceEntries<T> = {};
+    const traceEntries:TraceResults<T> = {};
     for( const entry of matches ) {
         const traceId = entry.meta?.trace.top_id;
         if( traceId && !traceEntries[traceId] ) {
-            traceEntries[traceId] = [];
+            traceEntries[traceId] = {all: [], matches: []};
+            if( traceEntryFilter ) {
+                // Record filter matches
+                traceEntries[traceId].matches.push(entry as LogEntry<T, SpanMeta>);
+            }
         }
     }
 
@@ -34,13 +43,13 @@ export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLo
         }))
     }
 
-    // Add each entry to its corresponding trace array 
+    // Add each entry to its corresponding trace results object, in the 'all' array 
     const allTracesEntries = await typedRawLogger.get(traceFilter);
     for( const entry of allTracesEntries ) {
         const traceId = entry.meta?.trace.top_id;
         const entries = traceId && traceEntries[traceId];
         if( entries ) {
-            entries.push(entry as LogEntry<T, SpanMeta>);
+            entries.all.push(entry as LogEntry<T, SpanMeta>);
         }
     }
 
@@ -49,7 +58,7 @@ export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLo
 }
 
 type CommonTraceName = 'has_error';
-export async function getCommonTraces<T extends MinimumContext = MinimumContext>(rawLogger:IRawLogger<any, SpanMeta>, traceName: CommonTraceName):Promise<TraceEntries<T>> {
+export async function getCommonTraces<T extends MinimumContext = MinimumContext>(rawLogger:IRawLogger<any, SpanMeta>, traceName: CommonTraceName):Promise<TraceResults<T>> {
     let filter:WhereFilterDefinition<LogEntry<any, SpanMeta>> | undefined;
     switch(traceName) {
         case 'has_error':
@@ -64,7 +73,7 @@ export async function getCommonTraces<T extends MinimumContext = MinimumContext>
     }
 
     if( filter ) {
-        return await getTraces(rawLogger, filter) as TraceEntries<T>;
+        return await getTraces(rawLogger, filter) as TraceResults<T>;
     } else {
         throw new Error("Unknown common name");
     }

@@ -1,9 +1,10 @@
 
-import type {  LogEntry } from "../raw-storage/types.ts";
+
+import type { LogEntry } from "../raw-storage/types.ts";
 import type { ILogger, MinimumContext } from "../types.ts"
 
-type TraceEntry<T extends MinimumContext = MinimumContext> = LogEntry<T, SpanMeta>;
-export type TraceEntries<T extends MinimumContext = MinimumContext> = Record<string, TraceEntry<T>[]>;
+
+
 
 
 export interface ISpan<T extends MinimumContext = MinimumContext> extends ILogger<T, SpanMeta> {
@@ -35,6 +36,24 @@ export type TraceId = {
 }
 
 export type SpanMeta= {
+    type: 'span',
     trace: TraceId,
     name?: string
 }
+
+export type TraceEntry<T extends MinimumContext = MinimumContext> = LogEntry<T, SpanMeta>;
+export type TraceResult<T extends MinimumContext = any> = {
+    /**
+     * Every log entry for the trace
+     */
+    all: TraceEntry<T>[],
+
+    /**
+     * Entries that match the filter, if provided 
+     */
+    matches: TraceEntry<T>[]
+}
+/**
+ * A record of log entries, keyed on the trace id
+ */
+export type TraceResults<T extends MinimumContext = any> = Record<string, TraceResult<T>>;

@@ -1,5 +1,5 @@
 import { createLogEntrySchema, LogEntrySchema } from "./raw-storage/schemas.ts";
-import { createTraceEntriesSchema, SpanMetaSchema, TraceEntriesSchema } from "./trace/schemas.ts";
+import {  createTraceResultsSchema, SpanMetaSchema, TraceResultsSchema } from "./trace/schemas.ts";
 
 // Kept seperate to isolate heavy zod usage. 
 
@@ -10,6 +10,6 @@ export {
 
 export {
     SpanMetaSchema,
-    TraceEntriesSchema,
-    createTraceEntriesSchema
+    TraceResultsSchema,
+    createTraceResultsSchema
 }

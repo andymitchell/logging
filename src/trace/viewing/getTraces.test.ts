@@ -13,8 +13,8 @@ describe('get-all', () => {
         
         const traces = await getTraces(rawLogger);
         
-        expect(traces[trace1.getId()]?.some(x => x.type==='info' && x.message==='abc1')).toBe(true)
-        
+        expect(traces[trace1.getId()]?.all.some(x => x.type==='info' && x.message==='abc1')).toBe(true)
+        expect(traces[trace1.getId()]?.matches.length).toBe(0);
     
     
     })
@@ -51,8 +51,9 @@ describe('filtering', () => {
         
         const traces = await getTraces(rawLogger, {type: 'info'});
         
-        expect(traces[trace1.getId()]?.some(x => x.type==='info' && x.message==='abc1')).toBe(true)
-        
+        expect(traces[trace1.getId()]?.all.some(x => x.type==='info' && x.message==='abc1')).toBe(true)
+        expect(traces[trace1.getId()]?.matches.some(x => x.type==='info' && x.message==='abc1')).toBe(true)
+        expect(traces[trace1.getId()]?.matches.length).toBe(1);
     
     
     })
@@ -122,7 +123,7 @@ describe('handles child traces', () => {
         expect(Object.keys(traces)).toEqual([trace1.getId(), trace2.getId()]);
         
         const trace1Entries = traces[trace1.getId()]!;
-        expect(trace1Entries.map(x => x.type==='info'? x.message : undefined).filter(x => !!x)).toEqual(['abc1', 'abc1.child1', 'abc1.child1.child2'])
+        expect(trace1Entries.all.map(x => x.type==='info'? x.message : undefined).filter(x => !!x)).toEqual(['abc1', 'abc1.child1', 'abc1.child1.child2'])
     
     
     })
