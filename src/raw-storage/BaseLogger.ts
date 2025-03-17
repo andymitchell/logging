@@ -12,6 +12,7 @@ export class BaseLogger<T extends MinimumContext = MinimumContext> implements IR
     protected includeStackTrace: Required<LoggerOptions>['include_stack_trace'];
     protected logToConsole:boolean;
     protected permitDangerousContextProperties: boolean;
+    protected maxAgeMs: number;
     protected dbNamespace:string;
 
     constructor(dbNamespace:string, options?: LoggerOptions) {
@@ -20,7 +21,15 @@ export class BaseLogger<T extends MinimumContext = MinimumContext> implements IR
         this.logToConsole = safeOptions.log_to_console;
         this.permitDangerousContextProperties = safeOptions.permit_dangerous_context_properties;
         this.dbNamespace = dbNamespace;
+        this.maxAgeMs = safeOptions.max_age_ms;
 
+    }
+
+    /**
+     * Remove old entries before the max age
+     */
+    protected async clearOldEntries() {
+        throw new Error("Method not implemented");
     }
 
 
@@ -70,6 +79,9 @@ export class BaseLogger<T extends MinimumContext = MinimumContext> implements IR
         throw new Error("Method not implemented");
     }
 
+    public async forceClearOldEntries() {
+        return this.clearOldEntries();
+    }
     
 }
 
@@ -81,5 +93,6 @@ const DEFAULT_LOGGER_OPTIONS:Required<LoggerOptions> = {
         event: false
     },
     log_to_console: false,
-    permit_dangerous_context_properties: false
+    permit_dangerous_context_properties: false,
+    max_age_ms: Infinity
 }

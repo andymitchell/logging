@@ -32,6 +32,10 @@ class FakeRawLogger<T extends MinimumContext = any> implements IRawLogger<T, Spa
         }
         return this.logs;
     }
+
+    async forceClearOldEntries(): Promise<void> {
+        this.logs = [];
+    }
 }
 
 describe('Span Integration Tests', () => {

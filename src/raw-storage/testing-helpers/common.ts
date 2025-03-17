@@ -1,19 +1,30 @@
+import { sleep } from "@andyrmitchell/utils";
 import type { LoggerOptions } from "../../types.ts";
 import type { IRawLogger } from "../types.ts";
-
+import {test} from 'vitest';
 
 
 const DETAIL_ITEM_MESSAGE = 'Message 1';
 const DETAIL_ITEM_LITERAL = {object_literal: true};
 const DETAIL_ITEM_ERROR = new Error('error1');
 
-export async function commonRawLoggerTests(generate:(options?:LoggerOptions) => IRawLogger) {
+type CreateTestLogger = (options?:LoggerOptions) => {
+    logger: IRawLogger,
+    cannot_recreate_with_same_data?: boolean,
+    /**
+     * 
+     * @returns 
+     */
+    recreateWithSameData: () => IRawLogger
+}
 
-    describe('Logger', () => {
+export async function commonRawLoggerTests(createLogger:CreateTestLogger) {
+
+    describe('Common Logger Tests', () => {
     
         test('Logger - basic', async () => {
     
-            const logger = generate();
+            const logger = createLogger().logger;
     
     
             await logger.add({
@@ -40,11 +51,80 @@ export async function commonRawLoggerTests(generate:(options?:LoggerOptions) => 
             expect(entry.context!.err.message).toBe('error1');
         })
 
+        describe('clean up', () => {
+
+            test('cleans before max age', async () => {
+                const aging = 4;
+                const logger = createLogger({max_age_ms: aging}).logger;
+
+                await logger.add({
+                    type: 'info',
+                    message: DETAIL_ITEM_MESSAGE,
+                    context: {
+                        obj: DETAIL_ITEM_LITERAL,
+                        err: DETAIL_ITEM_ERROR
+                    }
+                });
+
+                await sleep(aging * 2);
+
+                await logger.add({
+                    type: 'info',
+                    message: `Message 2`
+                });
+
+                await logger.forceClearOldEntries();
+
+                const all = await logger.get();
+                expect(all.length).toBe(1);
+                const entry = all[0]!;
+
+                expect(entry.type).toBe('info'); if( entry.type!=='info' ) throw new Error("noop");
+                expect(entry.message).toBe('Message 2');
+
+            })  
+
+
+            test('runs clean on constructor', async (cx) => {
+                const aging = 4;
+                const loggerTest = createLogger({max_age_ms: aging});
+                if( loggerTest.cannot_recreate_with_same_data ) cx.skip();
+
+
+                await loggerTest.logger.add({
+                    type: 'info',
+                    message: DETAIL_ITEM_MESSAGE,
+                    context: {
+                        obj: DETAIL_ITEM_LITERAL,
+                        err: DETAIL_ITEM_ERROR
+                    }
+                });
+
+                await sleep(aging * 2);
+
+                await loggerTest.logger.add({
+                    type: 'info',
+                    message: `Message 2`
+                });
+
+                const logger2 = loggerTest.recreateWithSameData();
+
+                const all = await logger2.get();
+                expect(all.length).toBe(1);
+                const entry = all[0]!;
+
+                expect(entry.type).toBe('info'); if( entry.type!=='info' ) throw new Error("noop");
+                expect(entry.message).toBe('Message 2');
+
+            })
+            
+        })
+
         describe('privacy', () => {
 
             test('Strips token data', async () => {
         
-                const logger = generate();
+                const logger = createLogger().logger;
         
         
                 await logger.add({
@@ -73,7 +153,7 @@ export async function commonRawLoggerTests(generate:(options?:LoggerOptions) => 
 
             test('Retains token data if marked dangerous', async () => {
         
-                const logger = generate({permit_dangerous_context_properties: true});
+                const logger = createLogger({permit_dangerous_context_properties: true}).logger;
         
         
                 await logger.add({
@@ -103,7 +183,7 @@ export async function commonRawLoggerTests(generate:(options?:LoggerOptions) => 
     
         test('Logger - serialisable', async () => {
     
-            const logger = generate();
+            const logger = createLogger().logger;
     
             
             await logger.add({
@@ -125,14 +205,14 @@ export async function commonRawLoggerTests(generate:(options?:LoggerOptions) => 
     
         test('Logger - stack trace', async () => {
     
-            const logger = generate({
+            const logger = createLogger({
                 'include_stack_trace': {
                     info: true, 
                     warn: true, 
                     error: true,
                     event: true
                 }
-            });
+            }).logger;
     
             
             await logger.add({

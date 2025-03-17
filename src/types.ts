@@ -28,6 +28,11 @@ export interface LoggerOptions {
     log_to_console?:boolean,
 
     /**
+     * Cull logs older than this 
+     */
+    max_age_ms?: number,
+
+    /**
      * Allow context properties that are prefixed with '_dangerous' to not be stripped of sensitive data. Useful to allow some tracking IDs through.
      */
     permit_dangerous_context_properties?: boolean

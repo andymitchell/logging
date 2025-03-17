@@ -16,8 +16,15 @@ export class MemoryLogger<T extends MinimumContext = MinimumContext> extends Bas
 
         this.#log = [];
         
+        this.clearOldEntries();
     }
 
+    protected override async clearOldEntries(): Promise<void> {
+        if( this.maxAgeMs!==Infinity ) {
+            const afterTs = Date.now()-this.maxAgeMs;
+            this.#log = this.#log.filter(x => x.timestamp>=afterTs);
+        }
+    }
 
 
     protected override async commitEntry(logEntry: LogEntry): Promise<void> {

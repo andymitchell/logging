@@ -85,4 +85,9 @@ export interface IRawLogger<T extends MinimumContext = MinimumContext, M extends
      */
     get(filter?:WhereFilterDefinition<LogEntry<T, M>>): Promise<LogEntry<T, M>[]>;
 
+    /**
+     * Remove items older than the max age stated in LoggerOptions
+     */
+    forceClearOldEntries(): Promise<void>;
+
 }

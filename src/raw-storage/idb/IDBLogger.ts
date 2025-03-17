@@ -14,7 +14,7 @@ export class IDBLogger<T extends MinimumContext = MinimumContext> extends BaseLo
         super(dbNamespace, options);
 
         this.#dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
-            const request = indexedDB.open(`${dbNamespace}_auth_log`, 1);
+            const request = indexedDB.open(`${dbNamespace}_logger`, 1);
 
             request.onupgradeneeded = (event) => {
                 const db = (event.target as IDBOpenDBRequest).result;
@@ -26,8 +26,9 @@ export class IDBLogger<T extends MinimumContext = MinimumContext> extends BaseLo
             };
 
             request.onsuccess = (event) => {
-                resolve((event.target as IDBOpenDBRequest).result);
-                this.#cleanupOldLogs();
+                const db = (event.target as IDBOpenDBRequest).result;
+                this.#clearOldEntriesUsingDb(db);
+                resolve(db);
             };
 
             request.onerror = (_event) => {
@@ -36,30 +37,35 @@ export class IDBLogger<T extends MinimumContext = MinimumContext> extends BaseLo
         })
     }
 
+    async #clearOldEntriesUsingDb(db:IDBDatabase): Promise<void> {
+        if( this.maxAgeMs===Infinity ) return;
 
-    async #cleanupOldLogs() {
-        const db = await this.#dbPromise;
         const transaction = db.transaction('logs', 'readwrite');
         const store = transaction.objectStore('logs');
         const index = store.index('timestamp');
-        const now = Date.now();
-        const threeDaysAgo = now - (3 * 24 * 60 * 60 * 1000);
-        const fourteenDaysAgo = now - (14 * 24 * 60 * 60 * 1000);
-        let recentError = false;
+
+        const afterTs = Date.now()-this.maxAgeMs;
+        
 
         index.openCursor().onsuccess = (event) => {
             const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
             if (cursor) {
-                const log = cursor.value;
-                if (log.level === 'error' && log.timestamp > threeDaysAgo) {
-                    recentError = true;
-                }
-                if ((recentError && log.timestamp < fourteenDaysAgo) || (!recentError && log.timestamp < threeDaysAgo)) {
+                const log = cursor.value as LogEntry;
+                
+                if ( log.timestamp<afterTs ) {
                     cursor.delete();
                 }
                 cursor.continue();
             }
         };
+    }
+
+    protected override async clearOldEntries(): Promise<void> {
+        
+
+        const db = await this.#dbPromise;
+        this.#clearOldEntriesUsingDb(db);
+        
     }
 
 
