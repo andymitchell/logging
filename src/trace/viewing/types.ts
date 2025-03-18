@@ -8,6 +8,8 @@ import type { MinimumContext } from "../../types.ts";
  */
 export type TraceEntryFilter<T extends MinimumContext = any> = WhereFilterDefinition<LogEntry<T, SpanMeta>>;
 
+export type TraceResultFilter<T extends MinimumContext = any> = WhereFilterDefinition<TraceResult<T>>;
+
 
 export interface ITraceViewer {
     
@@ -18,6 +20,6 @@ export interface ITraceViewer {
      * @param traceResultFilter Optional. Filter the final trace results (e.g. timestamp).
      * @returns A record, with trace ids as the key, containing an array of all entries in the trace (and an optional 'matches' list of entries just matching the traceEntryFilter)
      */
-    getTraces<T extends MinimumContext = any>(traceEntryFilter?:TraceEntryFilter<T>, traceResultFilter?: WhereFilterDefinition<TraceResult<T>>): Promise<TraceResults<T>>;
+    getTraces<T extends MinimumContext = any>(traceEntryFilter?:TraceEntryFilter<T>, traceResultFilter?: TraceResultFilter<T>): Promise<TraceResults<T>>;
 }
 

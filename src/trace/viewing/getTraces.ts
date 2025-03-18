@@ -1,8 +1,8 @@
 import { matchJavascriptObject, type WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import type { IRawLogger, LogEntry } from "../../raw-storage/types.ts";
-import type { SpanMeta, TraceResult, TraceResults } from "../types.ts";
+import type { SpanMeta,  TraceResults } from "../types.ts";
 import type { MinimumContext } from "../../types.ts";
-import type { TraceEntryFilter } from "./types.ts";
+import type { TraceEntryFilter, TraceResultFilter } from "./types.ts";
 
 
 /**
@@ -12,7 +12,7 @@ import type { TraceEntryFilter } from "./types.ts";
  * @param traceResultFilter Optional. Filter the final trace results (e.g. timestamp).
  * @returns A record, with trace ids as the key, containing an array of all entries in the trace (and an optional 'matches' list of entries just matching the traceEntryFilter)
  */
-export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLogger<any, any>, traceEntryFilter?:TraceEntryFilter<T>, traceResultFilter?: WhereFilterDefinition<TraceResult<T>>): Promise<TraceResults<T>> {
+export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLogger<any, any>, traceEntryFilter?:TraceEntryFilter<T>, traceResultFilter?: TraceResultFilter<T>): Promise<TraceResults<T>> {
 
     const typedRawLogger = rawLogger as IRawLogger<{}, SpanMeta>
 
