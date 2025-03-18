@@ -26,6 +26,7 @@ export function createTraceResultsSchema(context?:z.RecordType<any, any>) {
 
 export const TraceResultsSchema = createTraceResultsSchema();
 
+
 isTypeEqual<z.infer<typeof TraceIdSchema>, TraceId>(true);
 isTypeEqual<z.infer<typeof SpanMetaSchema>, SpanMeta>(true);
 isTypeEqual<z.infer<typeof TraceResultsSchema>, TraceResults>(true);
