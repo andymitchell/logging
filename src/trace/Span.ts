@@ -118,4 +118,8 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
     getId() {
         return this.traceId.id;
     }
+
+    getFullId(): TraceId {
+        return structuredClone(this.traceId);
+    }
 }

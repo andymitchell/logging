@@ -26,6 +26,8 @@ export interface ISpan<T extends MinimumContext = MinimumContext> extends ILogge
 
     getId():string;
 
+    getFullId():TraceId
+
 }
 
 
