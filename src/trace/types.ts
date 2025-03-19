@@ -61,4 +61,4 @@ export type TraceResult<T extends MinimumContext = any> = {
 /**
  * A record of log entries, keyed on the trace id
  */
-export type TraceResults<T extends MinimumContext = any> = Record<string, TraceResult<T>>;
+export type TraceResults<T extends MinimumContext = any> = TraceResult<T>[]; //Record<string, TraceResult<T>>;

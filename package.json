@@ -65,7 +65,7 @@
     },
     "dependencies": {
         "@andyrmitchell/objects": "^0.7.14",
-        "@andyrmitchell/utils": "^0.13.2"
+        "@andyrmitchell/utils": "^0.14.1"
     },
     "peerDependencies": {
         "zod": "^3.24.2"

@@ -18,7 +18,7 @@ export interface ITraceViewer {
      * @param rawLogger The storage of the entries
      * @param traceEntryFilter Optional. At least one entry in the trace must match this filter for the trace to be included.
      * @param traceResultFilter Optional. Filter the final trace results (e.g. timestamp).
-     * @returns A record, with trace ids as the key, containing an array of all entries in the trace (and an optional 'matches' list of entries just matching the traceEntryFilter)
+     * @returns An array of trace objects; sorted by timestamp asc; each with an id, timestamp and containing an array of all entries in the trace (and an optional 'matches' list of entries just matching the traceEntryFilter)
      */
     getTraces<T extends MinimumContext = any>(traceEntryFilter?:TraceEntryFilter<T>, traceResultFilter?: TraceResultFilter<T>): Promise<TraceResults<T>>;
 }

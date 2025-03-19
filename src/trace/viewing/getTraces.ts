@@ -1,6 +1,6 @@
 import { matchJavascriptObject, type WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import type { IRawLogger, LogEntry } from "../../raw-storage/types.ts";
-import type { SpanMeta,  TraceResults } from "../types.ts";
+import type { SpanMeta,  TraceResult,  TraceResults } from "../types.ts";
 import type { MinimumContext } from "../../types.ts";
 import type { TraceEntryFilter, TraceResultFilter } from "./types.ts";
 
@@ -10,7 +10,7 @@ import type { TraceEntryFilter, TraceResultFilter } from "./types.ts";
  * @param rawLogger The storage of the entries
  * @param traceEntryFilter Optional. At least one entry in the trace must match this filter for the trace to be included.
  * @param traceResultFilter Optional. Filter the final trace results (e.g. timestamp).
- * @returns A record, with trace ids as the key, containing an array of all entries in the trace (and an optional 'matches' list of entries just matching the traceEntryFilter)
+ * @returns An array of trace objects; sorted by timestamp asc; each with an id, timestamp and containing an array of all entries in the trace (and an optional 'matches' list of entries just matching the traceEntryFilter)
  */
 export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLogger<any, any>, traceEntryFilter?:TraceEntryFilter<T>, traceResultFilter?: TraceResultFilter<T>): Promise<TraceResults<T>> {
 
@@ -25,7 +25,7 @@ export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLo
     // TODO Filter to span entries only (as it's as LogEntry<T, SpanMeta>)
 
     // Extract trace ids: 
-    const traceEntries:TraceResults<T> = {};
+    const traceEntries:Record<string, TraceResult<T>> = {};
     for( const entry of matches ) {
         const traceId = entry.meta?.trace.top_id;
         if( traceId && !traceEntries[traceId] ) {
@@ -70,7 +70,7 @@ export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLo
         }
     }
 
-    return traceEntries;
+    return Object.values(traceEntries).sort((a, b) => a.timestamp-b.timestamp);
 
 }
 

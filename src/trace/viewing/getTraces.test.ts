@@ -1,7 +1,7 @@
 import { MemoryLogger } from "../../raw-storage/memory/MemoryLogger.ts";
 import { getTraces } from "./getTraces.ts";
 import { Trace } from "../Trace.ts";
-import { sleep } from "@andyrmitchell/utils";
+import { convertArrayToRecord, sleep } from "@andyrmitchell/utils";
 
 
 describe('get-all', () => {
@@ -12,7 +12,8 @@ describe('get-all', () => {
         const trace1 = new Trace(rawLogger);
         trace1.log('abc1');
         
-        const traces = await getTraces(rawLogger);
+        const tracesArray = await getTraces(rawLogger);
+        const traces = convertArrayToRecord(tracesArray, 'id');
         
         expect(traces[trace1.getId()]?.all.some(x => x.type==='info' && x.message==='abc1')).toBe(true)
         expect(traces[trace1.getId()]?.matches.length).toBe(0);
@@ -36,7 +37,8 @@ describe('get-all', () => {
         trace2.log('def');
 
         
-        const traces = await getTraces(rawLogger);
+        const tracesArray = await getTraces(rawLogger);
+        const traces = convertArrayToRecord(tracesArray, 'id');
         
         expect(Object.keys(traces)).toEqual([trace1.getId(), trace2.getId()]);
         
@@ -52,7 +54,8 @@ describe('get-all', () => {
         trace1.log('abc1');
         trace1.log('def2');
         
-        const traces = await getTraces(rawLogger);
+        const tracesArray = await getTraces(rawLogger);
+        const traces = convertArrayToRecord(tracesArray, 'id');
         
         expect(traces[trace1.getId()]?.id).toBe(traces[trace1.getId()]?.all[0]?.meta?.trace.id);
         expect(traces[trace1.getId()]?.id).toBe(traces[trace1.getId()]?.all[0]?.meta?.trace.top_id);
@@ -70,7 +73,8 @@ describe('filtering', () => {
         const trace1 = new Trace(rawLogger);
         trace1.log('abc1');
         
-        const traces = await getTraces(rawLogger, {type: 'info'});
+        const tracesArray = await getTraces(rawLogger, {type: 'info'});
+        const traces = convertArrayToRecord(tracesArray, 'id');
         
         expect(traces[trace1.getId()]?.all.some(x => x.type==='info' && x.message==='abc1')).toBe(true)
         expect(traces[trace1.getId()]?.matches.some(x => x.type==='info' && x.message==='abc1')).toBe(true)
@@ -93,7 +97,8 @@ describe('filtering', () => {
         trace2.log('def');
     
         
-        const traces = await getTraces(rawLogger, {type: 'info'});
+        const tracesArray = await getTraces(rawLogger, {type: 'info'});
+        const traces = convertArrayToRecord(tracesArray, 'id');
         
         expect(Object.keys(traces)).toEqual([trace1.getId(), trace2.getId()]);
         
@@ -112,8 +117,8 @@ describe('filtering', () => {
         trace2.log('def');
     
         
-        const traces = await getTraces(rawLogger, {type: 'info', message: 'abc1'});
-        
+        const tracesArray = await getTraces(rawLogger, {type: 'info', message: 'abc1'});
+        const traces = convertArrayToRecord(tracesArray, 'id');
         expect(Object.keys(traces)).toEqual([trace1.getId()]);
         
     
@@ -139,7 +144,8 @@ describe('filtering final traces', () => {
         trace2.log('def');
 
         
-        const traces = await getTraces(rawLogger, undefined, {timestamp: {'gt': afterTs}});
+        const tracesArray = await getTraces(rawLogger, undefined, {timestamp: {'gt': afterTs}});
+        const traces = convertArrayToRecord(tracesArray, 'id');
         expect(Object.keys(traces)).toEqual([trace2.getId()]);
     })
 })
@@ -162,7 +168,8 @@ describe('handles child traces', () => {
         trace2.log('def');
     
         
-        const traces = await getTraces(rawLogger);
+        const tracesArray = await getTraces(rawLogger);
+        const traces = convertArrayToRecord(tracesArray, 'id');
         
         expect(Object.keys(traces)).toEqual([trace1.getId(), trace2.getId()]);
         
