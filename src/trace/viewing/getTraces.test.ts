@@ -15,13 +15,13 @@ describe('get-all', () => {
         const tracesArray = await getTraces(rawLogger);
         const traces = convertArrayToRecord(tracesArray, 'id');
         
-        expect(traces[trace1.getId()]?.all.some(x => x.type==='info' && x.message==='abc1')).toBe(true)
+        expect(traces[trace1.getId()]?.logs.some(x => x.type==='info' && x.message==='abc1')).toBe(true)
         expect(traces[trace1.getId()]?.matches.length).toBe(0);
         
         // Check the trace result id is the same as the first entry
-        expect(traces[trace1.getId()]?.id).toBe(traces[trace1.getId()]?.all[0]?.meta?.trace.id);
-        expect(traces[trace1.getId()]?.id).toBe(traces[trace1.getId()]?.all[0]?.meta?.trace.top_id);
-        expect(traces[trace1.getId()]?.timestamp).toBe(traces[trace1.getId()]?.all[0]?.timestamp);
+        expect(traces[trace1.getId()]?.id).toBe(traces[trace1.getId()]?.logs[0]?.meta?.span.id);
+        expect(traces[trace1.getId()]?.id).toBe(traces[trace1.getId()]?.logs[0]?.meta?.span.top_id);
+        expect(traces[trace1.getId()]?.timestamp).toBe(traces[trace1.getId()]?.logs[0]?.timestamp);
     
     })
 
@@ -57,9 +57,9 @@ describe('get-all', () => {
         const tracesArray = await getTraces(rawLogger);
         const traces = convertArrayToRecord(tracesArray, 'id');
         
-        expect(traces[trace1.getId()]?.id).toBe(traces[trace1.getId()]?.all[0]?.meta?.trace.id);
-        expect(traces[trace1.getId()]?.id).toBe(traces[trace1.getId()]?.all[0]?.meta?.trace.top_id);
-        expect(traces[trace1.getId()]?.timestamp).toBe(traces[trace1.getId()]?.all[0]?.timestamp);
+        expect(traces[trace1.getId()]?.id).toBe(traces[trace1.getId()]?.logs[0]?.meta?.span.id);
+        expect(traces[trace1.getId()]?.id).toBe(traces[trace1.getId()]?.logs[0]?.meta?.span.top_id);
+        expect(traces[trace1.getId()]?.timestamp).toBe(traces[trace1.getId()]?.logs[0]?.timestamp);
     
     })
 
@@ -76,7 +76,7 @@ describe('filtering', () => {
         const tracesArray = await getTraces(rawLogger, {type: 'info'});
         const traces = convertArrayToRecord(tracesArray, 'id');
         
-        expect(traces[trace1.getId()]?.all.some(x => x.type==='info' && x.message==='abc1')).toBe(true)
+        expect(traces[trace1.getId()]?.logs.some(x => x.type==='info' && x.message==='abc1')).toBe(true)
         expect(traces[trace1.getId()]?.matches.some(x => x.type==='info' && x.message==='abc1')).toBe(true)
         expect(traces[trace1.getId()]?.matches.length).toBe(1);
     
@@ -150,6 +150,23 @@ describe('filtering final traces', () => {
     })
 })
 
+describe('toggle include all', () => {
+    it('get filter includes the entry', async () => {
+
+        const rawLogger = new MemoryLogger('');
+    
+        const trace1 = new Trace(rawLogger);
+        trace1.log('abc1');
+        trace1.log('abc2');
+        
+        const tracesArray = await getTraces(rawLogger, {message: 'abc1'}, undefined, false);
+        expect(tracesArray[0]?.matches[0]?.message).toBe('abc1');
+        expect(tracesArray[0]?.logs).toEqual([]);
+        
+    
+    })
+})
+
 describe('handles child traces', () => {
     it('it includes all items under the parent trace', async () => {
     
@@ -174,12 +191,12 @@ describe('handles child traces', () => {
         expect(Object.keys(traces)).toEqual([trace1.getId(), trace2.getId()]);
         
         const trace1Entries = traces[trace1.getId()]!;
-        expect(trace1Entries.all.map(x => x.type==='info'? x.message : undefined).filter(x => !!x)).toEqual(['abc1', 'abc1.child1', 'abc1.child1.child2'])
+        expect(trace1Entries.logs.map(x => x.type==='info'? x.message : undefined).filter(x => !!x)).toEqual(['abc1', 'abc1.child1', 'abc1.child1.child2'])
     
         // Check trace id is the same as the first entry
-        expect(traces[trace1.getId()]?.id).toBe(traces[trace1.getId()]?.all[0]?.meta?.trace.id);
-        expect(traces[trace1.getId()]?.id).toBe(traces[trace1.getId()]?.all[0]?.meta?.trace.top_id);
-        expect(traces[trace1.getId()]?.timestamp).toBe(traces[trace1.getId()]?.all[0]?.timestamp);
+        expect(traces[trace1.getId()]?.id).toBe(traces[trace1.getId()]?.logs[0]?.meta?.span.id);
+        expect(traces[trace1.getId()]?.id).toBe(traces[trace1.getId()]?.logs[0]?.meta?.span.top_id);
+        expect(traces[trace1.getId()]?.timestamp).toBe(traces[trace1.getId()]?.logs[0]?.timestamp);
     
     })
 })

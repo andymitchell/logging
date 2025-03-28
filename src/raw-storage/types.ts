@@ -7,7 +7,21 @@ import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter"
 
 
 export type BaseLogEntry<T extends MinimumContext = MinimumContext, M extends MinimumContext = MinimumContext> = {
+    
+    /**
+     * The Universally Unique Lexicographically Sortable Identifier. 
+     * 
+     * An id that if sorted, will be in time order (and is extremely unlikely to collide even on the same millisecond, even in distributed systems). 
+     */
+    ulid: string,
+
+    /**
+     * Entry timestamp.
+     * 
+     * You can discard this to save space, and instead use decodeTime from the 'ulid' package, on the .ulid property.
+     */
     timestamp: number,
+
     /**
      * Externally passed-in context (e.g. a parameter when the .log function is called)
      */
@@ -36,7 +50,7 @@ type ErrorLogEntry<T extends MinimumContext = MinimumContext, M extends MinimumC
 type BaseEventDetail = {
     name: string
 }
-type StartEventDetail = BaseEventDetail & {
+export type StartEventDetail = BaseEventDetail & {
     name: 'span_start'
 }
 type EndEventDetail = BaseEventDetail & {
@@ -44,10 +58,15 @@ type EndEventDetail = BaseEventDetail & {
 }
 export type EventDetail = StartEventDetail | EndEventDetail;
 
-type EventLogEntry<T extends MinimumContext = MinimumContext, M extends MinimumContext = MinimumContext> = BaseLogEntry<T, M> & {
+export type EventLogEntry<T extends MinimumContext = MinimumContext, M extends MinimumContext = MinimumContext, E extends EventDetail = EventDetail> = BaseLogEntry<T, M> & {
     type: 'event',
-    event: EventDetail
+    message?: string
+    event: E
 };
+
+export function isEventLogEntry(x: unknown): x is EventLogEntry<any, any> {
+    return (typeof x==='object') && !!x && "type" in x && x.type==='event';
+}
 
 /**
  * Union of all possible entry types
@@ -62,10 +81,10 @@ export type LogEntry<T extends MinimumContext = MinimumContext, M extends Minimu
  * Like LogEntry, but context can be anything (not yet serialised down)
  */
 export type AcceptLogEntry<T extends MinimumContext = MinimumContext, M extends MinimumContext = MinimumContext> =
-  | (Omit<InfoLogEntry<T, M>, 'context' | 'stack_trace' | 'timestamp'> & { context?: T })
-  | (Omit<WarnLogEntry<T, M>, 'context' | 'stack_trace' | 'timestamp'> & { context?: T })
-  | (Omit<ErrorLogEntry<T, M>, 'context' | 'stack_trace' | 'timestamp'> & { context?: T })
-  | (Omit<EventLogEntry<T, M>, 'context' | 'stack_trace' | 'timestamp'> & { context?: T });
+  | (Omit<InfoLogEntry<T, M>, 'context' | 'stack_trace' | 'timestamp' | 'ulid'> & { context?: T, ulid?: string })
+  | (Omit<WarnLogEntry<T, M>, 'context' | 'stack_trace' | 'timestamp' | 'ulid'> & { context?: T, ulid?: string })
+  | (Omit<ErrorLogEntry<T, M>, 'context' | 'stack_trace' | 'timestamp' | 'ulid'> & { context?: T, ulid?: string })
+  | (Omit<EventLogEntry<T, M>, 'context' | 'stack_trace' | 'timestamp' | 'ulid'> & { context?: T, ulid?: string });
 
 
 

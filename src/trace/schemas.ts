@@ -1,9 +1,9 @@
 import { isTypeEqual } from "@andyrmitchell/utils"
 import { z } from "zod"
-import { type TraceId, type SpanMeta, type TraceResults } from "./types.ts"
+import { type SpanId, type SpanMeta, type TraceSearchResults } from "./types.ts"
 import { createLogEntrySchema } from "../index-schemas.ts"
 
-export const TraceIdSchema = z.object({
+export const SpanIdSchema = z.object({
     id: z.string(), 
     top_id: z.string(),
     parent_id: z.string().optional(),
@@ -11,22 +11,21 @@ export const TraceIdSchema = z.object({
 
 export const SpanMetaSchema = z.object({
     type: z.literal('span'),
-    trace: TraceIdSchema,
-    name: z.string().optional()
+    span: SpanIdSchema
 })
 
-export function createTraceResultsSchema(context?:z.RecordType<any, any>) {
+export function createTraceSearchResultsSchema(context?:z.RecordType<any, any>) {
     return z.array(z.object({
         id: z.string(),
         timestamp: z.number(),
-        all: z.array(createLogEntrySchema(context, SpanMetaSchema)),
+        logs: z.array(createLogEntrySchema(context, SpanMetaSchema)),
         matches: z.array(createLogEntrySchema(context, SpanMetaSchema)),
     }));
 }
 
-export const TraceResultsSchema = createTraceResultsSchema();
+export const TraceSearchResultsSchema = createTraceSearchResultsSchema();
 
 
-isTypeEqual<z.infer<typeof TraceIdSchema>, TraceId>(true);
+isTypeEqual<z.infer<typeof SpanIdSchema>, SpanId>(true);
 isTypeEqual<z.infer<typeof SpanMetaSchema>, SpanMeta>(true);
-isTypeEqual<z.infer<typeof TraceResultsSchema>, TraceResults>(true);
+isTypeEqual<z.infer<typeof TraceSearchResultsSchema>, TraceSearchResults>(true);

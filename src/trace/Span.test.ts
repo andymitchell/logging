@@ -48,8 +48,8 @@ describe('Span Integration Tests', () => {
         const startLog = fakeLogger.logs[0]!;
         expect(startLog.type).toBe('event');
         expect(startLog.event.name).toBe('span_start');
-        expect(startLog.meta).toHaveProperty('trace');
-        expect(startLog.meta.trace.id).toBeTruthy();
+        expect(startLog.meta).toHaveProperty('span');
+        expect(startLog.meta.span.id).toBeTruthy();
     });
 
     it('should log an info message with the correct context', async () => {
@@ -63,7 +63,7 @@ describe('Span Integration Tests', () => {
         expect(infoLog.message).toBe('info message');
         expect(infoLog.context).toEqual({ test: "value" });
         // Verify that the log entry uses the same trace id as the span's start event.
-        expect(infoLog.meta.trace.id).toBe(fakeLogger.logs[0].meta.trace.id);
+        expect(infoLog.meta.span.id).toBe(fakeLogger.logs[0].meta.span.id);
     });
 
     it('should log warn and error messages correctly', async () => {
@@ -103,9 +103,9 @@ describe('Span Integration Tests', () => {
             const fakeLogger = new FakeRawLogger();
             const parentSpan = new Span(fakeLogger);
             // Get the parent's trace id from its span_start event.
-            const parentTraceId = fakeLogger.logs[0].meta.trace.id;
+            const parentSpanId = fakeLogger.logs[0].meta.span.id;
             // Even the top level has a top_id set 
-            expect(fakeLogger.logs[0].meta.trace.top_id).toBe(parentTraceId);
+            expect(fakeLogger.logs[0].meta.span.top_id).toBe(parentSpanId);
 
             // Create a child span.
             const childSpan = parentSpan.startSpan("child span");
@@ -114,30 +114,30 @@ describe('Span Integration Tests', () => {
             const childStartLog = fakeLogger.logs[1];
             expect(childStartLog.type).toBe('event');
             expect(childStartLog.event.name).toBe('span_start');
-            expect(childStartLog.meta.trace.parent_id).toBe(parentTraceId);
-            expect(childStartLog.meta.trace.top_id).toBe(parentTraceId);
+            expect(childStartLog.meta.span.parent_id).toBe(parentSpanId);
+            expect(childStartLog.meta.span.top_id).toBe(parentSpanId);
 
             // Further logging from the child span should continue to include the parent's id.
             await childSpan.log("child log");
             const childLog = fakeLogger.logs[2];
             expect(childLog.type).toBe('info');
             expect(childLog.message).toBe('child log');
-            expect(childLog.meta.trace.parent_id).toBe(parentTraceId);
-            expect(childLog.meta.trace.top_id).toBe(parentTraceId);
+            expect(childLog.meta.span.parent_id).toBe(parentSpanId);
+            expect(childLog.meta.span.top_id).toBe(parentSpanId);
 
             // A next generation should keep same top id
             const grandChildSpan = childSpan.startSpan("grandchild span");
             const grandChildStartLog = fakeLogger.logs[3];
             expect(grandChildStartLog.type).toBe('event');
-            expect(grandChildStartLog.meta.trace.parent_id).toBe(childLog.meta.trace.id);
-            expect(grandChildStartLog.meta.trace.top_id).toBe(parentTraceId);
+            expect(grandChildStartLog.meta.span.parent_id).toBe(childLog.meta.span.id);
+            expect(grandChildStartLog.meta.span.top_id).toBe(parentSpanId);
         });
 
         it('should create a child span with name and context set', async () => {
             const fakeLogger = new FakeRawLogger();
             const parentSpan = new Span(fakeLogger);
             // Get the parent's trace id from its span_start event.
-            const parentTraceId = fakeLogger.logs[0].meta.trace.id;
+            const parentSpanId = fakeLogger.logs[0].meta.span.id;
 
             // Create a child span.
             const childSpan = parentSpan.startSpan("child span", {did: 'abc1'});
@@ -146,7 +146,7 @@ describe('Span Integration Tests', () => {
             const childStartLog = fakeLogger.logs[1];
             expect(childStartLog.type).toBe('event');
             expect(childStartLog.event.name).toBe('span_start');
-            expect(childStartLog.meta.name).toBe('child span');
+            expect(childStartLog.message).toBe('child span');
             expect(childStartLog.context.did).toBe('abc1');
             
         });

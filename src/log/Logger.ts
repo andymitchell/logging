@@ -1,7 +1,7 @@
 
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
-import type { IRawLogger, LogEntry } from "./raw-storage/types.ts";
-import type { ILogger, MinimumContext} from "./types.ts";
+import type { IRawLogger, LogEntry } from "../raw-storage/types.ts";
+import type { ILogger, MinimumContext} from "../types.ts";
 
 
 

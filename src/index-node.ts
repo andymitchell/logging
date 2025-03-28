@@ -1,4 +1,4 @@
-import { Logger } from "./Logger.ts";
+import { Logger } from "./log/Logger.ts";
 import { MemoryLogger } from "./raw-storage/memory/MemoryLogger.ts";
 
 import { Span } from "./trace/Span.ts";

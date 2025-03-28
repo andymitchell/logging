@@ -15,6 +15,7 @@ export function createLogEntrySchema(context?:z.RecordType<any, any>, meta?:z.Re
     meta = meta ?? z.record(z.string(), z.any());
 
     const BaseLogEntrySchema = z.object({
+        ulid: z.string(),
         timestamp: z.number(),
         context: context.optional(),
         meta: meta.optional(),
@@ -55,6 +56,7 @@ export function createLogEntrySchema(context?:z.RecordType<any, any>, meta?:z.Re
     
     const EventLogEntrySchema = BaseLogEntrySchema.extend({
         type: z.literal("event"),
+        message: z.string().optional(),
         event: EventDetailSchema
     });
     

@@ -1,6 +1,6 @@
 
 
-import type { LogEntry } from "../raw-storage/types.ts";
+import { isEventLogEntry, type EventLogEntry, type LogEntry, type StartEventDetail } from "../raw-storage/types.ts";
 import type { ILogger, MinimumContext } from "../types.ts"
 
 
@@ -26,12 +26,12 @@ export interface ISpan<T extends MinimumContext = MinimumContext> extends ILogge
 
     getId():string;
 
-    getFullId():TraceId
+    getFullId():SpanId
 
 }
 
 
-export type TraceId = {
+export type SpanId = {
     id: string, 
     top_id: string
     parent_id?: string,
@@ -39,11 +39,12 @@ export type TraceId = {
 
 export type SpanMeta= {
     type: 'span',
-    trace: TraceId,
-    name?: string
+    span: SpanId
 }
 
 export type TraceEntry<T extends MinimumContext = MinimumContext> = LogEntry<T, SpanMeta>;
+
+
 export type TraceResult<T extends MinimumContext = any> = {
     id: string, 
     timestamp: number,
@@ -51,14 +52,24 @@ export type TraceResult<T extends MinimumContext = any> = {
     /**
      * Every log entry for the trace
      */
-    all: TraceEntry<T>[],
+    logs: TraceEntry<T>[],
 
+}
+
+export type TraceSearchResult<T extends MinimumContext = any> = TraceResult<T> & {
+    
     /**
      * Entries that match the filter, if provided 
      */
     matches: TraceEntry<T>[]
 }
+
 /**
  * A record of log entries, keyed on the trace id
  */
-export type TraceResults<T extends MinimumContext = any> = TraceResult<T>[]; //Record<string, TraceResult<T>>;
+export type TraceSearchResults<T extends MinimumContext = any> = TraceSearchResult<T>[]; //Record<string, TraceResult<T>>;
+
+
+export function isEventLogEntrySpanStart(x: unknown): x is EventLogEntry<any, SpanMeta, StartEventDetail> {
+    return isEventLogEntry(x) && x.event.name==='span_start';
+}

@@ -1,8 +1,11 @@
 import { matchJavascriptObject, type WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import type { IRawLogger, LogEntry } from "../../raw-storage/types.ts";
-import type { SpanMeta,  TraceResult,  TraceResults } from "../types.ts";
+import type { SpanMeta,  TraceSearchResult,  TraceSearchResults } from "../types.ts";
 import type { MinimumContext } from "../../types.ts";
 import type { TraceEntryFilter, TraceResultFilter } from "./types.ts";
+
+
+
 
 
 /**
@@ -12,7 +15,8 @@ import type { TraceEntryFilter, TraceResultFilter } from "./types.ts";
  * @param traceResultFilter Optional. Filter the final trace results (e.g. timestamp).
  * @returns An array of trace objects; sorted by timestamp asc; each with an id, timestamp and containing an array of all entries in the trace (and an optional 'matches' list of entries just matching the traceEntryFilter)
  */
-export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLogger<any, any>, traceEntryFilter?:TraceEntryFilter<T>, traceResultFilter?: TraceResultFilter<T>): Promise<TraceResults<T>> {
+export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLogger<any, any>, traceEntryFilter?:TraceEntryFilter<T>, traceResultFilter?: TraceResultFilter<T>, includeAllTraceEntries = true): Promise<TraceSearchResults<T>> {
+    if( includeAllTraceEntries===undefined ) includeAllTraceEntries = true;
 
     const typedRawLogger = rawLogger as IRawLogger<{}, SpanMeta>
 
@@ -25,38 +29,40 @@ export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLo
     // TODO Filter to span entries only (as it's as LogEntry<T, SpanMeta>)
 
     // Extract trace ids: 
-    const traceEntries:Record<string, TraceResult<T>> = {};
+    const traceEntries:Record<string, TraceSearchResult<T>> = {};
     for( const entry of matches ) {
-        const traceId = entry.meta?.trace.top_id;
-        if( traceId && !traceEntries[traceId] ) {
-            traceEntries[traceId] = {id: '', timestamp: -1, all: [], matches: []};
+        const spanId = entry.meta?.span.top_id;
+        if( spanId && !traceEntries[spanId] ) {
+            traceEntries[spanId] = {id: '', timestamp: -1, logs: [], matches: []};
             if( traceEntryFilter ) {
                 // Record filter matches
-                traceEntries[traceId].matches.push(entry as LogEntry<T, SpanMeta>);
+                traceEntries[spanId].matches.push(entry as LogEntry<T, SpanMeta>);
             }
         }
     }
 
     // Find all entries for each trace
-    const tracesFilter:WhereFilterDefinition<LogEntry<{}, SpanMeta>> = {
-        OR: Object.keys(traceEntries).map(x => ({
-            'meta.trace.top_id': x
-        }))
-    }
+    if( includeAllTraceEntries ) {
+        const tracesFilter:WhereFilterDefinition<LogEntry<{}, SpanMeta>> = {
+            OR: Object.keys(traceEntries).map(x => ({
+                'meta.span.top_id': x
+            }))
+        }
 
-    // Add each entry to its corresponding trace results object, in the 'all' array 
-    const allTracesEntries = await typedRawLogger.get(tracesFilter);
-    for( const entry of allTracesEntries ) {
-        const traceId = entry.meta?.trace.top_id;
-        const entries = traceId && traceEntries[traceId];
-        if( entries ) {
-            entries.all.push(entry as LogEntry<T, SpanMeta>);
+        // Add each entry to its corresponding trace results object, in the 'all' array 
+        const allTracesEntries = await typedRawLogger.get(tracesFilter);
+        for( const entry of allTracesEntries ) {
+            const spanId = entry.meta?.span.top_id;
+            const entries = spanId && traceEntries[spanId];
+            if( entries ) {
+                entries.logs.push(entry as LogEntry<T, SpanMeta>);
 
-            
-            if( !entries.id && entry.meta?.trace.id ) {
-                // Set the top level data
-                entries.id = entry.meta?.trace.id;
-                entries.timestamp = entry.timestamp;
+                
+                if( !entries.id && entry.meta?.span.id ) {
+                    // Set the top level data
+                    entries.id = entry.meta?.span.id;
+                    entries.timestamp = entry.timestamp;
+                }
             }
         }
     }
@@ -75,7 +81,7 @@ export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLo
 }
 
 type CommonTraceName = 'has_error';
-export async function getCommonTraces<T extends MinimumContext = MinimumContext>(rawLogger:IRawLogger<any, SpanMeta>, traceName: CommonTraceName):Promise<TraceResults<T>> {
+export async function getCommonTraces<T extends MinimumContext = MinimumContext>(rawLogger:IRawLogger<any, SpanMeta>, traceName: CommonTraceName):Promise<TraceSearchResults<T>> {
     let filter:WhereFilterDefinition<LogEntry<any, SpanMeta>> | undefined;
     switch(traceName) {
         case 'has_error':
@@ -90,7 +96,7 @@ export async function getCommonTraces<T extends MinimumContext = MinimumContext>
     }
 
     if( filter ) {
-        return await getTraces(rawLogger, filter) as TraceResults<T>;
+        return await getTraces(rawLogger, filter) as TraceSearchResults<T>;
     } else {
         throw new Error("Unknown common name");
     }

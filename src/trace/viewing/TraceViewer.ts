@@ -2,7 +2,7 @@
 
 import type { IRawLogger } from "../../index-browser.ts";
 import type { MinimumContext } from "../../types.ts";
-import type { TraceResults} from "../types.ts";
+import type { TraceSearchResults} from "../types.ts";
 import { getTraces } from "./getTraces.ts";
 import type { ITraceViewer, TraceEntryFilter, TraceResultFilter } from "./types.ts";
 
@@ -16,7 +16,7 @@ export class TraceViewer implements ITraceViewer {
         this.rawLogger = rawLogger;
     }
 
-    getTraces<T extends MinimumContext = any>(traceEntryFilter?:TraceEntryFilter<T>, traceResultFilter?: TraceResultFilter<T>): Promise<TraceResults<T>> {
-        return getTraces(this.rawLogger, traceEntryFilter, traceResultFilter);
+    getTraces<T extends MinimumContext = any>(traceEntryFilter?:TraceEntryFilter<T>, traceResultFilter?: TraceResultFilter<T>, includeAllTraceEntries?: boolean): Promise<TraceSearchResults<T>> {
+        return getTraces(this.rawLogger, traceEntryFilter, traceResultFilter, includeAllTraceEntries);
     }
 }

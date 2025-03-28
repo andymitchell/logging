@@ -4,6 +4,7 @@ import { cloneDeepScalarValues } from "@andyrmitchell/utils/deep-clone-scalar-va
 import type { LoggerOptions, MinimumContext } from "../types.ts";
 import type { AcceptLogEntry, IRawLogger, LogEntry } from "./types.ts";
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
+import { monotonicFactory } from "ulid";
 
 
 
@@ -14,6 +15,7 @@ export class BaseLogger<T extends MinimumContext = MinimumContext> implements IR
     protected permitDangerousContextProperties: boolean;
     protected maxAgeMs: number;
     protected dbNamespace:string;
+    protected ulid:Function;
 
     constructor(dbNamespace:string, options?: LoggerOptions) {
         const safeOptions = Object.assign({}, DEFAULT_LOGGER_OPTIONS, options);
@@ -22,6 +24,7 @@ export class BaseLogger<T extends MinimumContext = MinimumContext> implements IR
         this.permitDangerousContextProperties = safeOptions.permit_dangerous_context_properties;
         this.dbNamespace = dbNamespace;
         this.maxAgeMs = safeOptions.max_age_ms;
+        this.ulid = monotonicFactory(); // Monotonic guarantees ascending order within this context
 
     }
 
@@ -45,6 +48,7 @@ export class BaseLogger<T extends MinimumContext = MinimumContext> implements IR
                     this.permitDangerousContextProperties
             ) : undefined,
             stack_trace: stackTrace,
+            ulid: acceptEntry.ulid ?? this.ulid()
         }
         
         await this.commitEntry(logEntry);

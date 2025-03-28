@@ -4,7 +4,7 @@ import type { IRawLogger, LogEntry } from "../raw-storage/types.ts";
 
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import type { MinimumContext } from "../types.ts";
-import type { ISpan, SpanMeta,  TraceId } from "./types.ts";
+import type { ISpan, SpanMeta,  SpanId } from "./types.ts";
 
 
 /**
@@ -16,7 +16,7 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
 
     
 
-    protected traceId: Readonly<TraceId>;
+    protected spanId: Readonly<SpanId>;
     protected storage:IRawLogger<T, SpanMeta>;
 
 
@@ -24,7 +24,7 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
         this.storage = storage;
 
         const id = uuidV4();
-        this.traceId = {
+        this.spanId = {
             id,
             parent_id: parent?.parent_id,
             top_id: parent?.top_id ?? id
@@ -34,10 +34,11 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
         // Record the start time for accurate tracking
         this.storage.add({
             type: 'event',
+            
             meta: {
-                ...this.#getMeta(),
-                name
+                ...this.#getMeta()
             },
+            message: name,
             context,
             event: {
                 name: 'span_start'
@@ -54,7 +55,7 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
     #getMeta(): SpanMeta {
         return {
             type: 'span',
-            trace: this.traceId
+            span: this.spanId
         }
     }
     
@@ -95,8 +96,8 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
         return new Span<CT>(
             this.storage, 
             {
-                parent_id: this.traceId.id, 
-                top_id: this.traceId.top_id ?? this.traceId.id
+                parent_id: this.spanId.id, 
+                top_id: this.spanId.top_id ?? this.spanId.id
             }, 
             name, 
             context
@@ -116,10 +117,10 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
     }
 
     getId() {
-        return this.traceId.id;
+        return this.spanId.id;
     }
 
-    getFullId(): TraceId {
-        return structuredClone(this.traceId);
+    getFullId(): SpanId {
+        return structuredClone(this.spanId);
     }
 }

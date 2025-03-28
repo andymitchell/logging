@@ -1,6 +1,6 @@
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import type { LogEntry } from "../../raw-storage/types.ts";
-import type { SpanMeta, TraceResult, TraceResults } from "../types.ts";
+import type { SpanMeta, TraceResult, TraceSearchResults } from "../types.ts";
 import type { MinimumContext } from "../../types.ts";
 
 /**
@@ -20,6 +20,6 @@ export interface ITraceViewer {
      * @param traceResultFilter Optional. Filter the final trace results (e.g. timestamp).
      * @returns An array of trace objects; sorted by timestamp asc; each with an id, timestamp and containing an array of all entries in the trace (and an optional 'matches' list of entries just matching the traceEntryFilter)
      */
-    getTraces<T extends MinimumContext = any>(traceEntryFilter?:TraceEntryFilter<T>, traceResultFilter?: TraceResultFilter<T>): Promise<TraceResults<T>>;
+    getTraces<T extends MinimumContext = any>(traceEntryFilter?:TraceEntryFilter<T>, traceResultFilter?: TraceResultFilter<T>, includeAllTraceEntries?: boolean): Promise<TraceSearchResults<T>>;
 }
 
