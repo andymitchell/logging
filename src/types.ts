@@ -1,5 +1,5 @@
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
-import type { LogEntry } from "./raw-storage/types.ts";
+import type { AcceptLogEntry, LogEntry } from "./raw-storage/types.ts";
 
 export type MinimumContext = Record<string, any>;
 
@@ -13,6 +13,13 @@ export interface ILogger<T extends MinimumContext = MinimumContext, M extends Mi
 
     get(filter?:WhereFilterDefinition<LogEntry<T, M>>): Promise<LogEntry<T, M>[]>;
 
+    /**
+     * Trigger a call to the global break function when a log with a certain pattern is detected
+     * @param filter 
+     */
+    addBreakpoint(filter:WhereFilterDefinition<AcceptLogEntry<T, M>>):Promise<{id:string}>;
+
+    removeBreakpoint(id:string):Promise<void>;
 }
 
 

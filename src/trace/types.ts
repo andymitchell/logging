@@ -31,6 +31,7 @@ export interface ISpan<T extends MinimumContext = MinimumContext> extends ILogge
 }
 
 
+
 export type SpanId = {
     id: string, 
     top_id: string
