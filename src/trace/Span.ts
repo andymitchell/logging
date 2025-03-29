@@ -62,11 +62,11 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
 
     async #addToStorage(entry: AcceptLogEntry<T, SpanMeta>):Promise<void> {
         this.breakpoints.test(entry);
-        return this.storage.add(entry);
+        return await this.storage.add(entry);
     }
     
     async log(message: string, context?: T): Promise<void> {
-        this.#addToStorage({
+        await this.#addToStorage({
             type: 'info',
             message,
             context, 
@@ -75,7 +75,7 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
     }
 
     async warn(message: string, context?: T): Promise<void> {
-        this.#addToStorage({
+        await this.#addToStorage({
             type: 'warn',
             message,
             context, 
@@ -84,7 +84,7 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
     }
 
     async error(message: string, context?: T): Promise<void> {
-        this.#addToStorage({
+        await this.#addToStorage({
             type: 'error',
             message,
             context, 
@@ -113,7 +113,7 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
 
     async end(): Promise<void> {
 
-        this.#addToStorage({
+        await this.#addToStorage({
             type: 'event',
             meta: this.#getMeta(),
             event: {

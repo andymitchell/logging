@@ -120,6 +120,88 @@ export async function commonRawLoggerTests(createLogger:CreateTestLogger) {
             
         })
 
+        describe('get filter', () => {
+
+            describe('WhereFilter', () => {
+                test('filters OK', async () => {
+                    const logger = createLogger().logger;
+        
+            
+                    await logger.add({
+                        type: 'info',
+                        message: DETAIL_ITEM_MESSAGE,
+                        context: {
+                            obj: DETAIL_ITEM_LITERAL,
+                            err: DETAIL_ITEM_ERROR
+                        }
+                    });
+                        
+            
+                    const filtered = await logger.get({message: DETAIL_ITEM_MESSAGE});
+                    expect(filtered.length).toBe(1);
+                });
+
+                test('filter excludes non-matches', async () => {
+                    const logger = createLogger().logger;
+        
+            
+                    await logger.add({
+                        type: 'info',
+                        message: DETAIL_ITEM_MESSAGE,
+                        context: {
+                            obj: DETAIL_ITEM_LITERAL,
+                            err: DETAIL_ITEM_ERROR
+                        }
+                    });
+                        
+            
+                    const filtered = await logger.get({message: 'nomatchplease'});
+                    expect(filtered.length).toBe(0);
+                });
+            })
+
+            describe('full text', () => {
+                test('filters OK', async () => {
+                    const logger = createLogger().logger;
+        
+            
+                    await logger.add({
+                        type: 'info',
+                        message: DETAIL_ITEM_MESSAGE,
+                        context: {
+                            obj: DETAIL_ITEM_LITERAL,
+                            err: DETAIL_ITEM_ERROR
+                        }
+                    });
+                        
+            
+                    const filtered = await logger.get(undefined, DETAIL_ITEM_MESSAGE);
+                    expect(filtered.length).toBe(1);
+                });
+    
+                test('filter excludes non-matches', async () => {
+                    const logger = createLogger().logger;
+        
+            
+                    await logger.add({
+                        type: 'info',
+                        message: DETAIL_ITEM_MESSAGE,
+                        context: {
+                            obj: DETAIL_ITEM_LITERAL,
+                            err: DETAIL_ITEM_ERROR
+                        }
+                    });
+                        
+            
+                    const filtered = await logger.get(undefined, 'nomatchplease');
+                    expect(filtered.length).toBe(0);
+                });
+            })
+
+
+
+        })
+
         describe('privacy', () => {
 
             test('Strips token data', async () => {

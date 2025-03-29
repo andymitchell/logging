@@ -101,8 +101,10 @@ export interface IRawLogger<T extends MinimumContext = MinimumContext, M extends
 
     /**
      * Retrieve entries from the data store
+     * @param filter Match any entries with a precise spec
+     * @param fullTextFilter Match entries that, when serialised, contain this text 
      */
-    get(filter?:WhereFilterDefinition<LogEntry<T, M>>): Promise<LogEntry<T, M>[]>;
+    get(filter?:WhereFilterDefinition<LogEntry<T, M>>, fullTextFilter?: string): Promise<LogEntry<T, M>[]>;
 
     /**
      * Remove items older than the max age stated in LoggerOptions

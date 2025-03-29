@@ -1,11 +1,10 @@
 import type {  TraceSearchResults } from "../../../trace/types.ts";
 import type { TraceViewer } from "../../../trace/viewing/TraceViewer.ts";
-import type { TraceEntryFilter, TraceResultFilter } from "../../../trace/viewing/types.ts";
+import type {  TraceFilter } from "../../../trace/viewing/types.ts";
 import type { MinimumContext } from "../../../types.ts";
 
 export type GetTracesFn = <T extends MinimumContext = any>(
-    traceEntryFilter?: TraceEntryFilter<T>,
-    traceResultFilter?: TraceResultFilter<T>,
+    filter?: TraceFilter<T>,
     includeAllTraceEntries?: boolean
 ) => Promise<TraceSearchResults<T>>;
 

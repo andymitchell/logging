@@ -29,9 +29,9 @@ export function useTraceResults(
             try {
                 let data:TraceSearchResults<any>;
                 if( source instanceof TraceViewer ) {
-                    data = await source.getTraces(query, undefined, includeAllTraceEntries);
+                    data = await source.getTraces({entries: query}, includeAllTraceEntries);
                 } else {
-                    data = await source(query, undefined, includeAllTraceEntries);
+                    data = await source({entries: query}, includeAllTraceEntries);
                 }
 
                 if( loadingIdRef.current!==loadingId ) return;

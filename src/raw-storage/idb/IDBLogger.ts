@@ -85,7 +85,7 @@ export class IDBLogger<T extends MinimumContext = MinimumContext> extends BaseLo
     }
 
 
-    public override async get(filter?: WhereFilterDefinition<LogEntry<T>>): Promise<LogEntry<T>[]> {
+    public override async get(filter?: WhereFilterDefinition<LogEntry<T>>, fullTextFilter?: string): Promise<LogEntry<T>[]> {
         return new Promise(async (resolve, reject) => {
             const db = await this.#dbPromise;
             const transaction = db.transaction('logs', 'readonly');
@@ -96,6 +96,12 @@ export class IDBLogger<T extends MinimumContext = MinimumContext> extends BaseLo
                 let entries = (event.target as IDBRequest).result as LogEntry<T>[];
                 // TODO Filter IndexedDb properly
                 entries = filter? entries.filter(x => matchJavascriptObject(x, filter)) : entries;
+                if( fullTextFilter ) {
+                    entries = entries.filter(x => {
+                        const json = JSON.stringify(x);
+                        return json.includes(fullTextFilter);
+                    })
+                }
                 resolve(entries);
             };
 

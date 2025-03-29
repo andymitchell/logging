@@ -73,7 +73,7 @@ describe('filtering', () => {
         const trace1 = new Trace(rawLogger);
         trace1.log('abc1');
         
-        const tracesArray = await getTraces(rawLogger, {type: 'info'});
+        const tracesArray = await getTraces(rawLogger, {entries: {type: 'info'}});
         const traces = convertArrayToRecord(tracesArray, 'id');
         
         expect(traces[trace1.getId()]?.logs.some(x => x.type==='info' && x.message==='abc1')).toBe(true)
@@ -97,7 +97,7 @@ describe('filtering', () => {
         trace2.log('def');
     
         
-        const tracesArray = await getTraces(rawLogger, {type: 'info'});
+        const tracesArray = await getTraces(rawLogger, {entries: {type: 'info'}});
         const traces = convertArrayToRecord(tracesArray, 'id');
         
         expect(Object.keys(traces)).toEqual([trace1.getId(), trace2.getId()]);
@@ -117,13 +117,58 @@ describe('filtering', () => {
         trace2.log('def');
     
         
-        const tracesArray = await getTraces(rawLogger, {type: 'info', message: 'abc1'});
+        const tracesArray = await getTraces(rawLogger, {entries: {type: 'info', message: 'abc1'}});
         const traces = convertArrayToRecord(tracesArray, 'id');
         expect(Object.keys(traces)).toEqual([trace1.getId()]);
         
     
     
     })
+})
+
+
+describe('filtering full text', () => {
+    it('get filter includes the entry', async () => {
+
+        const rawLogger = new MemoryLogger('');
+    
+        const trace1 = new Trace(rawLogger);
+        trace1.log('abc1');
+        trace1.log('def');
+
+        const trace2 = new Trace(rawLogger);
+        trace2.log('xyz');
+        
+        const tracesArray = await getTraces(rawLogger, {entries_full_text: 'abc1'});
+        const traces = convertArrayToRecord(tracesArray, 'id');
+        
+        expect(Object.keys(traces).length).toBe(1);
+        expect(traces[trace1.getId()]?.logs.some(x => x.type==='info' && x.message==='abc1')).toBe(true)
+        expect(traces[trace1.getId()]?.matches.some(x => x.type==='info' && x.message==='abc1')).toBe(true)
+        expect(traces[trace1.getId()]?.matches.length).toBe(1);
+    
+    
+    })
+
+    it('get filter omits when no match', async () => {
+
+        const rawLogger = new MemoryLogger('');
+    
+        const trace1 = new Trace(rawLogger);
+        trace1.log('abc1');
+        trace1.log('def');
+
+        
+        const tracesArray = await getTraces(rawLogger, {entries_full_text: 'xyz'});
+        const traces = convertArrayToRecord(tracesArray, 'id');
+        
+        expect(Object.keys(traces).length).toBe(0);
+    
+    })
+    
+    
+    
+    
 })
 
 describe('filtering final traces', () => {
@@ -144,7 +189,7 @@ describe('filtering final traces', () => {
         trace2.log('def');
 
         
-        const tracesArray = await getTraces(rawLogger, undefined, {timestamp: {'gt': afterTs}});
+        const tracesArray = await getTraces(rawLogger, {results: {timestamp: {'gt': afterTs}}});
         const traces = convertArrayToRecord(tracesArray, 'id');
         expect(Object.keys(traces)).toEqual([trace2.getId()]);
     })
@@ -159,7 +204,7 @@ describe('toggle include all', () => {
         trace1.log('abc1');
         trace1.log('abc2');
         
-        const tracesArray = await getTraces(rawLogger, {message: 'abc1'}, undefined, false);
+        const tracesArray = await getTraces(rawLogger, {entries: {message: 'abc1'}}, false);
         expect(tracesArray[0]?.matches[0]?.message).toBe('abc1');
         expect(tracesArray[0]?.logs).toEqual([]);
         

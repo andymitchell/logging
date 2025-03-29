@@ -33,8 +33,17 @@ export class MemoryLogger<T extends MinimumContext = MinimumContext> extends Bas
     }
 
 
-    public override async get(filter?: WhereFilterDefinition<LogEntry<T>>): Promise<LogEntry<T>[]> {
-        const entries = JSON.parse(JSON.stringify(this.#log)) as LogEntry<T>[];
-        return filter? entries.filter(x => matchJavascriptObject(x, filter)) : entries;
+    public override async get(filter?: WhereFilterDefinition<LogEntry<T>>, fullTextFilter?: string): Promise<LogEntry<T>[]> {
+        let entries = structuredClone(this.#log) as LogEntry<T>[];
+        entries = filter? entries.filter(x => matchJavascriptObject(x, filter)) : entries;
+
+        if( fullTextFilter ) {
+            entries = entries.filter(x => {
+                const json = JSON.stringify(x);
+                return json.includes(fullTextFilter);
+            })
+        }
+
+        return entries;
     }
 }

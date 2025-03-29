@@ -13,13 +13,12 @@ export const generateTestLogFetch:(() => GetTracesFn) = () => {
     span1.error("Oh jeez no!");
     trace.log("Well that was that");
 
-    const testLogFetch:GetTracesFn = async (traceEntryFilter?, traceResultFilter?, includeAllTraceEntries?) => {
+    const testLogFetch:GetTracesFn = async (filter?, includeAllTraceEntries?) => {
         
 
         const viewer = new TraceViewer(logger);
-        const result = await viewer.getTraces(traceEntryFilter, traceResultFilter, includeAllTraceEntries);
+        const result = await viewer.getTraces(filter, includeAllTraceEntries);
 
-        console.log("testLogFetch got result", {traceEntryFilter, result});
         return result;
     }
 
