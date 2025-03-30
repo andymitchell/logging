@@ -5,6 +5,7 @@ import type { GetTracesFn } from "../types.ts";
 
 export const generateTestLogFetch:(() => GetTracesFn) = () => {
     const logger = new MemoryLogger('');
+    
 
     // Initialise some events:
     const trace = new Trace<any>(logger, 'T0', { 'name': 'Bob' });

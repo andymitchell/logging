@@ -1,3 +1,6 @@
+import { initiateBreakpointCommandsInDevTools } from "./breakpoints/initiateBreakpointCommandsInDevTools.ts";
+import { KvStorageBreakpoints } from "./breakpoints/KvStorageBreakpoints.ts";
+import  { MemoryBreakpoints } from "./breakpoints/MemoryBreakpoints.ts";
 import { Logger } from "./log/Logger.ts";
 import { IDBLogger } from "./raw-storage/idb/IDBLogger.ts";
 import { MemoryLogger } from "./raw-storage/memory/MemoryLogger.ts";
@@ -17,6 +20,12 @@ export {
 export {
     MemoryLogger,
     IDBLogger
+}
+
+export {
+    MemoryBreakpoints,
+    KvStorageBreakpoints,
+    initiateBreakpointCommandsInDevTools
 }
 
 export * from './index-types.ts';

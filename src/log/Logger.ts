@@ -2,7 +2,7 @@
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import type { AcceptLogEntry, IRawLogger, LogEntry } from "../raw-storage/types.ts";
 import type { ILogger, MinimumContext} from "../types.ts";
-import { MemoryBreakpoints } from "../utils/MemoryBreakpoints.ts";
+import { MemoryBreakpoints } from "../breakpoints/MemoryBreakpoints.ts";
 
 
 

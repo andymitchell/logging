@@ -2,6 +2,7 @@
 import type { DeepSerializable } from "@andyrmitchell/utils/deep-clone-scalar-values";
 import { type MinimumContext } from "../types.ts";
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
+import type { IBreakpoints } from "../breakpoints/types.ts";
 
 
 
@@ -92,6 +93,8 @@ export type AcceptLogEntry<T extends MinimumContext = MinimumContext, M extends 
 export type LogEntryType = LogEntry['type'];
 
 export interface IRawLogger<T extends MinimumContext = MinimumContext, M extends MinimumContext = MinimumContext> {
+
+    breakpoints: IBreakpoints,
 
     /**
      * Add an entry to the data store

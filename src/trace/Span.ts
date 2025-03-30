@@ -5,7 +5,7 @@ import type { AcceptLogEntry, IRawLogger, LogEntry } from "../raw-storage/types.
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import type { MinimumContext } from "../types.ts";
 import type { ISpan, SpanMeta,  SpanId } from "./types.ts";
-import { MemoryBreakpoints } from "../utils/MemoryBreakpoints.ts";
+
 
 
 /**
@@ -19,7 +19,6 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
 
     protected spanId: Readonly<SpanId>;
     protected storage:IRawLogger<T, SpanMeta>;
-    protected breakpoints:MemoryBreakpoints = new MemoryBreakpoints();
 
     constructor(storage:IRawLogger<any, any>, parent?: {parent_id?: string, top_id?: string}, name?: string, context?: T) {
         this.storage = storage;
@@ -61,7 +60,6 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
     }
 
     async #addToStorage(entry: AcceptLogEntry<T, SpanMeta>):Promise<void> {
-        this.breakpoints.test(entry);
         return await this.storage.add(entry);
     }
     
@@ -130,12 +128,4 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
         return structuredClone(this.spanId);
     }
 
-
-    async addBreakpoint(filter:WhereFilterDefinition<AcceptLogEntry>):Promise<{id:string}> {
-        return this.breakpoints.addBreakpoint(filter);
-    }
-
-    async removeBreakpoint(id:string):Promise<void> {
-        return this.breakpoints.removeBreakpoint(id);
-    }
 }

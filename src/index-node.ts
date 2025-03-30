@@ -4,6 +4,10 @@ import { MemoryLogger } from "./raw-storage/memory/MemoryLogger.ts";
 import { Span } from "./trace/Span.ts";
 import { Trace } from "./trace/Trace.ts";
 
+import { initiateBreakpointCommandsInDevTools } from "./breakpoints/initiateBreakpointCommandsInDevTools.ts";
+import { KvStorageBreakpoints } from "./breakpoints/KvStorageBreakpoints.ts";
+import  { MemoryBreakpoints } from "./breakpoints/MemoryBreakpoints.ts";
+
 
 export {
     Trace,
@@ -15,6 +19,13 @@ export {
 
 export {
     MemoryLogger
+}
+
+
+export {
+    MemoryBreakpoints,
+    KvStorageBreakpoints,
+    initiateBreakpointCommandsInDevTools
 }
 
 

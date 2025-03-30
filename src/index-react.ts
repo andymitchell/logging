@@ -15,5 +15,3 @@ export {
     TraceSearchResults
 }
 
-
-export * from './index-types.ts';

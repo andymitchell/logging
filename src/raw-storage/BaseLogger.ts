@@ -5,6 +5,8 @@ import type { LoggerOptions, MinimumContext } from "../types.ts";
 import type { AcceptLogEntry, IRawLogger, LogEntry } from "./types.ts";
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import { monotonicFactory } from "ulid";
+import { MemoryBreakpoints } from "../breakpoints/MemoryBreakpoints.ts";
+import type { IBreakpoints } from "../breakpoints/types.ts";
 
 
 
@@ -16,6 +18,7 @@ export class BaseLogger<T extends MinimumContext = MinimumContext> implements IR
     protected maxAgeMs: number;
     protected dbNamespace:string;
     protected ulid:Function;
+    breakpoints:IBreakpoints;
 
     constructor(dbNamespace:string, options?: LoggerOptions) {
         const safeOptions = Object.assign({}, DEFAULT_LOGGER_OPTIONS, options);
@@ -25,6 +28,7 @@ export class BaseLogger<T extends MinimumContext = MinimumContext> implements IR
         this.dbNamespace = dbNamespace;
         this.maxAgeMs = safeOptions.max_age_ms;
         this.ulid = monotonicFactory(); // Monotonic guarantees ascending order within this context
+        this.breakpoints = safeOptions.breakpoints;
 
     }
 
@@ -52,6 +56,7 @@ export class BaseLogger<T extends MinimumContext = MinimumContext> implements IR
         }
         
         await this.commitEntry(logEntry);
+        this.breakpoints.test(logEntry);
 
         if( this.logToConsole && logEntry.type!=='event') {
             console.log(`[Log ${this.dbNamespace}] ${logEntry.message}`, logEntry.context);
@@ -79,7 +84,7 @@ export class BaseLogger<T extends MinimumContext = MinimumContext> implements IR
     }
 
 
-    public async get(filter?:WhereFilterDefinition<LogEntry<T>>): Promise<LogEntry<T>[]> {
+    public async get(filter?:WhereFilterDefinition<LogEntry<T>>, fullTextFilter?: string): Promise<LogEntry<T>[]> {
         throw new Error("Method not implemented");
     }
 
@@ -98,5 +103,6 @@ const DEFAULT_LOGGER_OPTIONS:Required<LoggerOptions> = {
     },
     log_to_console: false,
     permit_dangerous_context_properties: false,
-    max_age_ms: Infinity
+    max_age_ms: Infinity,
+    breakpoints: new MemoryBreakpoints()
 }
