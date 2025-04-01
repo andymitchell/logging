@@ -1,14 +1,23 @@
-import { useState } from "react";
 
-import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
+import { LogLevelsDropdown } from "./LogLevelsDropdown.tsx";
+import { MessageDropdown } from "./MessageDropdown.tsx";
 
 
-
-interface TraceSearchFilterProps {
-    onSearch: (query: WhereFilterDefinition) => void;
+interface TraceFilterProps {
+    //onSearch: (query: WhereFilterDefinition) => void;
 }
 
-export const TraceSearchFilter: React.FC<TraceSearchFilterProps> = ({ onSearch }) => {
+export const TraceFilter: React.FC<TraceFilterProps> = ({  }) => {
+
+
+    return (
+        <div>
+            <MessageDropdown />
+            <LogLevelsDropdown  />
+        </div>
+    )
+
+    /*
     const [inputValue, setInputValue] = useState('');
 
     const handleInputChange = (
@@ -22,6 +31,7 @@ export const TraceSearchFilter: React.FC<TraceSearchFilterProps> = ({ onSearch }
         const filter: WhereFilterDefinition<{message?:string}> = { message: {contains: inputValue} };
         onSearch(filter);
     };
+    
 
     return (
         <div style={{ marginBottom: '1rem' }}>
@@ -31,8 +41,9 @@ export const TraceSearchFilter: React.FC<TraceSearchFilterProps> = ({ onSearch }
                 onChange={handleInputChange}
                 placeholder="Search logs..."
             />
-            <button onClick={handleSearch}>Search</button>
+            
         </div>
     );
+    */
 };
 

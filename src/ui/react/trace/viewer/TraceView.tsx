@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { convertLogToTree, type BaseComponentTypes, type TLog, type TLogBody, type TSpan } from "../types.ts";
+import { convertLogToTree, type BaseComponentTypes, type TLog, type TLogBody, type TSpan } from "../../types.ts";
 
 
-import type { TracesSource } from "./types.ts";
+import type { TracesSource } from "../types.ts";
 
-import { useTrace } from "./useTraceResults.ts";
+import { useTrace } from "../data/useTraceResults.ts";
 
 
 type TraceViewProps = BaseComponentTypes & {

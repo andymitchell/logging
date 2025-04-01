@@ -1,21 +1,21 @@
 import { useCallback, useMemo} from "react";
 
-import { convertLogSpanEntryToBody } from "../types.ts";
-import type { LogEntry } from "../../../raw-storage/types.ts";
-import type { SpanMeta, TraceEntry } from "../../../trace/types.ts";
-import { LogBody } from "./TraceView.tsx";
+import { convertLogSpanEntryToBody } from "../../types.ts";
+import type { LogEntry } from "../../../../raw-storage/types.ts";
+import type { SpanMeta, TraceEntry } from "../../../../trace/types.ts";
+import { LogBody } from "../viewer/TraceView.tsx";
 
 
 
 
 
-interface TraceSearchResultsProps {
+interface TraceSearchResultsListProps {
     entries: TraceEntry<any>[];
     onClick?: (traceId:string) => void;
 }
 
 
-export const TraceSearchResults: React.FC<TraceSearchResultsProps> = ({
+export const TraceSearchResultsList: React.FC<TraceSearchResultsListProps> = ({
     entries,
     onClick
 }) => {

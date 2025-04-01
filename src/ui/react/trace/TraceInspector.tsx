@@ -3,14 +3,17 @@ import {  useCallback, useMemo, useState } from "react";
 
 import type { TracesSource } from "./types.ts";
 import type { BaseComponentTypes } from "../types.ts";
-import { TraceFilteredSearchResults } from "./TraceFilteredSearchResults.tsx";
-import { TraceView } from "./TraceView.tsx";
-import styles from './TraceSearch.module.css';
+
+import { TraceView } from "./viewer/TraceView.tsx";
+import styles from './TraceInspector.module.css';
+import { FilterContextTraceSearch } from "./search/FilterContextTraceSearch.tsx";
+import { TraceFilter } from "./filter-bar/TraceFilter.tsx";
+import { FilterProvider } from "./filter-bar/FilterContext.tsx";
 
 
 
 
-type TraceSearchProps = BaseComponentTypes & {
+type TraceInspectorProps = BaseComponentTypes & {
 
 
     /**
@@ -22,7 +25,7 @@ type TraceSearchProps = BaseComponentTypes & {
 }
 
 
-export const TraceSearch: React.FC<TraceSearchProps> = (props) => {
+export const TraceInspector: React.FC<TraceInspectorProps> = (props) => {
 
     const className = useMemo(() => {
         let className = `${props.className ?? ''}`
@@ -53,7 +56,13 @@ export const TraceSearch: React.FC<TraceSearchProps> = (props) => {
         <div ref={props.ref} className={className} style={props.style}>
 
             <div style={searchStyle}>
-                <TraceFilteredSearchResults tracesSource={props.tracesSource} onClick={onClickSearchResult} />
+                <FilterProvider 
+                    initializedCriteria={{type: 'debounce'}} 
+                                      
+                >
+                    <TraceFilter  />
+                    <FilterContextTraceSearch tracesSource={props.tracesSource} onClick={onClickSearchResult} />
+                </FilterProvider>
             </div>
 
             {traceId && (
