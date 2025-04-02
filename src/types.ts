@@ -17,7 +17,17 @@ export interface ILogger<T extends MinimumContext = MinimumContext, M extends Mi
 }
 
 
+export type MaxAge = {
+    /**
+     * How long should any entry be preserved?
+     */
+    any_ms: number,
 
+    /**
+     * Optionally keep errors for longer
+     */
+    error_ms?: number
+}
 
 export interface LoggerOptions {
     include_stack_trace?: {
@@ -31,7 +41,8 @@ export interface LoggerOptions {
     /**
      * Cull logs older than this 
      */
-    max_age_ms?: number,
+    max_age?: MaxAge,
+
 
     /**
      * Allow context properties that are prefixed with '_dangerous' to not be stripped of sensitive data. Useful to allow some tracking IDs through.

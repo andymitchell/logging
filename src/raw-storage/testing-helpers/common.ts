@@ -55,7 +55,7 @@ export async function commonRawLoggerTests(createLogger:CreateTestLogger) {
 
             test('cleans before max age', async () => {
                 const aging = 4;
-                const logger = createLogger({max_age_ms: aging}).logger;
+                const logger = createLogger({max_age: {any_ms: aging}}).logger;
 
                 await logger.add({
                     type: 'info',
@@ -87,7 +87,7 @@ export async function commonRawLoggerTests(createLogger:CreateTestLogger) {
 
             test('runs clean on constructor', async (cx) => {
                 const aging = 4;
-                const loggerTest = createLogger({max_age_ms: aging});
+                const loggerTest = createLogger({max_age: {any_ms: aging}});
                 if( loggerTest.cannot_recreate_with_same_data ) cx.skip();
 
 

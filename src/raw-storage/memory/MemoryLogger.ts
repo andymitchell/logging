@@ -2,7 +2,7 @@ import { matchJavascriptObject, type WhereFilterDefinition } from "@andyrmitchel
 import type { LoggerOptions, MinimumContext } from "../../types.ts";
 import { BaseLogger } from "../BaseLogger.ts";
 import type { LogEntry, IRawLogger } from "../types.ts";
-
+import createMaxAgeTest from "../createMaxAgeTest.ts";
 
 
 export class MemoryLogger<T extends MinimumContext = MinimumContext> extends BaseLogger<T> implements IRawLogger<T> {
@@ -20,10 +20,8 @@ export class MemoryLogger<T extends MinimumContext = MinimumContext> extends Bas
     }
 
     protected override async clearOldEntries(): Promise<void> {
-        if( this.maxAgeMs!==Infinity ) {
-            const afterTs = Date.now()-this.maxAgeMs;
-            this.#log = this.#log.filter(x => x.timestamp>=afterTs);
-        }
+        const filter = createMaxAgeTest(this.maxAge);
+        this.#log = this.#log.filter(filter)
     }
 
 

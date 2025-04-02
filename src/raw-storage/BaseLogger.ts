@@ -1,7 +1,7 @@
 
 
 import { cloneDeepScalarValues } from "@andyrmitchell/utils/deep-clone-scalar-values";
-import type { LoggerOptions, MinimumContext } from "../types.ts";
+import type { LoggerOptions, MaxAge, MinimumContext } from "../types.ts";
 import type { AcceptLogEntry, IRawLogger, LogEntry } from "./types.ts";
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import { monotonicFactory } from "ulid";
@@ -15,7 +15,7 @@ export class BaseLogger<T extends MinimumContext = MinimumContext> implements IR
     protected includeStackTrace: Required<LoggerOptions>['include_stack_trace'];
     protected logToConsole:boolean;
     protected permitDangerousContextProperties: boolean;
-    protected maxAgeMs: number;
+    protected maxAge: MaxAge;
     protected dbNamespace:string;
     protected ulid:Function;
     breakpoints:IBreakpoints;
@@ -26,7 +26,7 @@ export class BaseLogger<T extends MinimumContext = MinimumContext> implements IR
         this.logToConsole = safeOptions.log_to_console;
         this.permitDangerousContextProperties = safeOptions.permit_dangerous_context_properties;
         this.dbNamespace = dbNamespace;
-        this.maxAgeMs = safeOptions.max_age_ms;
+        this.maxAge = safeOptions.max_age;
         this.ulid = monotonicFactory(); // Monotonic guarantees ascending order within this context
         this.breakpoints = safeOptions.breakpoints;
 
@@ -103,6 +103,8 @@ const DEFAULT_LOGGER_OPTIONS:Required<LoggerOptions> = {
     },
     log_to_console: false,
     permit_dangerous_context_properties: false,
-    max_age_ms: Infinity,
+    max_age: {
+        any_ms: Infinity
+    },
     breakpoints: new MemoryBreakpoints()
 }

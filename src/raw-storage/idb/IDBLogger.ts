@@ -2,6 +2,7 @@ import {  matchJavascriptObject, type WhereFilterDefinition } from "@andyrmitche
 import type { LoggerOptions, MinimumContext } from "../../types.ts";
 import { BaseLogger } from "../BaseLogger.js";
 import type { IRawLogger, LogEntry } from "../types.ts";
+import createMaxAgeTest from "../createMaxAgeTest.ts";
 
 
 
@@ -38,24 +39,25 @@ export class IDBLogger<T extends MinimumContext = MinimumContext> extends BaseLo
     }
 
     async #clearOldEntriesUsingDb(db:IDBDatabase): Promise<void> {
-        if( this.maxAgeMs===Infinity ) return;
+        const filter = createMaxAgeTest(this.maxAge);
+        
 
         const transaction = db.transaction('logs', 'readwrite');
         const store = transaction.objectStore('logs');
         const index = store.index('timestamp');
 
-        const afterTs = Date.now()-this.maxAgeMs;
         
 
         index.openCursor().onsuccess = (event) => {
             const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
             if (cursor) {
                 const log = cursor.value as LogEntry;
-                
-                if ( log.timestamp<afterTs ) {
+                if( filter(log) ) {
+                    cursor.continue();
+                } else {
                     cursor.delete();
                 }
-                cursor.continue();
+                
             }
         };
     }
