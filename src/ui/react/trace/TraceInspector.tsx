@@ -4,11 +4,10 @@ import {  useCallback, useMemo, useState } from "react";
 import type { TracesSource } from "./types.ts";
 import type { BaseComponentTypes } from "../types.ts";
 
-import { TraceView } from "./viewer/TraceView.tsx";
+
 import styles from './TraceInspector.module.css';
-import { FilterContextTraceSearch } from "./search/FilterContextTraceSearch.tsx";
-import { TraceFilter } from "./filter-bar/TraceFilter.tsx";
-import { FilterProvider } from "./filter-bar/FilterContext.tsx";
+import { TraceSelectAndView } from "./TraceSelectAndView.tsx";
+
 
 
 
@@ -25,6 +24,8 @@ type TraceInspectorProps = BaseComponentTypes & {
 }
 
 
+type Pane = 'list' | 'search';
+
 export const TraceInspector: React.FC<TraceInspectorProps> = (props) => {
 
     const className = useMemo(() => {
@@ -35,42 +36,44 @@ export const TraceInspector: React.FC<TraceInspectorProps> = (props) => {
         return className;
     }, [props.className, props.template]);
 
-    const [traceId, setTraceId] = useState<string | undefined>();
-
-    const searchStyle:React.CSSProperties = useMemo(() => {
-        return {
-            display: traceId? 'none' : 'block'
-        }
-    }, [traceId]);
-
-    const onClickSearchResult = useCallback((traceId:string) => {
-        setTraceId(traceId);
-    }, []);
-
-    const onClickBack = useCallback(() => {
-        setTraceId(undefined);
-    }, []);
+    const style:React.CSSProperties = {
+        display: 'flex',
+        flexDirection: 'row',
+        verticalAlign: 'top',
+        ...props.style,
+    }
     
+    const [pane, setPane] = useState<Pane>('search');
+
 
     return (
-        <div ref={props.ref} className={className} style={props.style}>
+        <div ref={props.ref} className={className} style={style}>
 
-            <div style={searchStyle}>
-                <FilterProvider 
-                    initializedCriteria={{type: 'debounce'}} 
-                                      
-                >
-                    <TraceFilter  />
-                    <FilterContextTraceSearch tracesSource={props.tracesSource} onClick={onClickSearchResult} />
-                </FilterProvider>
-            </div>
+            <nav>
+            
+                <div onClick={useCallback(() => setPane('search'), [])}>
+                    <span>Search</span>
+                </div>
+                <div onClick={useCallback(() => setPane('list'), [])}>
+                    <span>List</span>
+                </div>
+            
+            </nav>
 
-            {traceId && (
-                <>
-                    <button onClick={onClickBack}>Back</button>
-                    <TraceView traceId={traceId} tracesSource={props.tracesSource} />
-                </>
-            )}
+            <main>
+                {pane==='search' && (
+                    <div data-container='search-pane'>
+                        <TraceSelectAndView tracesSource={props.tracesSource} selector={'search'} />
+                    </div>
+                )}
+
+                {pane==='list' && (
+                    <div data-container='list-pane'>
+                        <TraceSelectAndView tracesSource={props.tracesSource} selector={'list'} />
+                    </div>
+                )}
+            </main>
+
             
         </div>
     );

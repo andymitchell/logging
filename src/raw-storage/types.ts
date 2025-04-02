@@ -5,7 +5,15 @@ import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter"
 import type { IBreakpoints } from "../breakpoints/types.ts";
 
 
-
+/**
+ * Test if the variable is a LogEntry. 
+ * 
+ * It's not an exhaustive zod-schema driven test, because trying to avoid requiring zod for this. 
+ * @param x 
+ */
+export function isLogEntrySimple(x: unknown):x is LogEntry {
+    return typeof x==='object' && x!==null && "ulid" in x && "type" in x;
+}
 
 export type BaseLogEntry<T extends MinimumContext = MinimumContext, M extends MinimumContext = MinimumContext> = {
     
@@ -77,6 +85,8 @@ export type LogEntry<T extends MinimumContext = MinimumContext, M extends Minimu
     WarnLogEntry<T, M> | 
     ErrorLogEntry<T, M> |
     EventLogEntry<T, M>
+
+
 
 /**
  * Like LogEntry, but context can be anything (not yet serialised down)

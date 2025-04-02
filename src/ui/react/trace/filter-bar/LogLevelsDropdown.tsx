@@ -22,9 +22,9 @@ export const LogLevelsDropdown: React.FC = () => {
         
         
         const componentFilter = componentFilters[COMPONENT_ID];
-        console.log("Updated selected", {componentFilter});
+        
         if (componentFilter && isLogicFilter(componentFilter) && componentFilter['OR']) {
-            console.log("It is OR");
+            
             const result = componentFilter['OR'].map(orFilter => {
                 if (isPartialObjectFilter<LogEntry>(orFilter)) {
                     return orFilter.type;

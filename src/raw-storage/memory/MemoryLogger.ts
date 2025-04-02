@@ -32,6 +32,9 @@ export class MemoryLogger<T extends MinimumContext = MinimumContext> extends Bas
         
     }
 
+    public load(entries: LogEntry<T>[]):void {
+        this.#log = entries;
+    }
 
     public override async get(filter?: WhereFilterDefinition<LogEntry<T>>, fullTextFilter?: string): Promise<LogEntry<T>[]> {
         let entries = structuredClone(this.#log) as LogEntry<T>[];

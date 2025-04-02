@@ -1,6 +1,6 @@
 
 
-import { isEventLogEntry, type EventLogEntry, type LogEntry, type StartEventDetail } from "../raw-storage/types.ts";
+import { isEventLogEntry, isLogEntrySimple, type EventLogEntry, type LogEntry, type StartEventDetail } from "../raw-storage/types.ts";
 import type { ILogger, MinimumContext } from "../types.ts"
 
 
@@ -73,4 +73,11 @@ export type TraceSearchResults<T extends MinimumContext = any> = TraceSearchResu
 
 export function isEventLogEntrySpanStart(x: unknown): x is EventLogEntry<any, SpanMeta, StartEventDetail> {
     return isEventLogEntry(x) && x.event.name==='span_start';
+}
+
+export function isTraceResult(x: unknown): x is TraceResult {
+    if( typeof x==='object' && x!==null && "id" in x && "logs" in x && Array.isArray(x.logs) ) {
+        return x.logs.every(isLogEntrySimple);
+    }
+    return false;
 }

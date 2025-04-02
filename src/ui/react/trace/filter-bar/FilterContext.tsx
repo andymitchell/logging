@@ -108,9 +108,16 @@ export const FilterProvider: React.FC<FilterProviderProps> = ({
 
     const filter = useMemo(() => {
         if( isInitializing ) return undefined;
-        return {
-            AND: Object.values(componentFilters).filter(x => !!x)
-        }
+
+        const componentFiltersArr = Object.values(componentFilters).filter(x => !!x);
+        const newFilter = componentFiltersArr.length>0? 
+            {
+                AND: componentFiltersArr
+            }
+            :
+            undefined; // {}
+        console.log({newFilter});
+        return newFilter;
     }, [componentFilters, isInitializing])
 
     return (
