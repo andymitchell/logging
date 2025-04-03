@@ -1,8 +1,9 @@
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import type {  TracesSource } from "../types.ts";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { TraceEntry, TraceSearchResults } from "../../../../trace/types.ts";
+import type { TraceEntry } from "../../../../trace/types.ts";
 import { TraceViewer } from "../../../../trace/viewing/TraceViewer.ts";
+import type { TraceSearchResults } from "../../../../trace/viewing/types.ts";
 
 
 export function useTraceResults(

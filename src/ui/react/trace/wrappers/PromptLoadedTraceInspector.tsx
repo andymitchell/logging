@@ -2,11 +2,12 @@ import { useCallback, useState } from "react";
 import type { BaseComponentTypes } from "../../types.ts";
 import { TraceInspector } from "../TraceInspector.tsx";
 import type { TracesSource } from "../types.ts";
-import { isTraceResult } from "../../../../trace/types.ts";
+
 import { isLogEntrySimple, type LogEntry } from "../../../../raw-storage/types.ts";
 import { MemoryLogger } from "../../../../raw-storage/memory/MemoryLogger.ts";
 import { TraceViewer } from "../../../../index-get-traces.ts";
 import { monotonicFactory } from "ulid";
+import { isTraceResult } from "../../../../trace/viewing/types.ts";
 
 
 type TraceInspectorProps = BaseComponentTypes & {

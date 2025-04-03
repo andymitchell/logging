@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState} from "react";
 
 import { convertLogSpanEntryToBody } from "../../types.ts";
-import type { TraceResult, TraceSearchResults } from "../../../../trace/types.ts";
+import type { TraceResult, TraceSearchResults } from "../../../../trace/viewing/types.ts";
 import { LogBody } from "../viewer/TraceView.tsx";
 import type { TracesSource } from "../types.ts";
 import { TraceViewer } from "../../../../index-get-traces.ts";

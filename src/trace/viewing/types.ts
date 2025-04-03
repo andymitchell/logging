@@ -1,6 +1,6 @@
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
-import type { LogEntry } from "../../raw-storage/types.ts";
-import type { SpanMeta, TraceResult, TraceSearchResults } from "../types.ts";
+import { isLogEntrySimple, type LogEntry } from "../../raw-storage/types.ts";
+import type { SpanMeta, TraceEntry } from "../types.ts";
 import type { MinimumContext } from "../../types.ts";
 
 /**
@@ -35,3 +35,36 @@ export interface ITraceViewer {
     getTraces<T extends MinimumContext = any>(filter?: TraceFilter<T>, includeAllTraceEntries?: boolean): Promise<TraceSearchResults<T>>;
 }
 
+
+export type TraceResult<T extends MinimumContext = any> = {
+    id: string, 
+    timestamp: number,
+
+    /**
+     * Every log entry for the trace
+     */
+    logs: TraceEntry<T>[],
+
+}
+
+export type TraceSearchResult<T extends MinimumContext = any> = TraceResult<T> & {
+    
+    /**
+     * Entries that match the filter, if provided 
+     */
+    matches: TraceEntry<T>[]
+}
+
+/**
+ * A record of log entries, keyed on the trace id
+ */
+export type TraceSearchResults<T extends MinimumContext = any> = TraceSearchResult<T>[]; //Record<string, TraceResult<T>>;
+
+
+
+export function isTraceResult(x: unknown): x is TraceResult {
+    if( typeof x==='object' && x!==null && "id" in x && "logs" in x && Array.isArray(x.logs) ) {
+        return x.logs.every(isLogEntrySimple);
+    }
+    return false;
+}

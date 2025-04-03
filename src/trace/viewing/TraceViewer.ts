@@ -2,9 +2,9 @@
 
 import type { IRawLogger } from "../../index-browser.ts";
 import type { MinimumContext } from "../../types.ts";
-import type { TraceSearchResults} from "../types.ts";
+
 import { getTraces } from "./getTraces.ts";
-import type { ITraceViewer, TraceFilter } from "./types.ts";
+import type { ITraceViewer, TraceFilter, TraceSearchResults } from "./types.ts";
 
 /**
  * Attach to a raw logger and retrieve traces 

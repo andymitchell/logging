@@ -1,8 +1,8 @@
 import { matchJavascriptObject, type WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import type { IRawLogger, LogEntry } from "../../raw-storage/types.ts";
-import type { SpanMeta,  TraceSearchResult,  TraceSearchResults } from "../types.ts";
+import type { SpanMeta } from "../types.ts";
 import type { MinimumContext } from "../../types.ts";
-import type { TraceEntryFilter, TraceFilter } from "./types.ts";
+import type { TraceEntryFilter, TraceFilter, TraceSearchResult, TraceSearchResults } from "./types.ts";
 
 
 
