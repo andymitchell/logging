@@ -11,8 +11,7 @@ import type { TraceEntryFilter, TraceFilter } from "./types.ts";
 /**
  * Retrieve traces and all their entries
  * @param rawLogger The storage of the entries
- * @param traceEntryFilter Optional. At least one entry in the trace must match this filter for the trace to be included.
- * @param traceResultFilter Optional. Filter the final trace results (e.g. timestamp).
+ * @param filter Filter the traces
  * @returns An array of trace objects; sorted by timestamp asc; each with an id, timestamp and containing an array of all entries in the trace (and an optional 'matches' list of entries just matching the traceEntryFilter)
  */
 export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLogger<any, any>, filter?: TraceFilter<T>, includeAllTraceEntries = true): Promise<TraceSearchResults<T>> {

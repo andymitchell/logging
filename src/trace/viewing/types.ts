@@ -29,7 +29,7 @@ export interface ITraceViewer {
     
     /**
      * Retrieve traces and all their entries
-     * @param filter Filter the traces includes 
+     * @param filter Filter the traces
      * @returns An array of trace objects; sorted by timestamp asc; each with an id, timestamp and containing an array of all entries in the trace (and an optional 'matches' list of entries just matching the traceEntryFilter)
      */
     getTraces<T extends MinimumContext = any>(filter?: TraceFilter<T>, includeAllTraceEntries?: boolean): Promise<TraceSearchResults<T>>;
