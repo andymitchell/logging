@@ -3,7 +3,7 @@ import type { AcceptLogEntry } from "../raw-storage/types.ts";
 import { uuidV4 } from "@andyrmitchell/utils/uid";
 import {  type Breakpoint, type BreakpointCallback, type IBreakpoints } from "./types.ts";
 import { BaseBreakpoints } from "./BaseBreakpoints.ts";
-import { ChromeStorage, TypedStorage, type IRawStorage } from "@andyrmitchell/utils/kv-storage";
+import { MemoryStorage, TypedStorage, type IKvStorage } from "@andyrmitchell/utils/kv-storage";
 
 
 
@@ -17,11 +17,11 @@ export class KvStorageBreakpoints extends BaseBreakpoints implements IBreakpoint
 
     
 
-    constructor(namespace:string, breakpointCallback?:BreakpointCallback, rawStorage?:IRawStorage) {
+    constructor(namespace:string, breakpointCallback?:BreakpointCallback, rawStorage?:IKvStorage) {
         
         super(breakpointCallback);
 
-        this.breakpoints = new TypedStorage(rawStorage ?? new ChromeStorage(), undefined, namespace);
+        this.breakpoints = new TypedStorage(rawStorage ?? new MemoryStorage(), undefined, namespace);
 
 
     }
