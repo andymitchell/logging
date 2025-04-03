@@ -103,8 +103,6 @@ const DEFAULT_LOGGER_OPTIONS:Required<LoggerOptions> = {
     },
     log_to_console: false,
     permit_dangerous_context_properties: false,
-    max_age: {
-        any_ms: Infinity
-    },
+    max_age: [],
     breakpoints: new MemoryBreakpoints()
 }

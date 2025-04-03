@@ -16,18 +16,18 @@ export interface ILogger<T extends MinimumContext = MinimumContext, M extends Mi
 
 }
 
-
+/**
+ * Remove LogEntry if they match the filter and are older than the max_ms. 
+ * 
+ * It tests the filters in array order, and will only use the first match. 
+ * 
+ * Leave the filter empty as a catch all. 
+ */
 export type MaxAge = {
-    /**
-     * How long should any entry be preserved?
-     */
-    any_ms: number,
+    filter?: WhereFilterDefinition<LogEntry>,
+    max_ms: number
+}[]
 
-    /**
-     * Optionally keep errors for longer
-     */
-    error_ms?: number
-}
 
 export interface LoggerOptions {
     include_stack_trace?: {
