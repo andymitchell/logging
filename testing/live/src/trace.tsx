@@ -1,8 +1,9 @@
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { TraceView } from '../../../src/ui/react/trace/TraceView'
+
 import { generateTestLogFetch } from '../../../src/ui/react/trace/testing/testLogFetch';
+import { TraceView } from '../../../src/ui/react/trace/viewer/TraceView';
 
 
 

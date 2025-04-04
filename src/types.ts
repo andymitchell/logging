@@ -39,7 +39,9 @@ export interface LoggerOptions {
     log_to_console?:boolean,
 
     /**
-     * Cull logs older than this 
+     * Cull logs based on age. Set different times for different filters (matching first found in array)
+     * 
+     * @example [{filter: {type: 'error'}, max_ms: dayMs*30}, {max_ms: dayMs*5}] 
      */
     max_age?: MaxAge,
 
