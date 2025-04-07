@@ -45,7 +45,7 @@ const Row: React.FC<RowProps> = ({
     }, [entry])
 
     const onClickWrapped = useCallback(() => {
-        const traceId = entry.meta?.span.top_id;
+        const traceId = entry.meta?.span?.top_id;
         if( onClick ) {
             if( !traceId ) throw new Error("Expect trace id");
             onClick(traceId);

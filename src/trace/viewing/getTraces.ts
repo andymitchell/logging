@@ -30,7 +30,7 @@ export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLo
     // Extract trace ids: 
     const traceEntries:Record<string, TraceSearchResult<T>> = {};
     for( const entry of matches ) {
-        const spanId = entry.meta?.span.top_id;
+        const spanId = entry.meta?.span?.top_id;
         if( spanId && !traceEntries[spanId] ) {
             traceEntries[spanId] = {id: '', timestamp: -1, logs: [], matches: []};
             if( filter?.entries || filter?.entries_full_text ) {
@@ -51,13 +51,13 @@ export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLo
         // Add each entry to its corresponding trace results object, in the 'all' array 
         const allTracesEntries = await typedRawLogger.get(tracesFilter);
         for( const entry of allTracesEntries ) {
-            const spanId = entry.meta?.span.top_id;
+            const spanId = entry.meta?.span?.top_id;
             const entries = spanId && traceEntries[spanId];
             if( entries ) {
                 entries.logs.push(entry as LogEntry<T, SpanMeta>);
 
                 
-                if( !entries.id && entry.meta?.span.id ) {
+                if( !entries.id && entry.meta?.span?.id ) {
                     // Set the top level data
                     entries.id = entry.meta?.span.id;
                     entries.timestamp = entry.timestamp;
