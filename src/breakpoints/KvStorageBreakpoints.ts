@@ -1,7 +1,7 @@
 import type { WhereFilterDefinition } from "@andyrmitchell/objects";
 import type { AcceptLogEntry } from "../raw-storage/types.ts";
 import { uuidV4 } from "@andyrmitchell/utils/uid";
-import {  type Breakpoint, type BreakpointCallback, type IBreakpoints } from "./types.ts";
+import {  type Breakpoint, type IBreakpoints } from "./types.ts";
 import { BaseBreakpoints } from "./BaseBreakpoints.ts";
 import { MemoryStorage, TypedStorage, type IKvStorage } from "@andyrmitchell/utils/kv-storage";
 
