@@ -16,11 +16,8 @@ export class BaseBreakpoints implements IBreakpoints {
 
     
 
-    constructor(breakpointCallback?:BreakpointCallback) {
+    constructor() {
 
-        if( breakpointCallback ) {
-            this.breakpointCallback = breakpointCallback;
-        }
 
     }
 

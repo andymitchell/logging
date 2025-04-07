@@ -2,19 +2,23 @@
 import { globalThisWithBreakpointFunction,  type BreakpointCallback,  type IBreakpoints } from "./types.ts";
 
 /**
- * Call this function to expose an IBreakpoints in the console, where it can be controlled 
- * @param id A unique name for accessing this IBreakpoints. Probably your app name.
- * @param breakpoints 
+ * Call this function to expose an IBreakpoints in the console, where it can be controlled. 
+ * 
+ * It will display in the console how to address and interact with it. 
+ * 
+ * @param accessName A unique name for accessing this IBreakpoints in the console. Probably your app name. It does not relate to storage.
+ * @param breakpoints The class to manage/store the breakpoints.
+ * @example `initiateBreakpointCommandsInDevTools('myApp', new KvStorageBreakpoints('ns_myapp', new IdbStorage('store_myapp')))`
  */
-export function initiateBreakpointCommandsInDevTools(id: string, breakpoints:IBreakpoints) {
+export function initiateBreakpointCommandsInDevTools(accessName: string, breakpoints:IBreakpoints) {
     
 
-    const isValidIdentifier = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(id);
+    const isValidIdentifier = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(accessName);
 
     if( !globalThisWithBreakpointFunction._loggerBreakpoints ) globalThisWithBreakpointFunction._loggerBreakpoints = {};
     if( !globalThisWithBreakpointFunction._loggerBreakpointCallbacks ) globalThisWithBreakpointFunction._loggerBreakpointCallbacks = {};
 
-    globalThisWithBreakpointFunction._loggerBreakpoints[id] = {
+    globalThisWithBreakpointFunction._loggerBreakpoints[accessName] = {
         async addBreakpoint(filter) {
             // TODO Check schema and error
             const result = await breakpoints.addBreakpoint(filter);
@@ -54,12 +58,12 @@ export function initiateBreakpointCommandsInDevTools(id: string, breakpoints:IBr
         
     }
 
-    const commandsIdentifier = isValidIdentifier? `_loggerBreakpoints.${id}` : `_loggerBreakpoints['${id}']`;
-    console.log(`Access Logger Breakpoints for ${id} at:\n${commandsIdentifier}`)
+    const commandsIdentifier = isValidIdentifier? `_loggerBreakpoints.${accessName}` : `_loggerBreakpoints['${accessName}']`;
+    console.log(`Access Logger Breakpoints for ${accessName} at:\n${commandsIdentifier}`)
 
     const breakpointCallbackDef = `${commandsIdentifier}.setHandler((entry) => {debugger});`
-    if( !globalThisWithBreakpointFunction._loggerBreakpointCallbacks[id] ) {
-        globalThisWithBreakpointFunction._loggerBreakpointCallbacks[id] = () => {
+    if( !globalThisWithBreakpointFunction._loggerBreakpointCallbacks[accessName] ) {
+        globalThisWithBreakpointFunction._loggerBreakpointCallbacks[accessName] = () => {
             const message = `Replace me with a function to handle the break, e.g. ${breakpointCallbackDef}`;
             if( console ) {
                 console.warn(message);
@@ -71,7 +75,7 @@ export function initiateBreakpointCommandsInDevTools(id: string, breakpoints:IBr
         console.log(`Don't forget to create a breakpoint handler, e.g.\n${breakpointCallbackDef}`)
     }
     breakpoints.setHandler((entry) => {
-        globalThisWithBreakpointFunction._loggerBreakpointCallbacks[id]!(entry);
+        globalThisWithBreakpointFunction._loggerBreakpointCallbacks[accessName]!(entry);
     })
 
     

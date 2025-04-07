@@ -8,21 +8,24 @@ import { MemoryStorage, TypedStorage, type IKvStorage } from "@andyrmitchell/uti
 
 
 /**
- * Callback to a breakpoint function when matching log entries are added 
+ * Manage breakpoints that will callback to a handler when a filter is matched. 
+ * 
+ * Uses IKvStorage classes as the repository. 
  */
 export class KvStorageBreakpoints extends BaseBreakpoints implements IBreakpoints {
 
     protected breakpoints:TypedStorage<Breakpoint>;
-    
 
-    
-
-    constructor(namespace:string, breakpointCallback?:BreakpointCallback, rawStorage?:IKvStorage) {
+    /**
+     * 
+     * @param namespace If the storage is shared, this will narrow to a namespace.
+     * @param rawStorage Defaults to MemoryStorage 
+     */
+    constructor(namespace:string = 'all_breakpoints', rawStorage?:IKvStorage) {
         
-        super(breakpointCallback);
+        super();
 
         this.breakpoints = new TypedStorage(rawStorage ?? new MemoryStorage(), undefined, namespace);
-
 
     }
 

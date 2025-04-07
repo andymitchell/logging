@@ -1,32 +1,21 @@
 import type { WhereFilterDefinition } from "@andyrmitchell/objects";
 import type { AcceptLogEntry } from "../raw-storage/types.ts";
 import { uuidV4 } from "@andyrmitchell/utils/uid";
-import {  type Breakpoint, type BreakpointCallback, type IBreakpoints } from "./types.ts";
+import {  type Breakpoint, type IBreakpoints } from "./types.ts";
 import { BaseBreakpoints } from "./BaseBreakpoints.ts";
 
 
 
 /**
- * Callback to a breakpoint function when matching log entries are added 
+ * Manage breakpoints that will callback to a handler when a filter is matched 
  */
 export class MemoryBreakpoints extends BaseBreakpoints implements IBreakpoints {
 
     protected breakpoints:Record<string, Breakpoint> = {};
     
-
-    
-
-    constructor(breakpointCallback?:BreakpointCallback) {
-
-        super(breakpointCallback);
-
-
+    constructor() {
+        super();
     }
-
-
-
-    
-
 
     override async addBreakpoint(filter:WhereFilterDefinition<AcceptLogEntry>):Promise<{id:string}> {
         const id = uuidV4();
