@@ -2,7 +2,7 @@ import type { WhereFilterDefinition } from "@andyrmitchell/objects";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { TraceFilter } from "../../../../trace/viewing/types.ts";
 
-type ComponentEntriesFilterData<T extends Record<string, any> = Record<string, any>> = WhereFilterDefinition<T> | undefined;
+export type ComponentEntriesFilterData<T extends Record<string, any> = Record<string, any>> = WhereFilterDefinition<T> | undefined;
 export type ComponentEntriesFilters<T extends Record<string, any> = Record<string, any>> = Record<string, ComponentEntriesFilterData<T>>;
 
 type FilterContextType<T extends Record<string, any> = Record<string, any>> = {

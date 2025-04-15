@@ -27,6 +27,7 @@ export type BaseComponentTypes = {
 export type TLogBody = {
     message: string,
     timestamp: number,
+    trace_id: string
 }
 
 export type TLog = {
@@ -53,12 +54,14 @@ export function convertLogSpanEntryToBody(entry:LogEntry<any, SpanMeta>):TLogBod
     if( isEventLogEntry(entry) && !isEventLogEntrySpanStart(entry) ) {
         return {
             message: "Unsupported. Do not pass in non-start events.",
-            timestamp: entry.timestamp
+            timestamp: entry.timestamp,
+            trace_id: entry.meta?.span.top_id ?? ''
         }
     } else {
         return {
             message: entry.message ?? '',
-            timestamp: entry.timestamp
+            timestamp: entry.timestamp,
+            trace_id: entry.meta?.span.top_id ?? ''
         }
     }
 }

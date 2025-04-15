@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { convertLogToTree, type BaseComponentTypes, type TLog, type TLogBody, type TSpan } from "../../types.ts";
+import { convertLogToTree, type BaseComponentTypes, type TLog, type TSpan } from "../../types.ts";
 
 import { JsonView, allExpanded, defaultStyles } from 'react-json-view-lite';
 import 'react-json-view-lite/dist/index.css';
@@ -7,6 +7,7 @@ import 'react-json-view-lite/dist/index.css';
 import type { TracesSource } from "../types.ts";
 
 import { useTrace } from "../data/useTraceResults.ts";
+import { LogBody } from "../common-components/LogBody.tsx";
 
 
 type TraceViewProps = BaseComponentTypes & {
@@ -88,14 +89,6 @@ const SpanOrLog: React.FC<SpanOrLogProps> = ({ item, parentDepth, onClickLog }) 
     }
 }
 
-type LogBodyProps = {
-    body: TLogBody
-}
-export const LogBody: React.FC<LogBodyProps> = ({ body }) => {
-    return (<>
-        {body.message} - {new Date(body.timestamp).toLocaleTimeString()}
-    </>)
-}
 
 
 type LogProps = {
@@ -113,7 +106,7 @@ const Log: React.FC<LogProps> = ({ item, parentDepth, onClickLog }) => {
         <div
             key={item.id}
             data-id={item.id}
-            style={{ marginLeft: `${parentDepth * 20}px` }}
+            style={{ marginLeft: `${parentDepth * 20}px`, marginTop: '5px' }}
             data-container='log'
             onClick={onClick}
         >
@@ -146,11 +139,11 @@ const Span: React.FC<SpanProps> = ({ span, scrollToId, onClickLog }) => {
     return (
         <div key={span.id} data-type='span' data-id={span.id} data-container='span'>
 
-            <div style={{ marginLeft: `${span.depth * 20}px` }}>
+            <div style={{ marginLeft: `${span.depth * 20}px`, display: 'flex', marginTop:'5px'  }}>
                 <div style={{ display: 'inline-block', width: '20px' }} onClick={toggleMinimised}>{minimised ? '+' : '-'}</div>
-                <strong onClick={onClick}>
+                <div onClick={onClick}>
                     <LogBody body={span.body} />
-                </strong>
+                </div>
             </div>
 
             {!minimised &&

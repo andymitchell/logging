@@ -3,7 +3,8 @@ import { useCallback, useMemo} from "react";
 import { convertLogSpanEntryToBody } from "../../types.ts";
 import type { LogEntry } from "../../../../raw-storage/types.ts";
 import type { SpanMeta, TraceEntry } from "../../../../trace/types.ts";
-import { LogBody } from "../viewer/TraceView.tsx";
+import { LogBody } from "../common-components/LogBody.tsx";
+
 
 
 
@@ -53,7 +54,7 @@ const Row: React.FC<RowProps> = ({
     }, [entry])
 
     return (
-        <div onClick={onClickWrapped} data-container='row'>
+        <div onClick={onClickWrapped} data-container='row' style={{marginTop: '5px'}}>
             <LogBody body={body} />
         </div>
     );

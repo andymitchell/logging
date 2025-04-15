@@ -2,6 +2,7 @@
 import { FullTextSearchDropdown } from "./FullTextSearchDropdown.tsx";
 import { LogLevelsDropdown } from "./LogLevelsDropdown.tsx";
 import { MessageDropdown } from "./MessageDropdown.tsx";
+import { TimeDropdown } from "./TimeDropdown.tsx";
 
 
 interface TraceFilterProps {
@@ -15,6 +16,9 @@ export const TraceFilter: React.FC<TraceFilterProps> = ({  }) => {
         <div>
             <MessageDropdown />
             <LogLevelsDropdown  />
+            <TimeDropdown />
+
+
             <FullTextSearchDropdown />
         </div>
     )
