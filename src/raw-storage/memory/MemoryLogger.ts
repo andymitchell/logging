@@ -30,8 +30,8 @@ export class MemoryLogger<T extends MinimumContext = MinimumContext> extends Bas
         
     }
 
-    public load(entries: LogEntry<T>[]):void {
-        this.#log = entries;
+    public override async reset(entries?: LogEntry<T>[]):Promise<void> {
+        this.#log = entries ?? [];
     }
 
     public override async get(filter?: WhereFilterDefinition<LogEntry<T>>, fullTextFilter?: string): Promise<LogEntry<T>[]> {

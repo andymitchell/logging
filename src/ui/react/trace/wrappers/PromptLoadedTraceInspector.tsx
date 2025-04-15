@@ -4,10 +4,10 @@ import { TraceInspector } from "../TraceInspector.tsx";
 import type { TracesSource } from "../types.ts";
 
 import { isLogEntrySimple, type LogEntry } from "../../../../raw-storage/types.ts";
-import { MemoryLogger } from "../../../../raw-storage/memory/MemoryLogger.ts";
 import { TraceViewer } from "../../../../index-get-traces.ts";
 import { monotonicFactory } from "ulid";
 import { isTraceResult } from "../../../../trace/viewing/types.ts";
+import { IDBLogger } from "../../../../index-browser.ts";
 
 
 type TraceInspectorProps = BaseComponentTypes & {
@@ -17,12 +17,26 @@ type TraceInspectorProps = BaseComponentTypes & {
     template?: 'neutral'
 }
 
+const DB_ID = 'loggertest_1';
 
 export const PromptLoadedTraceInspector: React.FC<TraceInspectorProps> = (props) => {
 
     //TracesSource
 
-    const [tracesSource, setTracesSources] = useState<TracesSource | undefined>();
+
+    const generateViewerForEntries = useCallback((resetEntries?:LogEntry[]) => {
+        const logger = new IDBLogger(DB_ID);
+        if( resetEntries ) {
+            logger.reset(resetEntries);
+            console.log("Reset entries", resetEntries);
+        }
+        const viewer = new TraceViewer(logger);
+
+        return viewer;
+        
+    }, []);
+
+    const [tracesSource, setTracesSources] = useState<TracesSource | undefined>(generateViewerForEntries());
 
     const onClickLoad = useCallback(() => {
         const json = prompt("Enter json of an array of log entries or a TraceResults:");
@@ -76,14 +90,11 @@ export const PromptLoadedTraceInspector: React.FC<TraceInspectorProps> = (props)
         }
         
         if( entries ) {
-            const logger = new MemoryLogger('');
-            logger.load(entries);
-            const viewer = new TraceViewer(logger);
-
-            console.log("Loaded entries", entries);
-            setTracesSources(viewer);
+            console.log("Entries: ", entries);
+            setTracesSources(generateViewerForEntries(entries));
         }
     }, [])
+
 
     return (
         <div>

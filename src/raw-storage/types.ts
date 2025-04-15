@@ -124,4 +124,11 @@ export interface IRawLogger<T extends MinimumContext = MinimumContext, M extends
      */
     forceClearOldEntries(): Promise<void>;
 
+
+    /**
+     * Manually reset the database and populate it with the passed in entries 
+     * @param entries 
+     */
+    reset(entries?:LogEntry<T>[]): Promise<void>;
+
 }

@@ -39,6 +39,10 @@ export class BaseLogger<T extends MinimumContext = MinimumContext> implements IR
         throw new Error("Method not implemented");
     }
 
+    public async reset() {
+        throw new Error("Method not implemented");
+    }
+
 
     async add(acceptEntry: AcceptLogEntry<T>): Promise<void> {
         let stackTrace:string | undefined = this.includeStackTrace[acceptEntry.type]? this.generateStackTrace() : undefined;

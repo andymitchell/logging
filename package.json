@@ -71,6 +71,7 @@
     "dependencies": {
         "@andyrmitchell/objects": "^0.8.1",
         "@andyrmitchell/utils": "^0.15.0",
+        "react-json-view-lite": "^2.4.1",
         "ulid": "^3.0.0"
     },
     "peerDependencies": {

@@ -1,6 +1,6 @@
 import { sleep } from "@andyrmitchell/utils";
 import type { LoggerOptions } from "../../types.ts";
-import type { IRawLogger } from "../types.ts";
+import type { IRawLogger, LogEntry } from "../types.ts";
 import {test} from 'vitest';
 
 
@@ -263,57 +263,111 @@ export async function commonRawLoggerTests(createLogger:CreateTestLogger) {
             })
         })
     
-        test('Logger - serialisable', async () => {
-    
-            const logger = createLogger().logger;
-    
-            
-            await logger.add({
-                type: 'info',
-                message: DETAIL_ITEM_MESSAGE,
-                context: {
-                    obj: DETAIL_ITEM_LITERAL,
-                    err: DETAIL_ITEM_ERROR
-                }
-            });
-    
-            const all = await logger.get();
-    
-            const entry = all[0]!;
-    
-            expect(JSON.parse(JSON.stringify(entry))).toEqual(entry);
-    
+        describe('misc', () => {
+            test('Logger - serialisable', async () => {
+        
+                const logger = createLogger().logger;
+        
+                
+                await logger.add({
+                    type: 'info',
+                    message: DETAIL_ITEM_MESSAGE,
+                    context: {
+                        obj: DETAIL_ITEM_LITERAL,
+                        err: DETAIL_ITEM_ERROR
+                    }
+                });
+        
+                const all = await logger.get();
+        
+                const entry = all[0]!;
+        
+                expect(JSON.parse(JSON.stringify(entry))).toEqual(entry);
+        
+            })
+        
+            test('Logger - stack trace', async () => {
+        
+                const logger = createLogger({
+                    'include_stack_trace': {
+                        info: true, 
+                        warn: true, 
+                        error: true,
+                        event: true
+                    }
+                }).logger;
+        
+                
+                await logger.add({
+                    type: 'info',
+                    message: DETAIL_ITEM_MESSAGE,
+                    context: {
+                        obj: DETAIL_ITEM_LITERAL,
+                        err: DETAIL_ITEM_ERROR
+                    }
+                });
+        
+                const all = await logger.get();
+        
+                const entry = all[0]!;
+        
+                // Check values
+                expect(entry.stack_trace!.split("\n")[0]!.includes("common.ts")).toBe(true);
+            })
         })
     
-        test('Logger - stack trace', async () => {
+        describe('reset', () => {
     
-            const logger = createLogger({
-                'include_stack_trace': {
-                    info: true, 
-                    warn: true, 
-                    error: true,
-                    event: true
-                }
-            }).logger;
-    
+            const sampleEntries = (count = 3): LogEntry[] =>
+                Array.from({ length: count }, (_, i) => ({
+                    type: 'info',
+                    id: i + 1,
+                    ulid: i+1+'',
+                    timestamp: Date.now() + i,
+                    message: `Test log ${i + 1}`,
+                    context: {}
+                }));
             
-            await logger.add({
-                type: 'info',
-                message: DETAIL_ITEM_MESSAGE,
-                context: {
-                    obj: DETAIL_ITEM_LITERAL,
-                    err: DETAIL_ITEM_ERROR
-                }
+            test('loads entries into an empty store', async () => {
+                const instance = createLogger();
+                const entries = sampleEntries(3);
+                await instance.logger.reset(entries);
+                const result = await instance.logger.get();
+        
+                expect(result.length).toBe(3);
+                expect(result.map(e => e.message)).toEqual([
+                    'Test log 1',
+                    'Test log 2',
+                    'Test log 3'
+                ]);
+            });
+        
+            test('replaces existing entries with new ones', async () => {
+                const instance = createLogger();
+                await instance.logger.reset(sampleEntries(2));
+                await instance.logger.reset(sampleEntries(1)); // only 1 new entry
+        
+                const result = await instance.logger.get();
+                expect(result.length).toBe(1);
+                expect(result[0]!.message).toBe('Test log 1');
+            });
+        
+            test('persists data across recreated logger instances', async (cx) => {
+                const instance = createLogger();
+                if( instance.cannot_recreate_with_same_data ) cx.skip();
+                await instance.logger.reset(sampleEntries(2));
+        
+                const newLogger = instance.recreateWithSameData();
+                const result = await newLogger.get();
+        
+                expect(result.length).toBe(2);
+                expect(result.map(e => e.message)).toContain('Test log 1');
+                expect(result.map(e => e.message)).toContain('Test log 2');
             });
     
-            const all = await logger.get();
-    
-            const entry = all[0]!;
-    
-            // Check values
-            expect(entry.stack_trace!.split("\n")[0]!.includes("common.ts")).toBe(true);
+            
         })
-    
-    
     })
+
+    
 }

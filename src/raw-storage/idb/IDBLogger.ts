@@ -86,6 +86,38 @@ export class IDBLogger<T extends MinimumContext = MinimumContext> extends BaseLo
         
     }
 
+    public override async reset(entries: LogEntry<T>[] = []):Promise<void> {
+        const db = await this.#dbPromise;
+        const transaction = db.transaction('logs', 'readwrite');
+        const store = transaction.objectStore('logs');
+    
+        return new Promise((resolve, reject) => {
+            // Clear existing logs first
+            const clearRequest = store.clear();
+            clearRequest.onerror = (event) => reject(event);
+            clearRequest.onsuccess = () => {
+                // Add new entries one by one
+                let remaining = entries.length;
+    
+                if (remaining === 0) {
+                    resolve();
+                    return;
+                }
+    
+                for (const entry of entries) {
+                    const addRequest = store.add(entry);
+                    addRequest.onerror = (event) => reject(event);
+                    addRequest.onsuccess = () => {
+                        remaining--;
+                        if (remaining === 0) {
+                            resolve();
+                        }
+                    };
+                }
+            };
+        });
+    }
+
 
     public override async get(filter?: WhereFilterDefinition<LogEntry<T>>, fullTextFilter?: string): Promise<LogEntry<T>[]> {
         return new Promise(async (resolve, reject) => {

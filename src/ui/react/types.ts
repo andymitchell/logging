@@ -43,6 +43,7 @@ export type TSpan = {
      * Logs are nested in a waterfall. The depth represents their indentation level.
      */
     depth: number,
+    ulid: string,
     body: TLogBody,
     children: Array<TLog | TSpan>
 }
@@ -93,6 +94,7 @@ export function convertLogToTree(logEntries: LogEntry<any, SpanMeta>[]): TSpan |
                 span = {
                     type: 'span',
                     id: meta.span.id,
+                    ulid: entry.ulid,
                     depth: parent ? parent.depth + 1 : 0,
                     body: convertLogSpanEntryToBody(entry),
                     children: []
