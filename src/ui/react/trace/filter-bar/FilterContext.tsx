@@ -1,19 +1,25 @@
 import type { WhereFilterDefinition } from "@andyrmitchell/objects";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import type { TraceFilter } from "../../../../trace/viewing/types.ts";
 
-type ComponentFilterData<T extends Record<string, any> = Record<string, any>> = WhereFilterDefinition<T> | undefined;
-export type ComponentFilters<T extends Record<string, any> = Record<string, any>> = Record<string, ComponentFilterData<T>>;
+type ComponentEntriesFilterData<T extends Record<string, any> = Record<string, any>> = WhereFilterDefinition<T> | undefined;
+export type ComponentEntriesFilters<T extends Record<string, any> = Record<string, any>> = Record<string, ComponentEntriesFilterData<T>>;
 
 type FilterContextType<T extends Record<string, any> = Record<string, any>> = {
     /**
-     * The final filter, used for searches 
+     * The computed TraceFilter, used for searches
      */
-    filter: WhereFilterDefinition<T> | undefined,
+    traceFilter: TraceFilter,
+
+    /**
+     * The computerd entries filter, used for searches 
+     */
+    entries_filter: WhereFilterDefinition<T> | undefined,
 
     /**
      * The filter for each component (will be combined to create the final 'filter') 
      */
-    componentFilters: ComponentFilters<T>;
+    componentEntriesFilters: ComponentEntriesFilters<T>;
 
     /**
      * Helper function to update the filter for a component 
@@ -22,7 +28,17 @@ type FilterContextType<T extends Record<string, any> = Record<string, any>> = {
      * @param data 
      * @returns 
      */
-    setComponentFilter: (id: string, data:ComponentFilterData<T>) => void;
+    setComponentEntriesFilter: (id: string, data:ComponentEntriesFilterData<T>) => void;
+
+
+
+    /**
+     * Optional string that will match anywhere in the serilalised log.
+     * 
+     */
+    entries_full_text_search?: string;
+
+    setEntriesFullTextSearch: (text?:string) => void;
 
     isInitializing: boolean;
 
@@ -37,7 +53,7 @@ type FilterContextType<T extends Record<string, any> = Record<string, any>> = {
 const FilterContext = createContext<FilterContextType | undefined>(undefined);
 
 type FilterProviderProps = React.PropsWithChildren<{
-    initialComponentFilters?: ComponentFilters;
+    initialComponentEntriesFilters?: ComponentEntriesFilters;
     initializedCriteria?: {
         type: 'debounce'
     } | {
@@ -47,13 +63,14 @@ type FilterProviderProps = React.PropsWithChildren<{
 }>;
 
 export const FilterProvider: React.FC<FilterProviderProps> = ({
-    initialComponentFilters,
+    initialComponentEntriesFilters,
     initializedCriteria,
     children,
 }) => {
-    const [componentFilters, setComponentFilters] = useState<ComponentFilters>(initialComponentFilters || {});
+    const [componentEntriesFilters, setComponentEntriesFilters] = useState<ComponentEntriesFilters>(initialComponentEntriesFilters || {});
     const [readyComponents, setReadyComponents] = useState<Set<string>>(new Set());
     const [isInitializing, setIsInitializing] = useState(true);
+    const [entries_full_text_search, setEntriesFullTextSearch] = useState<string | undefined>();
 
     const registerComponent = useCallback((id: string) => {
         setReadyComponents((prev) => {
@@ -64,8 +81,8 @@ export const FilterProvider: React.FC<FilterProviderProps> = ({
     }, []);
 
     // Create a helper function 
-    const setComponentFilter = (id:string, data:ComponentFilterData) => {
-        setComponentFilters(prev => ({
+    const setComponentEntriesFilter = (id:string, data:ComponentEntriesFilterData) => {
+        setComponentEntriesFilters(prev => ({
             ...prev,
             [id]: data
         }))
@@ -106,22 +123,36 @@ export const FilterProvider: React.FC<FilterProviderProps> = ({
         }
     }, [readyComponents, initializedCriteria]);
 
-    const filter = useMemo(() => {
+    const entries_filter = useMemo(() => {
         if( isInitializing ) return undefined;
 
-        const componentFiltersArr = Object.values(componentFilters).filter(x => !!x);
-        const newFilter = componentFiltersArr.length>0? 
+        const componentEntriesFiltersArr = Object.values(componentEntriesFilters).filter(x => !!x);
+        const newFilter = componentEntriesFiltersArr.length>0? 
             {
-                AND: componentFiltersArr
+                AND: componentEntriesFiltersArr
             }
             :
             undefined; // {}
-        console.log({newFilter});
+        
         return newFilter;
-    }, [componentFilters, isInitializing])
+    }, [componentEntriesFilters, isInitializing])
+
+    const traceFilter:TraceFilter = useMemo(() => {
+        const traceFilter:TraceFilter = {
+            entries_filter: entries_filter,
+            entries_full_text_search,
+        }
+        return traceFilter;
+    }, [entries_filter, entries_full_text_search])
+
+    const value:FilterContextType = useMemo(() => ({
+        traceFilter, entries_filter, componentEntriesFilters, setComponentEntriesFilter, isInitializing, registerComponent, entries_full_text_search, setEntriesFullTextSearch
+    }), [
+        traceFilter, entries_filter, componentEntriesFilters, setComponentEntriesFilter, isInitializing, registerComponent, entries_full_text_search, setEntriesFullTextSearch
+    ])
 
     return (
-        <FilterContext.Provider value={{ filter, componentFilters, setComponentFilter, isInitializing, registerComponent }}>
+        <FilterContext.Provider value={value}>
             {children}
         </FilterContext.Provider>
     );

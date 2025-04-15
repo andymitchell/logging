@@ -20,11 +20,11 @@ export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLo
     const typedRawLogger = rawLogger as IRawLogger<{}, SpanMeta>
 
     // Lock results to just span entries in the log 
-    const lockedTraceEntryFilter:TraceEntryFilter = filter?.entries? {...filter.entries, 'meta.type': 'span'} : {'meta.type': 'span'};
+    const lockedTraceEntryFilter:TraceEntryFilter = filter?.entries_filter? {...filter.entries_filter, 'meta.type': 'span'} : {'meta.type': 'span'};
     
 
     // Find all matching items for the filter
-    const matches = await typedRawLogger.get(lockedTraceEntryFilter, filter?.entries_full_text);
+    const matches = await typedRawLogger.get(lockedTraceEntryFilter, filter?.entries_full_text_search);
     // TODO Filter to span entries only (as it's as LogEntry<T, SpanMeta>)
 
     // Extract trace ids: 
@@ -33,7 +33,7 @@ export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLo
         const spanId = entry.meta?.span?.top_id;
         if( spanId && !traceEntries[spanId] ) {
             traceEntries[spanId] = {id: '', timestamp: -1, logs: [], matches: []};
-            if( filter?.entries || filter?.entries_full_text ) {
+            if( filter?.entries_filter || filter?.entries_full_text_search ) {
                 // Record filter matches
                 traceEntries[spanId].matches.push(entry as LogEntry<T, SpanMeta>);
             }
@@ -67,9 +67,9 @@ export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLo
     }
 
     // Filter the final results
-    if( filter?.results ) {
+    if( filter?.results_filter ) {
         for( const key in traceEntries ) {
-            if( !matchJavascriptObject(traceEntries[key]!, filter.results) ) {
+            if( !matchJavascriptObject(traceEntries[key]!, filter.results_filter) ) {
                 delete traceEntries[key];
             }
         }
@@ -95,7 +95,7 @@ export async function getCommonTraces<T extends MinimumContext = MinimumContext>
     }
 
     if( filter ) {
-        return await getTraces(rawLogger, {entries: filter}) as TraceSearchResults<T>;
+        return await getTraces(rawLogger, {entries_filter: filter}) as TraceSearchResults<T>;
     } else {
         throw new Error("Unknown common name");
     }

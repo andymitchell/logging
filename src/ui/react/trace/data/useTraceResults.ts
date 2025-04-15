@@ -1,14 +1,12 @@
-import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import type {  TracesSource } from "../types.ts";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { TraceEntry } from "../../../../trace/types.ts";
 import { TraceViewer } from "../../../../trace/viewing/TraceViewer.ts";
-import type { TraceSearchResults } from "../../../../trace/viewing/types.ts";
+import type { TraceFilter, TraceSearchResults } from "../../../../trace/viewing/types.ts";
 
 
 export function useTraceResults(
     source: TracesSource,
-    query: WhereFilterDefinition,
+    query: TraceFilter,
     includeAllTraceEntries?: boolean
 ) {
     const loadingIdRef = useRef(0);
@@ -30,10 +28,10 @@ export function useTraceResults(
             try {
                 let data:TraceSearchResults<any>;
                 if( source instanceof TraceViewer ) {
-                    data = await source.getTraces({entries: query}, includeAllTraceEntries);
+                    data = await source.getTraces(query, includeAllTraceEntries);
                     console.log("Got trace results: ", data);
                 } else {
-                    data = await source({entries: query}, includeAllTraceEntries);
+                    data = await source(query, includeAllTraceEntries);
                 }
 
                 if( loadingIdRef.current!==loadingId ) return;
@@ -62,13 +60,14 @@ export function useTrace(
 
     source: TracesSource,
     traceId: string) {
-    const traceQuery:WhereFilterDefinition<TraceEntry> = useMemo(() => {
-        return {
+
+    const traceFilter:TraceFilter = useMemo(() => {
+        return {entries_filter: {
             'meta.span.top_id': traceId
-        }
+        }};
     }, [traceId])
 
-    const { data, loading, error } = useTraceResults(source, traceQuery);
+    const { data, loading, error } = useTraceResults(source, traceFilter);
 
     const result = useMemo(() => {
         const trace = data? data[0] : undefined;

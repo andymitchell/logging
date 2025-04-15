@@ -1,4 +1,5 @@
 
+import { FullTextSearchDropdown } from "./FullTextSearchDropdown.tsx";
 import { LogLevelsDropdown } from "./LogLevelsDropdown.tsx";
 import { MessageDropdown } from "./MessageDropdown.tsx";
 
@@ -14,6 +15,7 @@ export const TraceFilter: React.FC<TraceFilterProps> = ({  }) => {
         <div>
             <MessageDropdown />
             <LogLevelsDropdown  />
+            <FullTextSearchDropdown />
         </div>
     )
 

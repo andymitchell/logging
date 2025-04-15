@@ -4,6 +4,7 @@ import type { TracesSource } from "../types.ts";
 import { useFilterContext } from "../filter-bar/FilterContext.tsx";
 import { TraceSearch } from "./TraceSearch.tsx";
 
+
 interface FilterContextTraceSearchProps {
     /**
      * Either a TraceViewer object or a GetTracesFn
@@ -18,13 +19,14 @@ export const FilterContextTraceSearch: React.FC<FilterContextTraceSearchProps> =
     onClick
 }) => {
     
-    const {filter} = useFilterContext();
+    const {traceFilter} = useFilterContext();
+
 
     return (
         <div>
 
-            {filter && 
-            (<TraceSearch tracesSource={tracesSource} query={filter} onClick={onClick}/>)
+            {traceFilter && 
+            (<TraceSearch tracesSource={tracesSource} query={traceFilter} onClick={onClick}/>)
             }
             
             

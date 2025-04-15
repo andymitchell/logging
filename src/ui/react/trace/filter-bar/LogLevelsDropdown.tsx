@@ -12,7 +12,7 @@ type Levels = (typeof levels)[number];
 export const LogLevelsDropdown: React.FC = () => {
     
 
-    const { componentFilters, setComponentFilter, registerComponent } = useFilterContext();
+    const { componentEntriesFilters, setComponentEntriesFilter, registerComponent } = useFilterContext();
 
     useEffect(() => {
         registerComponent(COMPONENT_ID);
@@ -21,11 +21,11 @@ export const LogLevelsDropdown: React.FC = () => {
     const selected: Levels[] = useMemo(() => {
         
         
-        const componentFilter = componentFilters[COMPONENT_ID];
+        const componentEntriesFilter = componentEntriesFilters[COMPONENT_ID];
         
-        if (componentFilter && isLogicFilter(componentFilter) && componentFilter['OR']) {
+        if (componentEntriesFilter && isLogicFilter(componentEntriesFilter) && componentEntriesFilter['OR']) {
             
-            const result = componentFilter['OR'].map(orFilter => {
+            const result = componentEntriesFilter['OR'].map(orFilter => {
                 if (isPartialObjectFilter<LogEntry>(orFilter)) {
                     return orFilter.type;
                 }
@@ -34,7 +34,7 @@ export const LogLevelsDropdown: React.FC = () => {
         } else {
             return [];
         }
-    }, [componentFilters])
+    }, [componentEntriesFilters])
 
 
 
@@ -47,7 +47,7 @@ export const LogLevelsDropdown: React.FC = () => {
             updated = [...selected, level];
         }
 
-        setComponentFilter(COMPONENT_ID, 
+        setComponentEntriesFilter(COMPONENT_ID, 
             updated.length?
             {
                 OR: updated.map(type => ({type}))

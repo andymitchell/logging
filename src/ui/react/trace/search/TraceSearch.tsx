@@ -1,15 +1,16 @@
-import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
+
 import { useMemo } from "react";
 import { useTraceResults } from "../data/useTraceResults.ts";
 import type { TracesSource } from "../types.ts";
 import { TraceSearchResultsList } from "./TraceSearchResultsList.tsx";
+import type { TraceFilter } from "../../../../trace/viewing/types.ts";
 
 interface TraceSearchProps {
     /**
      * Either a TraceViewer object or a GetTracesFn
      */
     tracesSource: TracesSource;
-    query: WhereFilterDefinition,
+    query: TraceFilter,
     onClick?: (traceId:string) => void;
 }
 

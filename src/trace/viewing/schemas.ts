@@ -21,8 +21,8 @@ isTypeEqual<z.infer<typeof TraceSearchResultsSchema>, TraceSearchResults>(true);
 
 
 export const TraceFilterSchema = z.object({
-    entries: WhereFilterSchema.optional(),
-    results:  WhereFilterSchema.optional(),
-    entries_full_text: z.string().optional()
+    entries_filter: WhereFilterSchema.optional(),
+    results_filter:  WhereFilterSchema.optional(),
+    entries_full_text_search: z.string().optional()
 })
 isTypeEqual<z.infer<typeof TraceFilterSchema>, TraceFilter>(true);

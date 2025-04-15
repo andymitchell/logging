@@ -14,15 +14,15 @@ export type TraceFilter<T extends MinimumContext = any> = {
     /**
      * At least one entry in the trace must match this filter for the trace to be included.
      */
-    entries?: TraceEntryFilter<T>,
+    entries_filter?: TraceEntryFilter<T>,
     /**
      * Filter the final trace results (e.g. trace timestamp).
      */
-    results?: TraceResultFilter<T>,
+    results_filter?: TraceResultFilter<T>,
     /**
      * At least one entry in the trace must include this string anywhere in its serialised data 
      */
-    entries_full_text?: string
+    entries_full_text_search?: string
 }
 
 export interface ITraceViewer {

@@ -11,26 +11,26 @@ const COMPONENT_ID = 'message';
 export const MessageDropdown: React.FC = () => {
     
 
-    const { componentFilters, setComponentFilter, registerComponent } = useFilterContext<LogEntry>();
+    const { componentEntriesFilters, setComponentEntriesFilter, registerComponent } = useFilterContext<LogEntry>();
 
     useEffect(() => {
         registerComponent(COMPONENT_ID);
     }, [registerComponent]);
 
     const inputValue: string = useMemo(() => {
-        const componentFilter = componentFilters[COMPONENT_ID];
+        const componentEntriesFilter = componentEntriesFilters[COMPONENT_ID];
 
-        if( componentFilter && isPartialObjectFilter(componentFilter) && typeof componentFilter.message==='object' ) {
-            return componentFilter.message.contains ?? '';
+        if( componentEntriesFilter && isPartialObjectFilter(componentEntriesFilter) && typeof componentEntriesFilter.message==='object' ) {
+            return componentEntriesFilter.message.contains ?? '';
         } else {
             return '';
         }
-    }, [componentFilters])
+    }, [componentEntriesFilters])
 
 
 
     const onChange = useCallback((value:string) => {
-        setComponentFilter(COMPONENT_ID, 
+        setComponentEntriesFilter(COMPONENT_ID, 
             value? 
             {
                 message: {contains: value}
