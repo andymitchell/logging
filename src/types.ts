@@ -6,11 +6,11 @@ export type MinimumContext = Record<string, any>;
 
 export interface ILogger<T extends MinimumContext = MinimumContext, M extends MinimumContext = MinimumContext> {
 
-    log(message: string, context?: T): Promise<void>,
+    log(message: string, context?: T): Promise<LogEntry<T, M>>,
 
-    warn(message: string, context?: T): Promise<void>,
+    warn(message: string, context?: T): Promise<LogEntry<T, M>>,
     
-    error(message: string, context?: T): Promise<void>
+    error(message: string, context?: T): Promise<LogEntry<T, M>>
 
     get(filter?:WhereFilterDefinition<LogEntry<T, M>>): Promise<LogEntry<T, M>[]>;
 

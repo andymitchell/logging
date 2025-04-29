@@ -110,7 +110,7 @@ export interface IRawLogger<T extends MinimumContext = MinimumContext, M extends
      * Add an entry to the data store
      * @param entry 
      */
-    add(entry:AcceptLogEntry<T, M>):Promise<void>;
+    add(entry:AcceptLogEntry<T, M>):Promise<LogEntry<T>>;
 
     /**
      * Retrieve entries from the data store

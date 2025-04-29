@@ -44,7 +44,7 @@ export class BaseLogger<T extends MinimumContext = MinimumContext> implements IR
     }
 
 
-    async add(acceptEntry: AcceptLogEntry<T>): Promise<void> {
+    async add(acceptEntry: AcceptLogEntry<T>): Promise<LogEntry<T>> {
         let stackTrace:string | undefined = this.includeStackTrace[acceptEntry.type]? this.generateStackTrace() : undefined;
 
         const logEntry:LogEntry<T> = {
@@ -65,6 +65,8 @@ export class BaseLogger<T extends MinimumContext = MinimumContext> implements IR
         if( this.logToConsole && logEntry.type!=='event') {
             console.log(`[Log ${this.dbNamespace}] ${logEntry.message}`, logEntry.context);
         }
+
+        return logEntry;
     }
 
 

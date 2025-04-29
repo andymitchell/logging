@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Span } from './Span.ts';
-import type { IRawLogger } from '../raw-storage/types.ts';
+import type { IRawLogger, LogEntry } from '../raw-storage/types.ts';
 import type { MinimumContext } from '../types.ts';
 import { WhereFilter, type WhereFilterDefinition } from '@andyrmitchell/objects';
 import type { SpanMeta } from './types.ts';
@@ -12,19 +12,23 @@ import { MemoryBreakpoints } from '../breakpoints/MemoryBreakpoints.ts';
  * It records every log entry in an array and can be configured to fail on add() or get().
  */
 class FakeRawLogger<T extends MinimumContext = any> implements IRawLogger<T, SpanMeta> {
+    
     logs: any[] = [];
     shouldFailAdd = false;
     shouldFailGetAll = false;
 
     breakpoints = new MemoryBreakpoints();
 
-    async add(entry: any): Promise<void> {
+    async add(entry: any): Promise<LogEntry<T>> {
         if (this.shouldFailAdd) {
             throw new Error("add failure");
         }
         // Simulate adding a timestamp (as required by LogEntry) if not provided.
         const logEntry = { ...entry, timestamp: Date.now() };
         this.logs.push(logEntry);
+
+        return logEntry;
+        
     }
 
     async get(filter?:WhereFilterDefinition): Promise<any[]> {
@@ -39,6 +43,10 @@ class FakeRawLogger<T extends MinimumContext = any> implements IRawLogger<T, Spa
 
     async forceClearOldEntries(): Promise<void> {
         this.logs = [];
+    }
+
+    reset(entries?: LogEntry<T, MinimumContext>[] | undefined): Promise<void> {
+        throw new Error('Method not implemented.');
     }
 }
 
