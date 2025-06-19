@@ -37,6 +37,11 @@ export function createLogEntrySchema(context?:z.RecordType<any, any>, meta?:z.Re
         message: z.string()
     });
     
+    const CriticalLogEntrySchema = BaseLogEntrySchema.extend({
+        type: z.literal("critical"),
+        message: z.string()
+    });
+    
     const BaseEventDetailSchema = z.object({
         name: z.string()
     });
@@ -64,6 +69,7 @@ export function createLogEntrySchema(context?:z.RecordType<any, any>, meta?:z.Re
         InfoLogEntrySchema,
         WarnLogEntrySchema,
         ErrorLogEntrySchema,
+        CriticalLogEntrySchema,
         EventLogEntrySchema
     ]);
 

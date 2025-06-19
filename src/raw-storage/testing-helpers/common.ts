@@ -293,6 +293,7 @@ export async function commonRawLoggerTests(createLogger:CreateTestLogger) {
                         info: true, 
                         warn: true, 
                         error: true,
+                        critical: true,
                         event: true
                     }
                 }).logger;

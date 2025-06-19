@@ -91,6 +91,16 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
         })
     }
 
+
+    async critical(message: string, context?: T): Promise<LogEntry<T, SpanMeta>> {
+        return await this.#addToStorage({
+            type: 'critical',
+            message,
+            context, 
+            meta: this.#getMeta()
+        })
+    }
+
     async get(filter?:WhereFilterDefinition<LogEntry<T, SpanMeta>>): Promise<LogEntry<T, SpanMeta>[]> {
         return await this.storage.get(filter);
     }

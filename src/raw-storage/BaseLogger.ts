@@ -105,6 +105,7 @@ const DEFAULT_LOGGER_OPTIONS:Required<LoggerOptions> = {
         info: false,
         warn: true,
         error: true,
+        critical: true,
         event: false
     },
     log_to_console: false,

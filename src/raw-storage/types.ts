@@ -55,6 +55,10 @@ type ErrorLogEntry<T extends MinimumContext = MinimumContext, M extends MinimumC
     type: 'error',
     message: string
 };
+type CriticalLogEntry<T extends MinimumContext = MinimumContext, M extends MinimumContext = MinimumContext> = BaseLogEntry<T, M> & {
+    type: 'critical',
+    message: string
+};
 
 type BaseEventDetail = {
     name: string
@@ -84,6 +88,7 @@ export type LogEntry<T extends MinimumContext = MinimumContext, M extends Minimu
     InfoLogEntry<T, M> | 
     WarnLogEntry<T, M> | 
     ErrorLogEntry<T, M> |
+    CriticalLogEntry<T, M> | 
     EventLogEntry<T, M>
 
 
@@ -95,6 +100,7 @@ export type AcceptLogEntry<T extends MinimumContext = MinimumContext, M extends 
   | (Omit<InfoLogEntry<T, M>, 'context' | 'stack_trace' | 'timestamp' | 'ulid'> & { context?: T, ulid?: string })
   | (Omit<WarnLogEntry<T, M>, 'context' | 'stack_trace' | 'timestamp' | 'ulid'> & { context?: T, ulid?: string })
   | (Omit<ErrorLogEntry<T, M>, 'context' | 'stack_trace' | 'timestamp' | 'ulid'> & { context?: T, ulid?: string })
+  | (Omit<CriticalLogEntry<T, M>, 'context' | 'stack_trace' | 'timestamp' | 'ulid'> & { context?: T, ulid?: string })
   | (Omit<EventLogEntry<T, M>, 'context' | 'stack_trace' | 'timestamp' | 'ulid'> & { context?: T, ulid?: string });
 
 

@@ -12,6 +12,8 @@ export interface ILogger<T extends MinimumContext = MinimumContext, M extends Mi
     
     error(message: string, context?: T): Promise<LogEntry<T, M>>
 
+    critical(message: string, context?: T): Promise<LogEntry<T, M>>
+
     get(filter?:WhereFilterDefinition<LogEntry<T, M>>): Promise<LogEntry<T, M>[]>;
 
 }
@@ -34,6 +36,7 @@ export interface LoggerOptions {
         info: boolean;
         warn: boolean;
         error: boolean;
+        critical: boolean;
         event: boolean;
     };
     log_to_console?:boolean,
