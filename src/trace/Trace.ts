@@ -1,5 +1,5 @@
 
-import type { IRawLogger } from "../index-browser.ts";
+import type { ILogStorage } from "../index-browser.ts";
 import { Span } from "./Span.ts";
 import type { ISpan } from "./types.ts";
 
@@ -14,7 +14,7 @@ export class Trace extends Span implements ISpan {
 
     
 
-    constructor(storage:IRawLogger, name?: string, context?: any) {
+    constructor(storage:ILogStorage, name?: string, context?: any) {
         super(storage, undefined, name, context);
         
     }

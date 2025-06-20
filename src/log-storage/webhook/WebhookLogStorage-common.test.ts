@@ -2,7 +2,7 @@
 import { vi } from "vitest";
 import { commonRawLoggerTests } from "../testing-helpers/common.ts";
 import { FetchEmitter } from "./testing-helpers/FetchEmitter.ts";
-import { WebhookLoggerForTesting } from "./testing-helpers/WebhookLoggerForTesting.ts";
+import { WebhookLogStorageForTesting } from "./testing-helpers/WebhookLogStorageForTesting.ts";
 
 let interceptor: FetchEmitter;
 
@@ -18,10 +18,10 @@ afterEach(() => {
     vi.clearAllMocks();
 });
 
-describe('MemoryLogger', () => {
+describe('MemoryLogStorage', () => {
 
     commonRawLoggerTests((options) => ({
-        logger: new WebhookLoggerForTesting('testing', 'https://www.whereever.com', interceptor, options),
+        logger: new WebhookLogStorageForTesting('testing', 'https://www.whereever.com', interceptor, options),
         cannot_recreate_with_same_data: true,
         recreateWithSameData() { throw new Error("Cannot") }
     }));

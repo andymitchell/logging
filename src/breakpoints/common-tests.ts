@@ -1,5 +1,5 @@
 import {it} from 'vitest';
-import type { AcceptLogEntry } from '../raw-storage/types.ts';
+import type { AcceptLogEntry } from '../log-storage/types.ts';
 import { promiseWithTrigger } from '@andyrmitchell/utils';
 import type { IBreakpoints } from './types.ts';
 

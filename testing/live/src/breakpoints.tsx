@@ -1,7 +1,7 @@
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { MemoryLogger } from '../../../src/raw-storage/memory/MemoryLogger';
+import { MemoryLogStorage } from '../../../src/raw-storage/memory/MemoryLogStorage';
 import { MemoryBreakpoints } from '../../../src/breakpoints/MemoryBreakpoints';
 import { initiateBreakpointCommandsInDevTools } from '../../../src/breakpoints/initiateBreakpointCommandsInDevTools';
 import { Trace } from '../../../src/index-browser';
@@ -10,7 +10,7 @@ import { Trace } from '../../../src/index-browser';
 
 
 const breakpoints = new MemoryBreakpoints();
-const logger = new MemoryLogger('', {breakpoints});
+const logger = new MemoryLogStorage('', {breakpoints});
 initiateBreakpointCommandsInDevTools('theTest', logger.breakpoints);
 
 

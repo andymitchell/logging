@@ -1,8 +1,5 @@
 import { Logger } from "./log/Logger.ts";
-import { IDBLogger } from "./raw-storage/idb/IDBLogger.ts";
-import { MemoryLogger } from "./raw-storage/memory/MemoryLogger.ts";
-import { WebhookLogger } from "./raw-storage/webhook/WebhookLogger.ts";
-import { ChannelsLogger } from "./raw-storage/channels/ChannelsLogger.ts";
+import { IDBLogStorage } from "./log-storage/idb/IDBLogStorage.ts";
 
 
 import { Span } from "./trace/Span.ts";
@@ -18,12 +15,10 @@ export {
     Logger
 }
 
-
+export * from './index-universal-logstorage.ts';
 export {
-    MemoryLogger,
-    IDBLogger,
-    WebhookLogger,
-    ChannelsLogger
+    IDBLogStorage,
+    IDBLogStorage as IDBLogger, // Deprecated
 }
 
 

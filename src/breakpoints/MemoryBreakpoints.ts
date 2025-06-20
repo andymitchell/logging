@@ -1,5 +1,5 @@
 import type { WhereFilterDefinition } from "@andyrmitchell/objects";
-import type { AcceptLogEntry } from "../raw-storage/types.ts";
+import type { AcceptLogEntry } from "../log-storage/types.ts";
 import { uuidV4 } from "@andyrmitchell/utils/uid";
 import {  type Breakpoint, type IBreakpoints } from "./types.ts";
 import { BaseBreakpoints } from "./BaseBreakpoints.ts";

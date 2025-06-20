@@ -1,6 +1,6 @@
 
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
-import type { AcceptLogEntry, IRawLogger, LogEntry } from "../raw-storage/types.ts";
+import type { AcceptLogEntry, ILogStorage, LogEntry } from "../log-storage/types.ts";
 import type { ILogger} from "../types.ts";
 
 
@@ -13,10 +13,10 @@ export class Logger implements ILogger {
 
     
 
-    protected storage:IRawLogger;
+    protected storage:ILogStorage;
 
 
-    constructor(storage:IRawLogger) {
+    constructor(storage:ILogStorage) {
         this.storage = storage;
     }
 

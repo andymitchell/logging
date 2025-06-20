@@ -1,6 +1,6 @@
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import type { IBreakpoints } from "../breakpoints/types.ts";
-import type { MinimumContext } from "../types.ts";
+import type { MaxAge, MinimumContext } from "../types.ts";
 
 
 /**
@@ -109,7 +109,7 @@ export type LogEntryType = LogEntry['type'];
 /**
  * The storage area for loggers. An implementation of this will always be passed into a Logger/Trace class. 
  */
-export interface IRawLogger {
+export interface ILogStorage {
 
     breakpoints: IBreakpoints,
 
@@ -127,7 +127,7 @@ export interface IRawLogger {
     get(filter?:WhereFilterDefinition<LogEntry>, fullTextFilter?: string): Promise<LogEntry[]>;
 
     /**
-     * Remove items older than the max age stated in LoggerOptions
+     * Remove items older than the max age stated in LogStorageOptions
      */
     forceClearOldEntries(): Promise<void>;
 
@@ -138,4 +138,33 @@ export interface IRawLogger {
      */
     reset(entries?:LogEntry[]): Promise<void>;
 
+}
+
+export interface LogStorageOptions {
+    include_stack_trace?: {
+        info: boolean;
+        warn: boolean;
+        error: boolean;
+        critical: boolean;
+        event: boolean;
+    };
+    log_to_console?:boolean,
+
+    /**
+     * Cull logs based on age. Set different times for different filters (matching first found in array)
+     * 
+     * @example [{filter: {type: 'error'}, max_ms: dayMs*30}, {max_ms: dayMs*5}] 
+     */
+    max_age?: MaxAge,
+
+
+    /**
+     * Allow context properties that are prefixed with '_dangerous' to not be stripped of sensitive data. Useful to allow some tracking IDs through.
+     */
+    permit_dangerous_context_properties?: boolean,
+
+    /**
+     * Set a custom IBreakpoints implementation (e.g. a different storage area). Defaults to in-memory if not provided.
+     */
+    breakpoints?: IBreakpoints
 }

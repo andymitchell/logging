@@ -1,7 +1,7 @@
 
-import type { LoggerOptions } from "../../../types.ts";
-import type { LogEntry, IRawLogger } from "../../types.ts";
-import { WebhookLogger } from "../WebhookLogger.ts";
+import type { LogStorageOptions } from "../../types.ts";
+import type { LogEntry, ILogStorage } from "../../types.ts";
+import { WebhookLogStorage } from "../WebhookLogStorage.ts";
 import type { FetchEmitter } from "./FetchEmitter.ts";
 import createMaxAgeTest from "../../createMaxAgeTest.ts";
 import { matchJavascriptObject, type WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
@@ -10,12 +10,12 @@ import { matchJavascriptObject, type WhereFilterDefinition } from "@andyrmitchel
 /**
  * This captures the logs sent via fetch, so they can be 'get'/'reset'/etc.
  */
-export class WebhookLoggerForTesting extends WebhookLogger implements IRawLogger {
+export class WebhookLogStorageForTesting extends WebhookLogStorage implements ILogStorage {
 
 
     #log:LogEntry[] = [];
 
-    constructor(dbNamespace: string, postUrl: string, fetchEmitter:FetchEmitter, options?: LoggerOptions) {
+    constructor(dbNamespace: string, postUrl: string, fetchEmitter:FetchEmitter, options?: LogStorageOptions) {
         super(dbNamespace, postUrl, options);
 
         this.clearOldEntries();

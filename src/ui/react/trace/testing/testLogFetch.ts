@@ -1,14 +1,14 @@
-import { MemoryLogger } from "../../../../raw-storage/memory/MemoryLogger.ts";
+import { MemoryLogStorage } from "../../../../log-storage/memory/MemoryLogStorage.ts";
 import { Trace } from "../../../../trace/Trace.ts";
 import { TraceViewer } from "../../../../trace/viewing/TraceViewer.ts";
 import type { GetTracesFn } from "../types.ts";
 
 export const generateTestLogFetch:(() => GetTracesFn) = () => {
-    const logger = new MemoryLogger('');
+    const logger = new MemoryLogStorage('');
     
 
     // Initialise some events:
-    const trace = new Trace<any>(logger, 'T0', { 'name': 'Bob' });
+    const trace = new Trace(logger, 'T0', { 'name': 'Bob' });
     trace.log("First moment", { name: 'Sue' });
     const span1 = trace.startSpan('T1', { color: 'blue' });
     span1.error("Oh jeez no!");

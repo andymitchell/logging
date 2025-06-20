@@ -1,5 +1,5 @@
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
-import { isLogEntrySimple, type LogEntry } from "../../raw-storage/types.ts";
+import { isLogEntrySimple, type LogEntry } from "../../log-storage/types.ts";
 import type { SpanMeta, TraceEntry } from "../types.ts";
 import type { MinimumContext } from "../../types.ts";
 

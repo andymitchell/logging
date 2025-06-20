@@ -1,6 +1,6 @@
 
 
-import { isEventLogEntry, type EventLogEntry, type LogEntry, type StartEventDetail } from "../raw-storage/types.ts";
+import { isEventLogEntry, type EventLogEntry, type LogEntry, type StartEventDetail } from "../log-storage/types.ts";
 import type { ILogger, MinimumContext } from "../types.ts"
 
 

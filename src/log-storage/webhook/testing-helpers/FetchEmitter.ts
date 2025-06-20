@@ -3,7 +3,7 @@
 import { vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import type { Mock } from 'vitest';
-import type { PostBody } from '../WebhookLogger.ts';
+import type { PostBody } from '../WebhookLogStorage.ts';
 
 /**
  * The payload emitted by the interceptor when a POST request is caught.
@@ -33,7 +33,7 @@ export interface InterceptedPayload {
  * });
  *
  * it('should capture the logger payload', async () => {
- *   const logger = new WebhookLogger(...);
+ *   const logger = new WebhookLogStorage(...);
  *   const captured = new Promise<InterceptedPayload>(res => {
  *      interceptor.on('post', payload => res(payload));
  *   });

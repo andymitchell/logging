@@ -1,5 +1,5 @@
 import type { Ref } from "react"
-import { isEventLogEntry, type LogEntry } from "../../raw-storage/types.ts"
+import { isEventLogEntry, type LogEntry } from "../../log-storage/types.ts"
 import { isEventLogEntrySpanStart, type SpanMeta } from "../../trace/types.ts"
 
 export type BaseComponentTypes = {

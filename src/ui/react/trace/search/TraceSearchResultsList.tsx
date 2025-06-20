@@ -1,7 +1,7 @@
 import { useCallback, useMemo} from "react";
 
 import { convertLogSpanEntryToBody } from "../../types.ts";
-import type { LogEntry } from "../../../../raw-storage/types.ts";
+import type { LogEntry } from "../../../../log-storage/types.ts";
 import type { SpanMeta, TraceEntry } from "../../../../trace/types.ts";
 import { LogBody } from "../common-components/LogBody.tsx";
 

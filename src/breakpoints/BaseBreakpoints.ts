@@ -1,5 +1,5 @@
 import type { WhereFilterDefinition } from "@andyrmitchell/objects";
-import type { AcceptLogEntry } from "../raw-storage/types.ts";
+import type { AcceptLogEntry } from "../log-storage/types.ts";
 
 import { matchJavascriptObject } from "@andyrmitchell/objects/where-filter";
 import {  type Breakpoint, type BreakpointCallback, type IBreakpoints } from "./types.ts";

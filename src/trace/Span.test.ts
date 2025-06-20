@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Span } from './Span.ts';
-import type { IRawLogger, LogEntry } from '../raw-storage/types.ts';
+import type { ILogStorage, LogEntry } from '../log-storage/types.ts';
 import type { MinimumContext } from '../types.ts';
 import { WhereFilter, type WhereFilterDefinition } from '@andyrmitchell/objects';
 import type { SpanMeta } from './types.ts';
@@ -8,10 +8,10 @@ import type { SpanMeta } from './types.ts';
 import { MemoryBreakpoints } from '../breakpoints/MemoryBreakpoints.ts';
 
 /**
- * A fake implementation of IRawLogger to be used in tests.
+ * A fake implementation of ILogStorage to be used in tests.
  * It records every log entry in an array and can be configured to fail on add() or get().
  */
-class FakeRawLogger<T extends MinimumContext = any> implements IRawLogger {
+class FakeRawLogger<T extends MinimumContext = any> implements ILogStorage {
     
     logs: any[] = [];
     shouldFailAdd = false;

@@ -1,18 +1,18 @@
 import { matchJavascriptObject, type WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
-import type { LoggerOptions } from "../../types.ts";
-import { BaseLogger } from "../BaseLogger.ts";
-import type { LogEntry, IRawLogger } from "../types.ts";
+import type { LogStorageOptions } from "../types.ts";
+import { BaseLogStorage } from "../BaseLogStorage.ts";
+import type { LogEntry, ILogStorage } from "../types.ts";
 import createMaxAgeTest from "../createMaxAgeTest.ts";
 
 
 
-export class MemoryLogger extends BaseLogger implements IRawLogger {
+export class MemoryLogStorage extends BaseLogStorage implements ILogStorage {
 
     #log:LogEntry[]
     
     
 
-    constructor(dbNamespace:string, options?: LoggerOptions) {
+    constructor(dbNamespace:string, options?: LogStorageOptions) {
         super(dbNamespace, options);
 
         this.#log = [];

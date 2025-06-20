@@ -1,8 +1,8 @@
 
 
 import { cloneDeepScalarValues } from "@andyrmitchell/utils/deep-clone-scalar-values";
-import type { LoggerOptions, MaxAge, MinimumContext } from "../types.ts";
-import type { AcceptLogEntry, IRawLogger, LogEntry } from "./types.ts";
+import type {  MaxAge, MinimumContext } from "../types.ts";
+import type { AcceptLogEntry, ILogStorage, LogEntry, LogStorageOptions } from "./types.ts";
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import { monotonicFactory } from "ulid";
 import { MemoryBreakpoints } from "../breakpoints/MemoryBreakpoints.ts";
@@ -11,8 +11,8 @@ import type { IBreakpoints } from "../breakpoints/types.ts";
 
 
 
-export class BaseLogger implements IRawLogger {
-    protected includeStackTrace: Required<LoggerOptions>['include_stack_trace'];
+export class BaseLogStorage implements ILogStorage {
+    protected includeStackTrace: Required<LogStorageOptions>['include_stack_trace'];
     protected logToConsole:boolean;
     protected permitDangerousContextProperties: boolean;
     protected maxAge: MaxAge;
@@ -20,7 +20,7 @@ export class BaseLogger implements IRawLogger {
     protected ulid:Function;
     breakpoints:IBreakpoints;
 
-    constructor(dbNamespace:string, options?: LoggerOptions) {
+    constructor(dbNamespace:string, options?: LogStorageOptions) {
         const safeOptions = Object.assign({}, DEFAULT_LOGGER_OPTIONS, options);
         this.includeStackTrace = safeOptions.include_stack_trace;
         this.logToConsole = safeOptions.log_to_console;
@@ -111,7 +111,7 @@ export class BaseLogger implements IRawLogger {
     
 }
 
-const DEFAULT_LOGGER_OPTIONS:Required<LoggerOptions> = {
+const DEFAULT_LOGGER_OPTIONS:Required<LogStorageOptions> = {
     include_stack_trace: {
         info: false,
         warn: true,

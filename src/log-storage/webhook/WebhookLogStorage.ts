@@ -1,7 +1,7 @@
 import { QueueMemory } from "@andyrmitchell/utils/queue-memory";
-import type { LoggerOptions } from "../../types.ts";
-import { BaseLogger } from "../BaseLogger.ts";
-import type { LogEntry, IRawLogger } from "../types.ts";
+import type { LogStorageOptions } from "../types.ts";
+import { BaseLogStorage } from "../BaseLogStorage.ts";
+import type { LogEntry, ILogStorage } from "../types.ts";
 import { uid } from "@andyrmitchell/utils/uid";
 
 
@@ -18,7 +18,7 @@ export type PostBody = {
  * 
  * The endpoint should expect a POST of {entries: LogEntry[], instanceId: string}
  */
-export class WebhookLogger extends BaseLogger implements IRawLogger {
+export class WebhookLogStorage extends BaseLogStorage implements ILogStorage {
 
 
     /**
@@ -30,7 +30,7 @@ export class WebhookLogger extends BaseLogger implements IRawLogger {
     /**
      * Make sure fetch functions run sequentially in a guaranteed order
      */
-    #queue = new QueueMemory('WebhookLogger');
+    #queue = new QueueMemory('WebhookLogStorage');
 
     #callbackId?: NodeJS.Timeout | number
 
@@ -47,7 +47,7 @@ export class WebhookLogger extends BaseLogger implements IRawLogger {
     #bufferStorage: BufferStorage;
 
 
-    constructor(dbNamespace: string, postUrl: string, options?: LoggerOptions) {
+    constructor(dbNamespace: string, postUrl: string, options?: LogStorageOptions) {
         super(dbNamespace, options);
 
 
@@ -82,7 +82,7 @@ export class WebhookLogger extends BaseLogger implements IRawLogger {
 
             // Continue sending batches as long as there are items in the buffer
             while (buffer.length > 0) {
-                const batch = buffer.slice(0, WebhookLogger.MAX_BATCH_SIZE);
+                const batch = buffer.slice(0, WebhookLogStorage.MAX_BATCH_SIZE);
 
                 try {
                     const postBody:PostBody = {
@@ -106,16 +106,16 @@ export class WebhookLogger extends BaseLogger implements IRawLogger {
 
                     } else if (RETRYABLE_STATUSES.includes(response.status)) {
                         // TRANSIENT FAILURE: Back off and retry later.
-                        console.warn(`WebhookLogger: Received retryable status ${response.status}. Backing off.`);
+                        console.warn(`WebhookLogStorage: Received retryable status ${response.status}. Backing off.`);
                         await this.#handleFailure();
                         break; // Stop processing batches and wait for the backoff period.
 
                     } else {
                         // PERMANENT FAILURE: Log the error and discard the batch to unblock the queue.
-                        console.error(`WebhookLogger: Received non-retryable status ${response.status}. Discarding batch.`);
+                        console.error(`WebhookLogStorage: Received non-retryable status ${response.status}. Discarding batch.`);
                         try {
                             const errorBody = await response.text();
-                            console.error(`WebhookLogger: Error response body: ${errorBody}`);
+                            console.error(`WebhookLogStorage: Error response body: ${errorBody}`);
                         } catch { /* Ignore if body can't be read */ }
                         
                         await this.#bufferStorage.markComplete(batch.map(x => x.ulid));
@@ -123,7 +123,7 @@ export class WebhookLogger extends BaseLogger implements IRawLogger {
                     }
 
                 } catch (error) {
-                    console.error(`WebhookLogger: Fetch failed for URL ${this.#postUrl}. Backing off.`, error);
+                    console.error(`WebhookLogStorage: Fetch failed for URL ${this.#postUrl}. Backing off.`, error);
                     await this.#handleFailure();
                     // Break the loop and wait for the backoff period.
                     break;

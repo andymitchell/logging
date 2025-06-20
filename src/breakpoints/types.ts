@@ -1,5 +1,5 @@
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter"
-import type { AcceptLogEntry } from "../raw-storage/types.ts"
+import type { AcceptLogEntry } from "../log-storage/types.ts"
 
 
 

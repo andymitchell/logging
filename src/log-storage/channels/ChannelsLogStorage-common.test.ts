@@ -1,18 +1,18 @@
 
 
 import { commonRawLoggerTests } from "../testing-helpers/common.ts";
-import { ChannelsLogger } from "./ChannelsLogger.ts";
-import { MemoryLogger } from "../memory/MemoryLogger.ts";
+import { ChannelsLogStorage } from "./ChannelsLogStorage.ts";
+import { MemoryLogStorage } from "../memory/MemoryLogStorage.ts";
 
 
 
 
-describe('MemoryLogger', () => {
+describe('MemoryLogStorage', () => {
 
     commonRawLoggerTests((options) => ({
-        logger: new ChannelsLogger('testing', [
+        logger: new ChannelsLogStorage('testing', [
             {
-                storage: new MemoryLogger('', options)
+                storage: new MemoryLogStorage('', options)
             }
         ], options),
         cannot_recreate_with_same_data: true,

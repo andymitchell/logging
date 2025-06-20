@@ -1,4 +1,4 @@
-import { MemoryLogger } from "../../raw-storage/memory/MemoryLogger.ts";
+import { MemoryLogStorage } from "../../log-storage/memory/MemoryLogStorage.ts";
 import { getTraces } from "./getTraces.ts";
 import { Trace } from "../Trace.ts";
 import { convertArrayToRecord, sleep } from "@andyrmitchell/utils";
@@ -7,7 +7,7 @@ import { convertArrayToRecord, sleep } from "@andyrmitchell/utils";
 describe('get-all', () => {
     it('get-all includes the entry', async () => {
 
-        const rawLogger = new MemoryLogger('');
+        const rawLogger = new MemoryLogStorage('');
     
         const trace1 = new Trace(rawLogger);
         trace1.log('abc1');
@@ -28,7 +28,7 @@ describe('get-all', () => {
 
     it('Includes second trace when get-all', async () => {
 
-        const rawLogger = new MemoryLogger('');
+        const rawLogger = new MemoryLogStorage('');
 
         const trace1 = new Trace(rawLogger);
         trace1.log('abc1');
@@ -48,7 +48,7 @@ describe('get-all', () => {
 
     it('logging twice will still use the correct trace id in the results', async () => {
 
-        const rawLogger = new MemoryLogger('');
+        const rawLogger = new MemoryLogStorage('');
     
         const trace1 = new Trace(rawLogger);
         trace1.log('abc1');
@@ -68,7 +68,7 @@ describe('get-all', () => {
 describe('filtering', () => {
     it('get filter includes the entry', async () => {
 
-        const rawLogger = new MemoryLogger('');
+        const rawLogger = new MemoryLogStorage('');
     
         const trace1 = new Trace(rawLogger);
         trace1.log('abc1');
@@ -88,7 +88,7 @@ describe('filtering', () => {
     
     it('Includes second trace when filtering across both', async () => {
     
-        const rawLogger = new MemoryLogger('');
+        const rawLogger = new MemoryLogStorage('');
     
         const trace1 = new Trace(rawLogger);
         trace1.log('abc1');
@@ -108,7 +108,7 @@ describe('filtering', () => {
     
     it('Ignores second trace when using a filter for just 1', async () => {
     
-        const rawLogger = new MemoryLogger('');
+        const rawLogger = new MemoryLogStorage('');
     
         const trace1 = new Trace(rawLogger);
         trace1.log('abc1');
@@ -130,7 +130,7 @@ describe('filtering', () => {
 describe('filtering full text', () => {
     it('get filter includes the entry', async () => {
 
-        const rawLogger = new MemoryLogger('');
+        const rawLogger = new MemoryLogStorage('');
     
         const trace1 = new Trace(rawLogger);
         trace1.log('abc1');
@@ -152,7 +152,7 @@ describe('filtering full text', () => {
 
     it('get filter omits when no match', async () => {
 
-        const rawLogger = new MemoryLogger('');
+        const rawLogger = new MemoryLogStorage('');
     
         const trace1 = new Trace(rawLogger);
         trace1.log('abc1');
@@ -176,7 +176,7 @@ describe('filtering final traces', () => {
     it('filter traces on the timestamp', async () => {
 
         
-        const rawLogger = new MemoryLogger('');
+        const rawLogger = new MemoryLogStorage('');
         
         const trace1 = new Trace(rawLogger);
         trace1.log('abc1');
@@ -198,7 +198,7 @@ describe('filtering final traces', () => {
 describe('toggle include all', () => {
     it('get filter includes the entry', async () => {
 
-        const rawLogger = new MemoryLogger('');
+        const rawLogger = new MemoryLogStorage('');
     
         const trace1 = new Trace(rawLogger);
         trace1.log('abc1');
@@ -215,7 +215,7 @@ describe('toggle include all', () => {
 describe('handles child traces', () => {
     it('it includes all items under the parent trace', async () => {
     
-        const rawLogger = new MemoryLogger('');
+        const rawLogger = new MemoryLogStorage('');
     
         const trace1 = new Trace(rawLogger);
         trace1.log('abc1');

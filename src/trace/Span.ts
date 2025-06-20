@@ -1,6 +1,6 @@
 
 import { uuidV4 } from "@andyrmitchell/utils/uid";
-import type { AcceptLogEntry, IRawLogger, LogEntry } from "../raw-storage/types.ts";
+import type { AcceptLogEntry, ILogStorage, LogEntry } from "../log-storage/types.ts";
 
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import type { ISpan, SpanMeta,  SpanId } from "./types.ts";
@@ -18,9 +18,9 @@ export class Span implements ISpan {
     
 
     protected spanId: Readonly<SpanId>;
-    protected storage:IRawLogger;
+    protected storage:ILogStorage;
 
-    constructor(storage:IRawLogger, parent?: {parent_id?: string, top_id?: string}, name?: string, context?: any) {
+    constructor(storage:ILogStorage, parent?: {parent_id?: string, top_id?: string}, name?: string, context?: any) {
         this.storage = storage;
 
         const id = uuidV4();

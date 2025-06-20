@@ -1,6 +1,6 @@
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
-import type {  LogEntry } from "./raw-storage/types.ts";
-import type {  IBreakpoints } from "./breakpoints/types.ts";
+import type {  LogEntry } from "./log-storage/types.ts";
+
 
 export type MinimumContext = Record<string, any>;
 
@@ -31,31 +31,3 @@ export type MaxAge = {
 }[]
 
 
-export interface LoggerOptions {
-    include_stack_trace?: {
-        info: boolean;
-        warn: boolean;
-        error: boolean;
-        critical: boolean;
-        event: boolean;
-    };
-    log_to_console?:boolean,
-
-    /**
-     * Cull logs based on age. Set different times for different filters (matching first found in array)
-     * 
-     * @example [{filter: {type: 'error'}, max_ms: dayMs*30}, {max_ms: dayMs*5}] 
-     */
-    max_age?: MaxAge,
-
-
-    /**
-     * Allow context properties that are prefixed with '_dangerous' to not be stripped of sensitive data. Useful to allow some tracking IDs through.
-     */
-    permit_dangerous_context_properties?: boolean,
-
-    /**
-     * Set a custom IBreakpoints implementation (e.g. a different storage area). Defaults to in-memory if not provided.
-     */
-    breakpoints?: IBreakpoints
-}

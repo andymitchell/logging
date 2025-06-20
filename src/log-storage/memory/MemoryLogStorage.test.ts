@@ -1,15 +1,15 @@
 
 import { commonRawLoggerTests } from "../testing-helpers/common.ts";
-import { MemoryLogger } from "./MemoryLogger.ts";
+import { MemoryLogStorage } from "./MemoryLogStorage.ts";
 
 
 beforeEach(async () => {
 })
 
-describe('MemoryLogger', () => {
+describe('MemoryLogStorage', () => {
 
     commonRawLoggerTests((options) => ({
-        logger: new MemoryLogger('testing', options),
+        logger: new MemoryLogStorage('testing', options),
         cannot_recreate_with_same_data: true,
         recreateWithSameData() { throw new Error("Cannot") }
     }));

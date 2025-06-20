@@ -1,17 +1,17 @@
 import {  matchJavascriptObject, type WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
-import type { LoggerOptions } from "../../types.ts";
-import { BaseLogger } from "../BaseLogger.js";
-import type { IRawLogger, LogEntry } from "../types.ts";
+import type { LogStorageOptions } from "../types.ts";
+import { BaseLogStorage } from "../BaseLogStorage.ts";
+import type { ILogStorage, LogEntry } from "../types.ts";
 import createMaxAgeTest from "../createMaxAgeTest.ts";
 
 
 
 
-export class IDBLogger extends BaseLogger implements IRawLogger {
+export class IDBLogStorage extends BaseLogStorage implements ILogStorage {
     #dbPromise: Promise<IDBDatabase>;
     
 
-    constructor(dbNamespace:string, options?: LoggerOptions) {
+    constructor(dbNamespace:string, options?: LogStorageOptions) {
         super(dbNamespace, options);
 
         this.#dbPromise = new Promise<IDBDatabase>((resolve, reject) => {

@@ -1,17 +1,17 @@
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import { matchJavascriptObject } from "@andyrmitchell/objects/where-filter"; 
-import type { LoggerOptions } from "../../types.ts";
-import { BaseLogger } from "../BaseLogger.ts";
-import type { IRawLogger, LogEntry } from "../types.ts";
+import type { LogStorageOptions } from "../types.ts";
+import { BaseLogStorage } from "../BaseLogStorage.ts";
+import type { ILogStorage, LogEntry } from "../types.ts";
 
 /**
- * Defines the configuration for a single channel within the ChannelsLogger.
+ * Defines the configuration for a single channel within the ChannelsLogStorage.
  */
 export interface Channel {
     /**
      * The underlying storage instance (e.g., MemoryRawLogger, IDBRawLogger) for this channel.
      */
-    storage: IRawLogger;
+    storage: ILogStorage;
 
     /**
      * An optional filter. If provided, only log entries that match this filter
@@ -26,18 +26,18 @@ export interface Channel {
     transform?: (entry: LogEntry) => LogEntry;
 }
 
-type LoggerOptionsWithoutSensitive = Omit<LoggerOptions, 'permit_dangerous_context_properties'>;
+type LogStorageOptionsWithoutSensitive = Omit<LogStorageOptions, 'permit_dangerous_context_properties'>;
 
 /**
  * A facade RawLogger that distributes log entries to multiple "channels" based on a set of rules.
  * 
- * Each channel consists of an underlying IRawLogger (the storage) and optional rules for accepting
+ * Each channel consists of an underlying ILogStorage (the storage) and optional rules for accepting
  * and transforming entries. This allows for complex logging strategies, such as:
  * - Sending only errors to a Webhook logger.
  * - Sending all logs to an in-memory logger for quick access.
  * - Redacting sensitive information before sending logs to a persistent IndexedDB store.
  */
-export class ChannelsLogger extends BaseLogger implements IRawLogger {
+export class ChannelsLogStorage extends BaseLogStorage implements ILogStorage {
 
     private channels: Channel[];
 
@@ -46,10 +46,10 @@ export class ChannelsLogger extends BaseLogger implements IRawLogger {
      * @param channels An array of channel configurations.
      * @param options Standard logger options.
      */
-    constructor(dbNamespace: string, channels: Channel[], options?: LoggerOptionsWithoutSensitive) {
+    constructor(dbNamespace: string, channels: Channel[], options?: LogStorageOptionsWithoutSensitive) {
         super(dbNamespace, options);
         if (!channels || channels.length === 0) {
-            throw new Error("ChannelsLogger requires at least one channel in its configuration.");
+            throw new Error("ChannelsLogStorage requires at least one channel in its configuration.");
         }
         this.channels = channels;
     }
@@ -66,7 +66,7 @@ export class ChannelsLogger extends BaseLogger implements IRawLogger {
 
     /**
      * Distributes the finalized log entry to all matching channels.
-     * This method is called internally by the `add` method in `BaseLogger`.
+     * This method is called internally by the `add` method in `BaseLogStorage`.
      * @param logEntry The complete log entry to be committed.
      */
     protected override async commitEntry(logEntry: LogEntry): Promise<void> {
@@ -84,8 +84,8 @@ export class ChannelsLogger extends BaseLogger implements IRawLogger {
                 // 3. Transform the entry if a transformer is provided
                 const entryToSend:LogEntry = channel.transform ? channel.transform(entryForChannel) : entryForChannel;
 
-                // 4. Send to the channel's storage. We call .add() to adhere to the IRawLogger interface.
-                // The underlying BaseLogger.add() will use the existing ulid.
+                // 4. Send to the channel's storage. We call .add() to adhere to the ILogStorage interface.
+                // The underlying BaseLogStorage.add() will use the existing ulid.
                 commitPromises.push(channel.storage.add(entryToSend));
             }
         }

@@ -1,9 +1,9 @@
 import "fake-indexeddb/auto"; // Prevent any long-term IDB storage
-import { IDBLogger } from "./IDBLogger.js";
+import { IDBLogStorage } from "./IDBLogStorage.ts";
 import { IDBFactory } from "fake-indexeddb";
 import { commonRawLoggerTests } from "../testing-helpers/common.ts";
 import { uuidV4 } from "@andyrmitchell/utils/uid";
-import type { LoggerOptions } from "../../types.ts";
+import type { LogStorageOptions } from "../types.ts";
 
 
 
@@ -12,15 +12,15 @@ beforeEach(async () => {
     indexedDB = new IDBFactory()
 })
 
-const makeLogger = (options?:LoggerOptions) => {
+const makeLogger = (options?:LogStorageOptions) => {
     const id = `testing_${uuidV4}`;
     return {
-        logger: new IDBLogger(id, options),
-        recreateWithSameData: () => new IDBLogger(id, options)
+        logger: new IDBLogStorage(id, options),
+        recreateWithSameData: () => new IDBLogStorage(id, options)
     }
 };
 
-describe('IDBLogger', () => {
+describe('IDBLogStorage', () => {
 
     commonRawLoggerTests(makeLogger);
 

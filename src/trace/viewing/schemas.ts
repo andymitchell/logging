@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createLogEntrySchema } from "../../raw-storage/schemas.ts";
+import { createLogEntrySchema } from "../../log-storage/schemas.ts";
 import { SpanMetaSchema } from "../schemas.ts";
 import type { TraceFilter, TraceSearchResults } from "./types.ts";
 import { isTypeEqual } from "@andyrmitchell/utils";

@@ -1,5 +1,5 @@
-import { MemoryLogger } from "../memory/MemoryLogger.ts"
-import { ChannelsLogger, type Channel } from "./ChannelsLogger.ts"
+import { MemoryLogStorage } from "../memory/MemoryLogStorage.ts"
+import { ChannelsLogStorage, type Channel } from "./ChannelsLogStorage.ts"
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
@@ -7,9 +7,9 @@ import type { AcceptLogEntry, LogEntry } from '../types.ts';
 
 
 it('basic', async () => {
-    const memoryLogger = new MemoryLogger('');
+    const memoryLogger = new MemoryLogStorage('');
 
-    const storage = new ChannelsLogger('', [
+    const storage = new ChannelsLogStorage('', [
         {
             storage: memoryLogger
         }
@@ -36,16 +36,16 @@ it('basic', async () => {
 })
 
 
-describe('ChannelsLogger: commitEntry (via add)', () => {
-    let memoryLogger1: MemoryLogger;
-    let memoryLogger2: MemoryLogger;
-    let memoryLogger3: MemoryLogger;
+describe('ChannelsLogStorage: commitEntry (via add)', () => {
+    let memoryLogger1: MemoryLogStorage;
+    let memoryLogger2: MemoryLogStorage;
+    let memoryLogger3: MemoryLogStorage;
 
     // Reset logger instances before each test to ensure isolation
     beforeEach(() => {
-        memoryLogger1 = new MemoryLogger('mem1');
-        memoryLogger2 = new MemoryLogger('mem2');
-        memoryLogger3 = new MemoryLogger('mem3');
+        memoryLogger1 = new MemoryLogStorage('mem1');
+        memoryLogger2 = new MemoryLogStorage('mem2');
+        memoryLogger3 = new MemoryLogStorage('mem3');
     });
 
     it('should distribute a log entry to all channels when no accept filters are provided', async () => {
@@ -53,7 +53,7 @@ describe('ChannelsLogger: commitEntry (via add)', () => {
             { storage: memoryLogger1 },
             { storage: memoryLogger2 },
         ];
-        const channelsLogger = new ChannelsLogger('test-app', channels);
+        const channelsLogger = new ChannelsLogStorage('test-app', channels);
 
         const entry: AcceptLogEntry = { type: 'info', message: 'broadcast message' };
         await channelsLogger.add(entry);
@@ -75,7 +75,7 @@ describe('ChannelsLogger: commitEntry (via add)', () => {
             { storage: memoryLogger2, accept: { type: 'info' } },
             { storage: memoryLogger3 }, // Accepts all
         ];
-        const channelsLogger = new ChannelsLogger('test-app', channels);
+        const channelsLogger = new ChannelsLogStorage('test-app', channels);
 
         await channelsLogger.add({ type: 'info', message: 'Just some info' });
         await channelsLogger.add({ type: 'error', message: 'An error occurred' });
@@ -106,7 +106,7 @@ describe('ChannelsLogger: commitEntry (via add)', () => {
             },
             { storage: memoryLogger2 },
         ];
-        const channelsLogger = new ChannelsLogger('test-app', channels);
+        const channelsLogger = new ChannelsLogStorage('test-app', channels);
 
         await channelsLogger.add({ type: 'warn', message: 'A warning' });
 
@@ -134,7 +134,7 @@ describe('ChannelsLogger: commitEntry (via add)', () => {
             },
             { storage: memoryLogger2 }, // Accepts all, no transform
         ];
-        const channelsLogger = new ChannelsLogger('test-app', channels);
+        const channelsLogger = new ChannelsLogStorage('test-app', channels);
 
         await channelsLogger.add({ type: 'info', message: 'regular log' });
         await channelsLogger.add({ type: 'critical', message: 'System failure' });
@@ -168,7 +168,7 @@ describe('ChannelsLogger: commitEntry (via add)', () => {
                 }
             }
         ];
-        const channelsLogger = new ChannelsLogger('test-app', channels);
+        const channelsLogger = new ChannelsLogStorage('test-app', channels);
 
         await channelsLogger.add({ type: 'info', message: 'test', context: {} });
 
@@ -184,7 +184,7 @@ describe('ChannelsLogger: commitEntry (via add)', () => {
             { storage: memoryLogger1, accept: { type: 'error' } },
             { storage: memoryLogger2, accept: { type: 'critical' } },
         ];
-        const channelsLogger = new ChannelsLogger('test-app', channels);
+        const channelsLogger = new ChannelsLogStorage('test-app', channels);
 
         // Spy on the commitEntry methods to be certain
         const spy1 = vi.spyOn(memoryLogger1, 'add');
@@ -205,7 +205,7 @@ describe('ChannelsLogger: commitEntry (via add)', () => {
         const channels: Channel[] = [
             { storage: memoryLogger1, accept: { NOT: [{type: 'info' }]} }, // Everything BUT info
         ];
-        const channelsLogger = new ChannelsLogger('test-app', channels);
+        const channelsLogger = new ChannelsLogStorage('test-app', channels);
 
         await channelsLogger.add({ type: 'info', message: 'ignored' });
         await channelsLogger.add({ type: 'warn', message: 'accepted' });
@@ -220,18 +220,18 @@ describe('ChannelsLogger: commitEntry (via add)', () => {
     });
 
     it('should call the underlying storage `add` method, not `commitEntry`', async () => {
-        // This test ensures we're respecting the IRawLogger interface of the channels
+        // This test ensures we're respecting the ILogStorage interface of the channels
         const addSpy = vi.spyOn(memoryLogger1, 'add');
         const commitSpy = vi.spyOn(memoryLogger1 as any, 'commitEntry'); // cast to any to access protected
 
         const channels: Channel[] = [{ storage: memoryLogger1 }];
-        const channelsLogger = new ChannelsLogger('test-app', channels);
+        const channelsLogger = new ChannelsLogStorage('test-app', channels);
 
         await channelsLogger.add({ type: 'info', message: 'test' });
 
         expect(addSpy).toHaveBeenCalledTimes(1);
         // The channel's own commitEntry should be called by its own `add` method,
-        // but ChannelsLogger should not call it directly.
+        // but ChannelsLogStorage should not call it directly.
         expect(commitSpy).toHaveBeenCalledTimes(1);
     });
 });

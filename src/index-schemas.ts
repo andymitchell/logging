@@ -1,4 +1,4 @@
-import { createLogEntrySchema, LogEntrySchema } from "./raw-storage/schemas.ts";
+import { createLogEntrySchema, LogEntrySchema } from "./log-storage/schemas.ts";
 import {  SpanMetaSchema, SpanIdSchema } from "./trace/schemas.ts";
 import { createTraceSearchResultsSchema, TraceFilterSchema, TraceSearchResultsSchema } from "./trace/viewing/schemas.ts";
 

@@ -3,11 +3,11 @@ import type { BaseComponentTypes } from "../../types.ts";
 import { TraceInspector } from "../TraceInspector.tsx";
 import type { TracesSource } from "../types.ts";
 
-import { isLogEntrySimple, type LogEntry } from "../../../../raw-storage/types.ts";
+import { isLogEntrySimple, type LogEntry } from "../../../../log-storage/types.ts";
 import { TraceViewer } from "../../../../index-get-traces.ts";
 import { monotonicFactory } from "ulid";
 import { isTraceResult } from "../../../../trace/viewing/types.ts";
-import { IDBLogger } from "../../../../index-browser.ts";
+import { IDBLogStorage } from "../../../../index-browser.ts";
 
 
 type TraceInspectorProps = BaseComponentTypes & {
@@ -25,7 +25,7 @@ export const PromptLoadedTraceInspector: React.FC<TraceInspectorProps> = (props)
 
 
     const generateViewerForEntries = useCallback((resetEntries?:LogEntry[]) => {
-        const logger = new IDBLogger(DB_ID);
+        const logger = new IDBLogStorage(DB_ID);
         if( resetEntries ) {
             logger.reset(resetEntries);
             console.log("Reset entries", resetEntries);

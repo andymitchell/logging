@@ -1,6 +1,6 @@
 import { sleep } from "@andyrmitchell/utils";
-import type { LoggerOptions } from "../../types.ts";
-import type { IRawLogger, LogEntry } from "../types.ts";
+import type { LogStorageOptions } from "../types.ts";
+import type { ILogStorage, LogEntry } from "../types.ts";
 import {test} from 'vitest';
 
 
@@ -8,14 +8,14 @@ const DETAIL_ITEM_MESSAGE = 'Message 1';
 const DETAIL_ITEM_LITERAL = {object_literal: true};
 const DETAIL_ITEM_ERROR = new Error('error1');
 
-type CreateTestLogger = (options?:LoggerOptions) => {
-    logger: IRawLogger,
+type CreateTestLogger = (options?:LogStorageOptions) => {
+    logger: ILogStorage,
     cannot_recreate_with_same_data?: boolean,
     /**
      * 
      * @returns 
      */
-    recreateWithSameData: () => IRawLogger
+    recreateWithSameData: () => ILogStorage
 }
 
 export async function commonRawLoggerTests(createLogger:CreateTestLogger) {
@@ -229,7 +229,7 @@ export async function commonRawLoggerTests(createLogger:CreateTestLogger) {
         
     
                 expect(entry.context!.obj.abc).toEqual("12...89");
-                expect(entry.context!.obj._dangerousDef).toEqual("12...89"); // Note not permitted in LoggerOptions
+                expect(entry.context!.obj._dangerousDef).toEqual("12...89"); // Note not permitted in LogStorageOptions
                 
             })
 

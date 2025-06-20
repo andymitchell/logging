@@ -1,14 +1,14 @@
-// WebhookLogger.test.ts
+// WebhookLogStorage.test.ts
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { WebhookLogger } from './WebhookLogger.ts'; // Adjust path
+import { WebhookLogStorage } from './WebhookLogStorage.ts'; // Adjust path
 import { FetchEmitter, type InterceptedPayload } from './testing-helpers/FetchEmitter.ts';
 
 
 // Use fake timers to control setTimeout for backoff tests
 vi.useFakeTimers();
 
-describe('WebhookLogger', () => {
+describe('WebhookLogStorage', () => {
     const POST_URL = 'https://api.example.com/log';
     let interceptor: FetchEmitter;
 
@@ -26,7 +26,7 @@ describe('WebhookLogger', () => {
 
     it('should send a single log entry to the webhook', async () => {
         // Arrange
-        const logger = new WebhookLogger('test-ns', POST_URL);
+        const logger = new WebhookLogStorage('test-ns', POST_URL);
         const captured = new Promise<InterceptedPayload>(resolve => {
             interceptor.on('post', payload => resolve(payload));
         });
@@ -49,13 +49,13 @@ describe('WebhookLogger', () => {
 
     it('should batch multiple log entries up to MAX_BATCH_SIZE', async () => {
         // Arrange
-        const logger = new WebhookLogger('test-ns', POST_URL);
+        const logger = new WebhookLogStorage('test-ns', POST_URL);
         let capturedPayload: InterceptedPayload | undefined;
         interceptor.on('post', payload => (capturedPayload = payload));
 
         // Act
         // Log one more than the max batch size
-        for (let i = 0; i < WebhookLogger.MAX_BATCH_SIZE + 1; i++) {
+        for (let i = 0; i < WebhookLogStorage.MAX_BATCH_SIZE + 1; i++) {
             logger.add({type: 'info', message: `Log ${i}`});
         }
 
@@ -66,14 +66,14 @@ describe('WebhookLogger', () => {
 
         // The second call's payload should be the last one we check
         expect(capturedPayload!.body.entries).toHaveLength(1);
-        expect(capturedPayload!.body.entries[0]!.message).toBe(`Log ${WebhookLogger.MAX_BATCH_SIZE}`);
+        expect(capturedPayload!.body.entries[0]!.message).toBe(`Log ${WebhookLogStorage.MAX_BATCH_SIZE}`);
     });
 
 
     it('should retry on retryable status codes (e.g., 503)', async () => {
         // Arrange
         interceptor.setResponse({ status: 503 }); // Service Unavailable
-        const logger = new WebhookLogger('test-ns', POST_URL);
+        const logger = new WebhookLogStorage('test-ns', POST_URL);
 
         let callCount = 0;
         interceptor.on('post', () => { callCount++ });
@@ -97,7 +97,7 @@ describe('WebhookLogger', () => {
     it('should discard batch on permanent failure (e.g., 400)', async () => {
         // Arrange
         interceptor.setResponse({ status: 400 }); // Bad Request
-        const logger = new WebhookLogger('test-ns', POST_URL);
+        const logger = new WebhookLogStorage('test-ns', POST_URL);
         const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => { });
 
         let callCount = 0;
@@ -121,7 +121,7 @@ describe('WebhookLogger', () => {
     it('should back off on network failure', async () => {
         // Arrange
         interceptor.simulateNetworkError('Failed to connect');
-        const logger = new WebhookLogger('test-ns', POST_URL);
+        const logger = new WebhookLogStorage('test-ns', POST_URL);
 
         let callCount = 0;
         interceptor.on('post', () => { callCount++ });

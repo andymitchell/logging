@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo } from "react";
 import { useFilterContext } from "./FilterContext.tsx";
-import type { LogEntry } from "../../../../raw-storage/types.ts";
+import type { LogEntry } from "../../../../log-storage/types.ts";
 import Dropdown from "../../utils/Dropdown.tsx";
 import DelayedInput from "../../utils/DelayedInput.tsx";
 

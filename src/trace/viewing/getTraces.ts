@@ -1,5 +1,5 @@
 import { matchJavascriptObject, type WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
-import type { IRawLogger, LogEntry } from "../../raw-storage/types.ts";
+import type { ILogStorage, LogEntry } from "../../log-storage/types.ts";
 import type { MinimumContext } from "../../types.ts";
 import type { TraceEntryFilter, TraceFilter, TraceSearchResult, TraceSearchResults } from "./types.ts";
 import type { SpanMeta } from "../types.ts";
@@ -14,7 +14,7 @@ import type { SpanMeta } from "../types.ts";
  * @param filter Filter the traces
  * @returns An array of trace objects; sorted by timestamp asc; each with an id, timestamp and containing an array of all entries in the trace (and an optional 'matches' list of entries just matching the traceEntryFilter)
  */
-export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLogger, filter?: TraceFilter<T>, includeAllTraceEntries = true): Promise<TraceSearchResults<T>> {
+export async function getTraces<T extends MinimumContext = any>(rawLogger:ILogStorage, filter?: TraceFilter<T>, includeAllTraceEntries = true): Promise<TraceSearchResults<T>> {
     if( includeAllTraceEntries===undefined ) includeAllTraceEntries = true;
 
     
@@ -80,7 +80,7 @@ export async function getTraces<T extends MinimumContext = any>(rawLogger:IRawLo
 }
 
 type CommonTraceName = 'has_error';
-export async function getCommonTraces(rawLogger:IRawLogger, traceName: CommonTraceName):Promise<TraceSearchResults> {
+export async function getCommonTraces(rawLogger:ILogStorage, traceName: CommonTraceName):Promise<TraceSearchResults> {
     let filter:WhereFilterDefinition<LogEntry> | undefined;
     switch(traceName) {
         case 'has_error':
