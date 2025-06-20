@@ -4,3 +4,4 @@
 node_modules/
 dist/
 test-schemas
+src/raw-storage/channels/

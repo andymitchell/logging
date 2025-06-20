@@ -19,17 +19,19 @@ export class MemoryLogger<T extends MinimumContext = MinimumContext> extends Bas
         this.clearOldEntries();
     }
 
-    protected override async clearOldEntries(): Promise<void> {
-        const filter = createMaxAgeTest(this.maxAge);
-        this.#log = this.#log.filter(filter)
-    }
-
+    
 
     protected override async commitEntry(logEntry: LogEntry): Promise<void> {
         this.#log.push(logEntry);
         
     }
 
+    protected override async clearOldEntries(): Promise<void> {
+        const filter = createMaxAgeTest(this.maxAge);
+        this.#log = this.#log.filter(filter)
+    }
+
+    
     public override async reset(entries?: LogEntry<T>[]):Promise<void> {
         this.#log = entries ?? [];
     }

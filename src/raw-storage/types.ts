@@ -108,6 +108,9 @@ export type AcceptLogEntry<T extends MinimumContext = MinimumContext, M extends 
 
 export type LogEntryType = LogEntry['type'];
 
+/**
+ * The storage area for loggers. An implementation of this will always be passed into a Logger/Trace class. 
+ */
 export interface IRawLogger<T extends MinimumContext = MinimumContext, M extends MinimumContext = MinimumContext> {
 
     breakpoints: IBreakpoints,
