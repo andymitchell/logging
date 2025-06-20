@@ -1,7 +1,7 @@
 
 
 import { cloneDeepScalarValues } from "@andyrmitchell/utils/deep-clone-scalar-values";
-import type { LoggerOptions, MaxAge } from "../types.ts";
+import type { LoggerOptions, MaxAge, MinimumContext } from "../types.ts";
 import type { AcceptLogEntry, IRawLogger, LogEntry } from "./types.ts";
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import { monotonicFactory } from "ulid";
@@ -43,19 +43,30 @@ export class BaseLogger implements IRawLogger {
         throw new Error("Method not implemented");
     }
 
+    /**
+     * (Optionally) remove sensitive information from the context
+     * @param context 
+     */
+    protected prepareContext(context?: any) {
+        if( context ) {
+            return cloneDeepScalarValues(
+                context,
+                true, 
+                this.permitDangerousContextProperties
+            )
+        } else {
+            return undefined;
+        }
+    }
 
-    async add(acceptEntry: AcceptLogEntry): Promise<LogEntry> {
+    async add<C extends MinimumContext>(acceptEntry: AcceptLogEntry<C>): Promise<LogEntry<C>> {
         let stackTrace:string | undefined = this.includeStackTrace[acceptEntry.type]? this.generateStackTrace() : undefined;
 
         const logEntry:LogEntry = {
             ...acceptEntry,
             timestamp: Date.now(),
-            context: acceptEntry.context? cloneDeepScalarValues(
-                    acceptEntry.context,
-                    true,
-                    this.permitDangerousContextProperties
-            ) : undefined,
-            stack_trace: stackTrace,
+            context: this.prepareContext(acceptEntry.context),
+            stack_trace: acceptEntry.stack_trace ?? stackTrace,
             ulid: acceptEntry.ulid ?? this.ulid()
         }
         

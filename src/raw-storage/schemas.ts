@@ -79,7 +79,7 @@ export function createLogEntrySchema(context?:z.RecordType<any, any>, meta?:z.Re
 export const LogEntrySchema = createLogEntrySchema();
 
 // Verify it matches the type
-isTypeEqual<z.infer<typeof LogEntrySchema>, ILogger>(true);
+isTypeEqual<z.infer<typeof LogEntrySchema>, LogEntry>(true);
 
 export function isLogEntry(x: unknown): x is LogEntry {
     return LogEntrySchema.safeParse(x).success;

@@ -1,6 +1,7 @@
 import { Logger } from "./log/Logger.ts";
 import { MemoryLogger } from "./raw-storage/memory/MemoryLogger.ts";
 import { WebhookLogger } from "./raw-storage/webhook/WebhookLogger.ts";
+import { ChannelsLogger } from "./raw-storage/channels/ChannelsLogger.ts";
 
 import { Span } from "./trace/Span.ts";
 import { Trace } from "./trace/Trace.ts";
@@ -20,7 +21,8 @@ export {
 
 export {
     MemoryLogger,
-    WebhookLogger
+    WebhookLogger,
+    ChannelsLogger
 }
 
 

@@ -313,6 +313,7 @@ export async function commonRawLoggerTests(createLogger:CreateTestLogger) {
                 const entry = all[0]!;
         
                 // Check values
+                console.log(entry);
                 expect(entry.stack_trace!.split("\n")[0]!.includes("common.ts")).toBe(true);
             })
         })

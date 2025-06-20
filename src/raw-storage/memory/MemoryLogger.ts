@@ -5,6 +5,7 @@ import type { LogEntry, IRawLogger } from "../types.ts";
 import createMaxAgeTest from "../createMaxAgeTest.ts";
 
 
+
 export class MemoryLogger extends BaseLogger implements IRawLogger {
 
     #log:LogEntry[]

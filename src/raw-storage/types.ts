@@ -95,11 +95,11 @@ export type LogEntry<C extends MinimumContext = any, M extends MinimumContext = 
  * Like LogEntry, but context can be anything (not yet serialised down)
  */
 export type AcceptLogEntry<C extends MinimumContext = any, M extends MinimumContext = any> =
-  | (Omit<InfoLogEntry<C, M>, 'stack_trace' | 'timestamp' | 'ulid'> & { ulid?: string })
-  | (Omit<WarnLogEntry<C, M>, 'stack_trace' | 'timestamp' | 'ulid'> & { ulid?: string })
-  | (Omit<ErrorLogEntry<C, M>, 'stack_trace' | 'timestamp' | 'ulid'> & { ulid?: string })
-  | (Omit<CriticalLogEntry<C, M>, 'stack_trace' | 'timestamp' | 'ulid'> & { ulid?: string })
-  | (Omit<EventLogEntry<C, M>, 'stack_trace' | 'timestamp' | 'ulid'> & { ulid?: string });
+  | (Omit<InfoLogEntry<C, M>, 'timestamp' | 'ulid'> & { ulid?: string })
+  | (Omit<WarnLogEntry<C, M>, 'timestamp' | 'ulid'> & { ulid?: string })
+  | (Omit<ErrorLogEntry<C, M>, 'timestamp' | 'ulid'> & { ulid?: string })
+  | (Omit<CriticalLogEntry<C, M>, 'timestamp' | 'ulid'> & { ulid?: string })
+  | (Omit<EventLogEntry<C, M>, 'timestamp' | 'ulid'> & { ulid?: string });
 
 
 
@@ -117,7 +117,7 @@ export interface IRawLogger {
      * Add an entry to the data store
      * @param entry 
      */
-    add(entry:AcceptLogEntry):Promise<LogEntry>;
+    add<T extends MinimumContext>(entry:AcceptLogEntry<T>):Promise<LogEntry<T>>;
 
     /**
      * Retrieve entries from the data store
