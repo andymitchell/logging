@@ -4,17 +4,17 @@ import type {  IBreakpoints } from "./breakpoints/types.ts";
 
 export type MinimumContext = Record<string, any>;
 
-export interface ILogger<T extends MinimumContext = MinimumContext, M extends MinimumContext = MinimumContext> {
+export interface ILogger {
 
-    log(message: string, context?: T): Promise<LogEntry<T, M>>,
+    log(message: string, context?: any): Promise<LogEntry>,
 
-    warn(message: string, context?: T): Promise<LogEntry<T, M>>,
+    warn(message: string, context?: any): Promise<LogEntry>,
     
-    error(message: string, context?: T): Promise<LogEntry<T, M>>
+    error(message: string, context?: any): Promise<LogEntry>
 
-    critical(message: string, context?: T): Promise<LogEntry<T, M>>
+    critical(message: string, context?: any): Promise<LogEntry>
 
-    get(filter?:WhereFilterDefinition<LogEntry<T, M>>): Promise<LogEntry<T, M>[]>;
+    get(filter?:WhereFilterDefinition<LogEntry>): Promise<LogEntry[]>;
 
 }
 

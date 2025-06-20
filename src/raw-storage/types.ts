@@ -1,8 +1,6 @@
-
-import type { DeepSerializable } from "@andyrmitchell/utils/deep-clone-scalar-values";
-import { type MinimumContext } from "../types.ts";
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import type { IBreakpoints } from "../breakpoints/types.ts";
+import type { MinimumContext } from "../types.ts";
 
 
 /**
@@ -15,7 +13,7 @@ export function isLogEntrySimple(x: unknown):x is LogEntry {
     return typeof x==='object' && x!==null && "ulid" in x && "type" in x;
 }
 
-export type BaseLogEntry<T extends MinimumContext = MinimumContext, M extends MinimumContext = MinimumContext> = {
+export type BaseLogEntry<C extends MinimumContext = any, M extends MinimumContext = any> = {
     
     /**
      * The Universally Unique Lexicographically Sortable Identifier. 
@@ -34,7 +32,7 @@ export type BaseLogEntry<T extends MinimumContext = MinimumContext, M extends Mi
     /**
      * Externally passed-in context (e.g. a parameter when the .log function is called)
      */
-    context?: DeepSerializable<T>,
+    context?: C, //DeepSerializable<any>,
 
     /**
      * Internal data used by the logging system. Does not get security-reduced. Use for things like Span ID.
@@ -43,19 +41,19 @@ export type BaseLogEntry<T extends MinimumContext = MinimumContext, M extends Mi
     
     stack_trace?: string
 }
-type InfoLogEntry<T extends MinimumContext = MinimumContext, M extends MinimumContext = MinimumContext> = BaseLogEntry<T, M> & {
+type InfoLogEntry<C extends MinimumContext = any, M extends MinimumContext = any> = BaseLogEntry<C, M> & {
     type: 'info',
     message: string
 };
-type WarnLogEntry<T extends MinimumContext = MinimumContext, M extends MinimumContext = MinimumContext> = BaseLogEntry<T, M> & {
+type WarnLogEntry<C extends MinimumContext = any, M extends MinimumContext = any> = BaseLogEntry<C, M> & {
     type: 'warn',
     message: string
 };
-type ErrorLogEntry<T extends MinimumContext = MinimumContext, M extends MinimumContext = MinimumContext> = BaseLogEntry<T, M> & {
+type ErrorLogEntry<C extends MinimumContext = any, M extends MinimumContext = any> = BaseLogEntry<C, M> & {
     type: 'error',
     message: string
 };
-type CriticalLogEntry<T extends MinimumContext = MinimumContext, M extends MinimumContext = MinimumContext> = BaseLogEntry<T, M> & {
+type CriticalLogEntry<C extends MinimumContext = any, M extends MinimumContext = any> = BaseLogEntry<C, M> & {
     type: 'critical',
     message: string
 };
@@ -71,37 +69,37 @@ type EndEventDetail = BaseEventDetail & {
 }
 export type EventDetail = StartEventDetail | EndEventDetail;
 
-export type EventLogEntry<T extends MinimumContext = MinimumContext, M extends MinimumContext = MinimumContext, E extends EventDetail = EventDetail> = BaseLogEntry<T, M> & {
+export type EventLogEntry<C extends MinimumContext = any, M extends MinimumContext = any, E extends EventDetail = EventDetail> = BaseLogEntry<C, M> & {
     type: 'event',
     message?: string
     event: E
 };
 
-export function isEventLogEntry(x: unknown): x is EventLogEntry<any, any> {
+export function isEventLogEntry(x: unknown): x is EventLogEntry {
     return (typeof x==='object') && !!x && "type" in x && x.type==='event';
 }
 
 /**
  * Union of all possible entry types
  */
-export type LogEntry<T extends MinimumContext = MinimumContext, M extends MinimumContext = MinimumContext> = 
-    InfoLogEntry<T, M> | 
-    WarnLogEntry<T, M> | 
-    ErrorLogEntry<T, M> |
-    CriticalLogEntry<T, M> | 
-    EventLogEntry<T, M>
+export type LogEntry<C extends MinimumContext = any, M extends MinimumContext = any> = 
+    InfoLogEntry<C, M> | 
+    WarnLogEntry<C, M> | 
+    ErrorLogEntry<C, M> |
+    CriticalLogEntry<C, M> | 
+    EventLogEntry<C, M>
 
 
 
 /**
  * Like LogEntry, but context can be anything (not yet serialised down)
  */
-export type AcceptLogEntry<T extends MinimumContext = MinimumContext, M extends MinimumContext = MinimumContext> =
-  | (Omit<InfoLogEntry<T, M>, 'context' | 'stack_trace' | 'timestamp' | 'ulid'> & { context?: T, ulid?: string })
-  | (Omit<WarnLogEntry<T, M>, 'context' | 'stack_trace' | 'timestamp' | 'ulid'> & { context?: T, ulid?: string })
-  | (Omit<ErrorLogEntry<T, M>, 'context' | 'stack_trace' | 'timestamp' | 'ulid'> & { context?: T, ulid?: string })
-  | (Omit<CriticalLogEntry<T, M>, 'context' | 'stack_trace' | 'timestamp' | 'ulid'> & { context?: T, ulid?: string })
-  | (Omit<EventLogEntry<T, M>, 'context' | 'stack_trace' | 'timestamp' | 'ulid'> & { context?: T, ulid?: string });
+export type AcceptLogEntry<C extends MinimumContext = any, M extends MinimumContext = any> =
+  | (Omit<InfoLogEntry<C, M>, 'stack_trace' | 'timestamp' | 'ulid'> & { ulid?: string })
+  | (Omit<WarnLogEntry<C, M>, 'stack_trace' | 'timestamp' | 'ulid'> & { ulid?: string })
+  | (Omit<ErrorLogEntry<C, M>, 'stack_trace' | 'timestamp' | 'ulid'> & { ulid?: string })
+  | (Omit<CriticalLogEntry<C, M>, 'stack_trace' | 'timestamp' | 'ulid'> & { ulid?: string })
+  | (Omit<EventLogEntry<C, M>, 'stack_trace' | 'timestamp' | 'ulid'> & { ulid?: string });
 
 
 
@@ -111,7 +109,7 @@ export type LogEntryType = LogEntry['type'];
 /**
  * The storage area for loggers. An implementation of this will always be passed into a Logger/Trace class. 
  */
-export interface IRawLogger<T extends MinimumContext = MinimumContext, M extends MinimumContext = MinimumContext> {
+export interface IRawLogger {
 
     breakpoints: IBreakpoints,
 
@@ -119,14 +117,14 @@ export interface IRawLogger<T extends MinimumContext = MinimumContext, M extends
      * Add an entry to the data store
      * @param entry 
      */
-    add(entry:AcceptLogEntry<T, M>):Promise<LogEntry<T>>;
+    add(entry:AcceptLogEntry):Promise<LogEntry>;
 
     /**
      * Retrieve entries from the data store
      * @param filter Match any entries with a precise spec
      * @param fullTextFilter Match entries that, when serialised, contain this text 
      */
-    get(filter?:WhereFilterDefinition<LogEntry<T, M>>, fullTextFilter?: string): Promise<LogEntry<T, M>[]>;
+    get(filter?:WhereFilterDefinition<LogEntry>, fullTextFilter?: string): Promise<LogEntry[]>;
 
     /**
      * Remove items older than the max age stated in LoggerOptions
@@ -138,6 +136,6 @@ export interface IRawLogger<T extends MinimumContext = MinimumContext, M extends
      * Manually reset the database and populate it with the passed in entries 
      * @param entries 
      */
-    reset(entries?:LogEntry<T>[]): Promise<void>;
+    reset(entries?:LogEntry[]): Promise<void>;
 
 }

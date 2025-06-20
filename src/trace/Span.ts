@@ -3,8 +3,8 @@ import { uuidV4 } from "@andyrmitchell/utils/uid";
 import type { AcceptLogEntry, IRawLogger, LogEntry } from "../raw-storage/types.ts";
 
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
-import type { MinimumContext } from "../types.ts";
 import type { ISpan, SpanMeta,  SpanId } from "./types.ts";
+import type { MinimumContext } from "../types.ts";
 
 
 
@@ -13,14 +13,14 @@ import type { ISpan, SpanMeta,  SpanId } from "./types.ts";
  * 
  * It forms part of an overall trace, represented as a waterfall. 
  */
-export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T> {
+export class Span implements ISpan {
 
     
 
     protected spanId: Readonly<SpanId>;
-    protected storage:IRawLogger<T, SpanMeta>;
+    protected storage:IRawLogger;
 
-    constructor(storage:IRawLogger<any, any>, parent?: {parent_id?: string, top_id?: string}, name?: string, context?: T) {
+    constructor(storage:IRawLogger, parent?: {parent_id?: string, top_id?: string}, name?: string, context?: any) {
         this.storage = storage;
 
         const id = uuidV4();
@@ -59,12 +59,12 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
         }
     }
 
-    async #addToStorage(entry: AcceptLogEntry<T, SpanMeta>):Promise<LogEntry<T, SpanMeta>> {
-        const logEntry = await this.storage.add(entry) as LogEntry<T, SpanMeta>;
+    async #addToStorage(entry: AcceptLogEntry):Promise<LogEntry<any, SpanMeta>> {
+        const logEntry = await this.storage.add(entry) as LogEntry<any, SpanMeta>;
         return logEntry;
     }
     
-    async log(message: string, context?: T): Promise<LogEntry<T, SpanMeta>> {
+    async log<C extends MinimumContext = any>(message: string, context?: any): Promise<LogEntry<C, SpanMeta>> {
         return await this.#addToStorage({
             type: 'info',
             message,
@@ -73,7 +73,7 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
         })
     }
 
-    async warn(message: string, context?: T): Promise<LogEntry<T, SpanMeta>> {
+    async warn<C extends MinimumContext = any>(message: string, context?: any): Promise<LogEntry<C, SpanMeta>> {
         return await this.#addToStorage({
             type: 'warn',
             message,
@@ -82,7 +82,7 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
         })
     }
 
-    async error(message: string, context?: T): Promise<LogEntry<T, SpanMeta>> {
+    async error<C extends MinimumContext = any>(message: string, context?: any): Promise<LogEntry<C, SpanMeta>> {
         return await this.#addToStorage({
             type: 'error',
             message,
@@ -92,7 +92,7 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
     }
 
 
-    async critical(message: string, context?: T): Promise<LogEntry<T, SpanMeta>> {
+    async critical<C extends MinimumContext = any>(message: string, context?: any): Promise<LogEntry<C, SpanMeta>> {
         return await this.#addToStorage({
             type: 'critical',
             message,
@@ -101,14 +101,14 @@ export class Span<T extends MinimumContext = MinimumContext> implements ISpan<T>
         })
     }
 
-    async get(filter?:WhereFilterDefinition<LogEntry<T, SpanMeta>>): Promise<LogEntry<T, SpanMeta>[]> {
+    async get(filter?:WhereFilterDefinition<LogEntry<any, SpanMeta>>): Promise<LogEntry<any, SpanMeta>[]> {
         return await this.storage.get(filter);
     }
 
     
-    startSpan<CT extends MinimumContext = T>(name?: string, context?: CT): ISpan<CT> {
+    startSpan(name?: string, context?: any): ISpan {
 
-        return new Span<CT>(
+        return new Span(
             this.storage, 
             {
                 parent_id: this.spanId.id, 

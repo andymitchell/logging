@@ -11,7 +11,7 @@ import { MemoryBreakpoints } from '../breakpoints/MemoryBreakpoints.ts';
  * A fake implementation of IRawLogger to be used in tests.
  * It records every log entry in an array and can be configured to fail on add() or get().
  */
-class FakeRawLogger<T extends MinimumContext = any> implements IRawLogger<T, SpanMeta> {
+class FakeRawLogger<T extends MinimumContext = any> implements IRawLogger {
     
     logs: any[] = [];
     shouldFailAdd = false;
@@ -19,7 +19,7 @@ class FakeRawLogger<T extends MinimumContext = any> implements IRawLogger<T, Spa
 
     breakpoints = new MemoryBreakpoints();
 
-    async add(entry: any): Promise<LogEntry<T>> {
+    async add(entry: any): Promise<LogEntry> {
         if (this.shouldFailAdd) {
             throw new Error("add failure");
         }
@@ -162,15 +162,6 @@ describe('Span Integration Tests', () => {
             expect(childStartLog.context.did).toBe('abc1');
             
         });
-
-        it('can change the context type of the child', async () => {
-            const fakeLogger = new FakeRawLogger();
-            const parentSpan = new Span<{a: string}>(fakeLogger);
-            parentSpan.log('msg', {a: ''});
-
-            const childSpan = parentSpan.startSpan<{b: number}>();
-            childSpan.log('msg', {b: 1});
-        })
     })
 
     it('should record a span_end event when end() is called', () => {

@@ -1,6 +1,5 @@
 
 import type { IRawLogger } from "../index-browser.ts";
-import type { MinimumContext } from "../types.ts";
 import { Span } from "./Span.ts";
 import type { ISpan } from "./types.ts";
 
@@ -11,11 +10,11 @@ import type { ISpan } from "./types.ts";
  * 
  * An alias for Span without parentId in the constructor
  */
-export class Trace<T extends MinimumContext = MinimumContext> extends Span<T> implements ISpan<T> {
+export class Trace extends Span implements ISpan {
 
     
 
-    constructor(storage:IRawLogger<any>, name?: string, context?: T) {
+    constructor(storage:IRawLogger, name?: string, context?: any) {
         super(storage, undefined, name, context);
         
     }

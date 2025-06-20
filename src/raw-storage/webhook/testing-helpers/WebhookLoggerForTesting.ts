@@ -1,5 +1,5 @@
 
-import type { LoggerOptions, MinimumContext } from "../../../types.ts";
+import type { LoggerOptions } from "../../../types.ts";
 import type { LogEntry, IRawLogger } from "../../types.ts";
 import { WebhookLogger } from "../WebhookLogger.ts";
 import type { FetchEmitter } from "./FetchEmitter.ts";
@@ -10,7 +10,7 @@ import { matchJavascriptObject, type WhereFilterDefinition } from "@andyrmitchel
 /**
  * This captures the logs sent via fetch, so they can be 'get'/'reset'/etc.
  */
-export class WebhookLoggerForTesting<T extends MinimumContext = MinimumContext> extends WebhookLogger<T> implements IRawLogger<T> {
+export class WebhookLoggerForTesting extends WebhookLogger implements IRawLogger {
 
 
     #log:LogEntry[] = [];
@@ -38,12 +38,12 @@ export class WebhookLoggerForTesting<T extends MinimumContext = MinimumContext> 
     }
 
     
-    public override async reset(entries?: LogEntry<T>[]):Promise<void> {
+    public override async reset(entries?: LogEntry[]):Promise<void> {
         this.#log = entries ?? [];
     }
 
-    public override async get(filter?: WhereFilterDefinition<LogEntry<T>>, fullTextFilter?: string): Promise<LogEntry<T>[]> {
-        let entries = structuredClone(this.#log) as LogEntry<T>[];
+    public override async get(filter?: WhereFilterDefinition<LogEntry>, fullTextFilter?: string): Promise<LogEntry[]> {
+        let entries = structuredClone(this.#log) as LogEntry[];
         entries = filter? entries.filter(x => matchJavascriptObject(x, filter)) : entries;
 
         if( fullTextFilter ) {

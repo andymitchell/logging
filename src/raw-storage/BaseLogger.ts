@@ -1,7 +1,7 @@
 
 
 import { cloneDeepScalarValues } from "@andyrmitchell/utils/deep-clone-scalar-values";
-import type { LoggerOptions, MaxAge, MinimumContext } from "../types.ts";
+import type { LoggerOptions, MaxAge } from "../types.ts";
 import type { AcceptLogEntry, IRawLogger, LogEntry } from "./types.ts";
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import { monotonicFactory } from "ulid";
@@ -11,7 +11,7 @@ import type { IBreakpoints } from "../breakpoints/types.ts";
 
 
 
-export class BaseLogger<T extends MinimumContext = MinimumContext> implements IRawLogger<T> {
+export class BaseLogger implements IRawLogger {
     protected includeStackTrace: Required<LoggerOptions>['include_stack_trace'];
     protected logToConsole:boolean;
     protected permitDangerousContextProperties: boolean;
@@ -44,10 +44,10 @@ export class BaseLogger<T extends MinimumContext = MinimumContext> implements IR
     }
 
 
-    async add(acceptEntry: AcceptLogEntry<T>): Promise<LogEntry<T>> {
+    async add(acceptEntry: AcceptLogEntry): Promise<LogEntry> {
         let stackTrace:string | undefined = this.includeStackTrace[acceptEntry.type]? this.generateStackTrace() : undefined;
 
-        const logEntry:LogEntry<T> = {
+        const logEntry:LogEntry = {
             ...acceptEntry,
             timestamp: Date.now(),
             context: acceptEntry.context? cloneDeepScalarValues(
@@ -90,7 +90,7 @@ export class BaseLogger<T extends MinimumContext = MinimumContext> implements IR
     }
 
 
-    public async get(filter?:WhereFilterDefinition<LogEntry<T>>, fullTextFilter?: string): Promise<LogEntry<T>[]> {
+    public async get(filter?:WhereFilterDefinition<LogEntry>, fullTextFilter?: string): Promise<LogEntry[]> {
         throw new Error("Method not implemented");
     }
 

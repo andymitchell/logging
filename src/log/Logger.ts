@@ -1,7 +1,7 @@
 
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import type { AcceptLogEntry, IRawLogger, LogEntry } from "../raw-storage/types.ts";
-import type { ILogger, MinimumContext} from "../types.ts";
+import type { ILogger} from "../types.ts";
 
 
 
@@ -9,23 +9,23 @@ import type { ILogger, MinimumContext} from "../types.ts";
 /**
  * A simple logger, backed by various storage adapters.
  */
-export class Logger<T extends MinimumContext = MinimumContext> implements ILogger<T> {
+export class Logger implements ILogger {
 
     
 
-    protected storage:IRawLogger<T>;
+    protected storage:IRawLogger;
 
 
-    constructor(storage:IRawLogger<any>) {
+    constructor(storage:IRawLogger) {
         this.storage = storage;
     }
 
-    async #addToStorage(entry: AcceptLogEntry<T>):Promise<LogEntry<T>> {
+    async #addToStorage(entry: AcceptLogEntry):Promise<LogEntry> {
         const logEntry = this.storage.add(entry);
         return logEntry;
     }
 
-    async log(message: string, context?: T): Promise<LogEntry<T>> {
+    async log(message: string, context?: any): Promise<LogEntry> {
         return await this.#addToStorage({
             type: 'info',
             message,
@@ -33,7 +33,7 @@ export class Logger<T extends MinimumContext = MinimumContext> implements ILogge
         })
     }
 
-    async warn(message: string, context?: T): Promise<LogEntry<T>> {
+    async warn(message: string, context?: any): Promise<LogEntry> {
         return await this.#addToStorage({
             type: 'warn',
             message,
@@ -41,7 +41,7 @@ export class Logger<T extends MinimumContext = MinimumContext> implements ILogge
         })
     }
 
-    async error(message: string, context?: T): Promise<LogEntry<T>> {
+    async error(message: string, context?: any): Promise<LogEntry> {
         return await this.#addToStorage({
             type: 'error',
             message,
@@ -50,7 +50,7 @@ export class Logger<T extends MinimumContext = MinimumContext> implements ILogge
     }
 
 
-    async critical(message: string, context?: T): Promise<LogEntry<T>> {
+    async critical(message: string, context?: any): Promise<LogEntry> {
         return await this.#addToStorage({
             type: 'critical',
             message,
@@ -58,7 +58,7 @@ export class Logger<T extends MinimumContext = MinimumContext> implements ILogge
         })
     }
 
-    async get(filter?:WhereFilterDefinition): Promise<LogEntry<T>[]> {
+    async get(filter?:WhereFilterDefinition): Promise<LogEntry[]> {
         return await this.storage.get(filter);
     }
 

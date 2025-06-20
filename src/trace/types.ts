@@ -7,7 +7,7 @@ import type { ILogger, MinimumContext } from "../types.ts"
 
 
 
-export interface ISpan<T extends MinimumContext = MinimumContext> extends ILogger<T, SpanMeta> {
+export interface ISpan extends ILogger {
 
 
     /**
@@ -15,7 +15,7 @@ export interface ISpan<T extends MinimumContext = MinimumContext> extends ILogge
      * @param name 
      * @returns 
      */
-    startSpan<CT extends MinimumContext = T>(name?: string, context?: CT): ISpan<CT>;
+    startSpan(name?: string, context?: any): ISpan;
 
     /**
      * Adds a final timestamp for duration logging. 
@@ -43,7 +43,7 @@ export type SpanMeta= {
     span: SpanId
 }
 
-export type TraceEntry<T extends MinimumContext = MinimumContext> = LogEntry<T, SpanMeta>;
+export type TraceEntry<C extends MinimumContext = any> = LogEntry<C, SpanMeta>;
 
 
 export function isEventLogEntrySpanStart(x: unknown): x is EventLogEntry<any, SpanMeta, StartEventDetail> {

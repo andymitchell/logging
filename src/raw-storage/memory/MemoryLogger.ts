@@ -1,11 +1,11 @@
 import { matchJavascriptObject, type WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
-import type { LoggerOptions, MinimumContext } from "../../types.ts";
+import type { LoggerOptions } from "../../types.ts";
 import { BaseLogger } from "../BaseLogger.ts";
 import type { LogEntry, IRawLogger } from "../types.ts";
 import createMaxAgeTest from "../createMaxAgeTest.ts";
 
 
-export class MemoryLogger<T extends MinimumContext = MinimumContext> extends BaseLogger<T> implements IRawLogger<T> {
+export class MemoryLogger extends BaseLogger implements IRawLogger {
 
     #log:LogEntry[]
     
@@ -31,13 +31,13 @@ export class MemoryLogger<T extends MinimumContext = MinimumContext> extends Bas
         this.#log = this.#log.filter(filter)
     }
 
-    
-    public override async reset(entries?: LogEntry<T>[]):Promise<void> {
+
+    public override async reset(entries?: LogEntry[]):Promise<void> {
         this.#log = entries ?? [];
     }
 
-    public override async get(filter?: WhereFilterDefinition<LogEntry<T>>, fullTextFilter?: string): Promise<LogEntry<T>[]> {
-        let entries = structuredClone(this.#log) as LogEntry<T>[];
+    public override async get(filter?: WhereFilterDefinition<LogEntry>, fullTextFilter?: string): Promise<LogEntry[]> {
+        let entries = structuredClone(this.#log) as LogEntry[];
         entries = filter? entries.filter(x => matchJavascriptObject(x, filter)) : entries;
 
         if( fullTextFilter ) {

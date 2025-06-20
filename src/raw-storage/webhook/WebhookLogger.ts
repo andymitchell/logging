@@ -1,5 +1,5 @@
 import { QueueMemory } from "@andyrmitchell/utils/queue-memory";
-import type { LoggerOptions, MinimumContext } from "../../types.ts";
+import type { LoggerOptions } from "../../types.ts";
 import { BaseLogger } from "../BaseLogger.ts";
 import type { LogEntry, IRawLogger } from "../types.ts";
 import { uid } from "@andyrmitchell/utils/uid";
@@ -18,7 +18,7 @@ export type PostBody = {
  * 
  * The endpoint should expect a POST of {entries: LogEntry[], instanceId: string}
  */
-export class WebhookLogger<T extends MinimumContext = MinimumContext> extends BaseLogger<T> implements IRawLogger<T> {
+export class WebhookLogger extends BaseLogger implements IRawLogger {
 
 
     /**
