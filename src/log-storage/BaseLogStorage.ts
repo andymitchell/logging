@@ -10,14 +10,23 @@ import type { IBreakpoints } from "../breakpoints/types.ts";
 
 
 
-
+/**
+ * Use this to build specific LogStorage
+ */
 export class BaseLogStorage implements ILogStorage {
     protected includeStackTrace: Required<LogStorageOptions>['include_stack_trace'];
     protected logToConsole:boolean;
     protected permitDangerousContextProperties: boolean;
     protected maxAge: MaxAge;
     protected dbNamespace:string;
+
+    /**
+     * Generate an ID. 
+     * 
+     * @default monotonicFactory // guarantees ascending order within this context
+     */
     protected ulid:Function;
+    
     breakpoints:IBreakpoints;
 
     constructor(dbNamespace:string, options?: LogStorageOptions) {
@@ -27,9 +36,17 @@ export class BaseLogStorage implements ILogStorage {
         this.permitDangerousContextProperties = safeOptions.permit_dangerous_context_properties;
         this.dbNamespace = dbNamespace;
         this.maxAge = safeOptions.max_age;
-        this.ulid = monotonicFactory(); // Monotonic guarantees ascending order within this context
+        this.ulid = monotonicFactory();
         this.breakpoints = safeOptions.breakpoints;
 
+    }
+
+    /**
+     * This is the main thing a sub class is expected to provide. Commit to storage / transport it somewhere.
+     * @param _entry 
+     */
+    protected commitEntry(_entry:LogEntry):Promise<void> {
+        throw new Error("Method not implemented");
     }
 
     /**
@@ -39,12 +56,17 @@ export class BaseLogStorage implements ILogStorage {
         throw new Error("Method not implemented");
     }
 
+
+    public async forceClearOldEntries() {
+        return this.clearOldEntries();
+    }
+
     public async reset() {
         throw new Error("Method not implemented");
     }
 
     /**
-     * (Optionally) remove sensitive information from the context
+     * (Optionally) remove sensitive information from the context during `add`
      * @param context 
      */
     protected prepareContext(context?: any) {
@@ -80,12 +102,12 @@ export class BaseLogStorage implements ILogStorage {
         return logEntry;
     }
 
-
-    protected commitEntry(_entry:LogEntry):Promise<void> {
-        throw new Error("Method not implemented");
-    }
     
 
+    /**
+     * Helper to create a stack trace back to before the log call. 
+     * @returns 
+     */
     protected generateStackTrace() {
         try {
             throw new Error('Generate stack trace');
@@ -105,9 +127,6 @@ export class BaseLogStorage implements ILogStorage {
         throw new Error("Method not implemented");
     }
 
-    public async forceClearOldEntries() {
-        return this.clearOldEntries();
-    }
     
 }
 

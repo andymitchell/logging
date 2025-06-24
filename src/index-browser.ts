@@ -6,13 +6,16 @@ import { IDBLogStorage } from "./log-storage/idb/IDBLogStorage.ts";
 
 import { Span } from "./trace/Span.ts";
 import { Trace } from "./trace/Trace.ts";
+import { BaseLogStorage } from "./log-storage/BaseLogStorage.ts";
+import { startTrace } from "./trace/startTrace.ts";
 
 
 export {
     Trace,
     Span,
-    Logger
-
+    Logger,
+    BaseLogStorage,
+    startTrace
 }
 
 
