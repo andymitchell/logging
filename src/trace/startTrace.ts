@@ -10,7 +10,6 @@ import type { ISpan } from "./types.ts";
  * If there's a current trace, create a new span on it. 
  * Otherwise start a new trace from the provided LogStorage
  * 
- * Create a new trace from LogStorage, or if there's currently a trace extend it into a new span. 
  * @param name The name of the new span.
  * @param context Optional. 
  * @param logStorage Optional. The ILogStorage from which to create a new Trace.
