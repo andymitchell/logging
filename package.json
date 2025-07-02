@@ -1,6 +1,6 @@
 {
     "name": "@andyrmitchell/logging",
-    "version": "0.3.3",
+    "version": "0.3.4",
     "description": "",
     "type": "module",
     "sideEffects": false,
@@ -72,8 +72,6 @@
         "@andyrmitchell/objects": "^0.8.1",
         "@andyrmitchell/utils": "^0.16.1",
         "ulid": "^3.0.0",
-
-        
         "react-json-view-lite": "^2.4.1",
         "material-symbols": "^0.31.9"
     },
