@@ -1,7 +1,7 @@
 
 
-import { cloneDeepScalarValues } from "@andyrmitchell/utils/deep-clone-scalar-values";
-import type {  MaxAge, MinimumContext } from "../types.ts";
+import { cloneDeepScalarValuesAny } from "@andyrmitchell/utils/deep-clone-scalar-values";
+import type {  MaxAge } from "../types.ts";
 import type { AcceptLogEntry, ILogStorage, LogEntry, LogStorageOptions } from "./types.ts";
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import { monotonicFactory } from "ulid";
@@ -70,7 +70,7 @@ export class BaseLogStorage implements ILogStorage {
      */
     protected prepareContext(context?: any) {
         if( context ) {
-            return cloneDeepScalarValues(
+            return cloneDeepScalarValuesAny(
                 context,
                 true, 
                 this.permitDangerousContextProperties
@@ -80,7 +80,7 @@ export class BaseLogStorage implements ILogStorage {
         }
     }
 
-    async add<C extends MinimumContext>(acceptEntry: AcceptLogEntry<C>): Promise<LogEntry<C>> {
+    async add<C extends any>(acceptEntry: AcceptLogEntry<C>): Promise<LogEntry<C>> {
         let stackTrace:string | undefined = this.includeStackTrace[acceptEntry.type]? this.generateStackTrace() : undefined;
 
         const logEntry:LogEntry = {

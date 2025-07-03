@@ -83,6 +83,7 @@ describe('filtering', () => {
     
     })
     
+
     
     
     
@@ -123,6 +124,66 @@ describe('filtering', () => {
         
     
     
+    })
+
+    describe('context variations', () => {
+        it('filters on basic context object', async () => {
+
+            const rawLogger = new MemoryLogStorage('');
+        
+            const trace1 = new Trace(rawLogger);
+            trace1.log('abc1', {name: 'Bob'});
+            
+            const tracesArray = await getTraces(rawLogger, {entries_filter: {context: {name: 'Bob'}}});
+            const traces = convertArrayToRecord(tracesArray, 'id');
+            
+            expect(traces[trace1.getId()]?.matches.length).toBe(1);
+        
+            const tracesArray1 = await getTraces(rawLogger, {entries_filter: {context: {name: 'Sue'}}});
+            const traces1 = convertArrayToRecord(tracesArray1, 'id');
+            
+            expect(traces1[trace1.getId()]?.matches.length).toBe(undefined);
+        
+        })
+
+        it('filters on a string', async () => {
+
+            const rawLogger = new MemoryLogStorage('');
+        
+            const trace1 = new Trace(rawLogger);
+            trace1.log('abc1', 'Bob');
+            
+            const tracesArray = await getTraces(rawLogger, {entries_filter: {context: 'Bob'}});
+            const traces = convertArrayToRecord(tracesArray, 'id');
+            
+            expect(traces[trace1.getId()]?.matches.length).toBe(1);
+        
+            const tracesArray1 = await getTraces(rawLogger, {entries_filter: {context: 'Sue'}});
+            const traces1 = convertArrayToRecord(tracesArray1, 'id');
+            
+            expect(traces1[trace1.getId()]?.matches.length).toBe(undefined);
+        
+        })
+
+
+        it('filters on an array', async () => {
+
+            const rawLogger = new MemoryLogStorage('');
+        
+            const trace1 = new Trace(rawLogger);
+            trace1.log('abc1', ['Bob']);
+            
+            const tracesArray = await getTraces(rawLogger, {entries_filter: {context: {contains: 'Bob'}}});
+            const traces = convertArrayToRecord(tracesArray, 'id');
+            
+            expect(traces[trace1.getId()]?.matches.length).toBe(1);
+        
+            const tracesArray1 = await getTraces(rawLogger, {entries_filter: {context: {contains: 'Sue'}}});
+            const traces1 = convertArrayToRecord(tracesArray1, 'id');
+            
+            expect(traces1[trace1.getId()]?.matches.length).toBe(undefined);
+        
+        })
     })
 })
 

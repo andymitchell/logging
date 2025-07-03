@@ -123,7 +123,7 @@ export interface ILogStorage {
      * Add an entry to the data store
      * @param entry 
      */
-    add<T extends MinimumContext>(entry:AcceptLogEntry<T>):Promise<LogEntry<T>>;
+    add<T extends any>(entry:AcceptLogEntry<T>):Promise<LogEntry<T>>;
 
     /**
      * Retrieve entries from the data store

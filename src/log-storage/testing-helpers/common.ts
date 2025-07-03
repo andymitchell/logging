@@ -1,7 +1,7 @@
 import { sleep } from "@andyrmitchell/utils";
 import type { LogStorageOptions } from "../types.ts";
 import type { ILogStorage, LogEntry } from "../types.ts";
-import {test} from 'vitest';
+import {it} from 'vitest';
 
 
 const DETAIL_ITEM_MESSAGE = 'Message 1';
@@ -22,7 +22,7 @@ export async function commonRawLoggerTests(createLogger:CreateTestLogger) {
 
     describe('Common Logger Tests', () => {
     
-        test('Logger - basic', async () => {
+        it('Logger - basic', async () => {
     
             const logger = createLogger().logger;
     
@@ -51,9 +51,95 @@ export async function commonRawLoggerTests(createLogger:CreateTestLogger) {
             expect(entry.context!.err.message).toBe('error1');
         })
 
+        describe('Logger context variation safety', () => {
+            it('handles a string', async () => {
+        
+                const logger = createLogger().logger;
+        
+        
+                const context = "just a string";
+                await logger.add({
+                    type: 'info',
+                    message: DETAIL_ITEM_MESSAGE,
+                    context
+                });
+        
+                const all = await logger.get();
+        
+                // Check values
+                const entry = all[0]!;
+        
+                expect(entry.context).toBe(context);
+            })
+
+            it('handles an array', async () => {
+        
+                const logger = createLogger().logger;
+        
+        
+                const context = [{a: 1}, {b: 2}, "string"];
+                await logger.add({
+                    type: 'info',
+                    message: DETAIL_ITEM_MESSAGE,
+                    context
+                });
+        
+                const all = await logger.get();
+        
+                // Check values
+                const entry = all[0]!;
+        
+                
+                expect(entry.context).toEqual(context);
+            })
+
+            it('handles a deep array', async () => {
+        
+                const logger = createLogger().logger;
+        
+        
+                const context = [{a: 1, b: {c: 2}}, "string"];
+                await logger.add({
+                    type: 'info',
+                    message: DETAIL_ITEM_MESSAGE,
+                    context
+                });
+        
+                const all = await logger.get();
+        
+                // Check values
+                const entry = all[0]!;
+        
+                
+                expect(entry.context).toEqual(context);
+            })
+
+
+            it('cleans a deep array', async () => {
+        
+                const logger = createLogger().logger;
+        
+        
+                const context = [{a: 1, b: {c: 1234123412341234}}, new Error("hello world"), "string"];
+                await logger.add({
+                    type: 'info',
+                    message: DETAIL_ITEM_MESSAGE,
+                    context
+                });
+        
+                const all = await logger.get();
+        
+                // Check values
+                const entry = all[0]!;
+        
+                
+                expect(entry.context).toEqual([{a: 1, b: {c: "12...34"}}, {message: "hello world"}, "string"]);
+            })
+        })
+
         describe('clean up', () => {
 
-            test('cleans before max age', async () => {
+            it('cleans before max age', async () => {
                 const aging = 4;
                 const logger = createLogger({max_age: [{max_ms: aging}]}).logger;
 
@@ -85,7 +171,7 @@ export async function commonRawLoggerTests(createLogger:CreateTestLogger) {
             })  
 
 
-            test('runs clean on constructor', async (cx) => {
+            it('runs clean on constructor', async (cx) => {
                 const aging = 4;
                 const loggerTest = createLogger({max_age: [{max_ms: aging}]});
                 if( loggerTest.cannot_recreate_with_same_data ) cx.skip();
@@ -123,7 +209,7 @@ export async function commonRawLoggerTests(createLogger:CreateTestLogger) {
         describe('get filter', () => {
 
             describe('WhereFilter', () => {
-                test('filters OK', async () => {
+                it('filters OK', async () => {
                     const logger = createLogger().logger;
         
             
@@ -141,7 +227,7 @@ export async function commonRawLoggerTests(createLogger:CreateTestLogger) {
                     expect(filtered.length).toBe(1);
                 });
 
-                test('filter excludes non-matches', async () => {
+                it('filter excludes non-matches', async () => {
                     const logger = createLogger().logger;
         
             
@@ -161,7 +247,7 @@ export async function commonRawLoggerTests(createLogger:CreateTestLogger) {
             })
 
             describe('full text', () => {
-                test('filters OK', async () => {
+                it('filters OK', async () => {
                     const logger = createLogger().logger;
         
             
@@ -179,7 +265,7 @@ export async function commonRawLoggerTests(createLogger:CreateTestLogger) {
                     expect(filtered.length).toBe(1);
                 });
     
-                test('filter excludes non-matches', async () => {
+                it('filter excludes non-matches', async () => {
                     const logger = createLogger().logger;
         
             
@@ -204,7 +290,7 @@ export async function commonRawLoggerTests(createLogger:CreateTestLogger) {
 
         describe('privacy', () => {
 
-            test('Strips token data', async () => {
+            it('Strips token data', async () => {
         
                 const logger = createLogger().logger;
         
@@ -233,7 +319,7 @@ export async function commonRawLoggerTests(createLogger:CreateTestLogger) {
                 
             })
 
-            test('Retains token data if marked dangerous', async () => {
+            it('Retains token data if marked dangerous', async () => {
         
                 const logger = createLogger({permit_dangerous_context_properties: true}).logger;
         
@@ -264,7 +350,7 @@ export async function commonRawLoggerTests(createLogger:CreateTestLogger) {
         })
     
         describe('misc', () => {
-            test('Logger - serialisable', async () => {
+            it('Logger - serialisable', async () => {
         
                 const logger = createLogger().logger;
         
@@ -286,7 +372,7 @@ export async function commonRawLoggerTests(createLogger:CreateTestLogger) {
         
             })
         
-            test('Logger - stack trace', async () => {
+            it('Logger - stack trace', async () => {
         
                 const logger = createLogger({
                     'include_stack_trace': {
@@ -331,7 +417,7 @@ export async function commonRawLoggerTests(createLogger:CreateTestLogger) {
                     context: {}
                 }));
             
-            test('loads entries into an empty store', async () => {
+            it('loads entries into an empty store', async () => {
                 const instance = createLogger();
                 const entries = sampleEntries(3);
                 await instance.logger.reset(entries);
@@ -345,7 +431,7 @@ export async function commonRawLoggerTests(createLogger:CreateTestLogger) {
                 ]);
             });
         
-            test('replaces existing entries with new ones', async () => {
+            it('replaces existing entries with new ones', async () => {
                 const instance = createLogger();
                 await instance.logger.reset(sampleEntries(2));
                 await instance.logger.reset(sampleEntries(1)); // only 1 new entry
@@ -355,7 +441,7 @@ export async function commonRawLoggerTests(createLogger:CreateTestLogger) {
                 expect(result[0]!.message).toBe('Test log 1');
             });
         
-            test('persists data across recreated logger instances', async (cx) => {
+            it('persists data across recreated logger instances', async (cx) => {
                 const instance = createLogger();
                 if( instance.cannot_recreate_with_same_data ) cx.skip();
                 await instance.logger.reset(sampleEntries(2));
