@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Span } from './Span.ts';
 import type { ILogStorage, LogEntry } from '../log-storage/types.ts';
-import type { MinimumContext } from '../types.ts';
+import type { ILogger, MinimumContext } from '../types.ts';
 import { WhereFilter, type WhereFilterDefinition } from '@andyrmitchell/objects';
 import type { SpanMeta } from './types.ts';
 
@@ -66,7 +66,7 @@ describe('Span Integration Tests', () => {
 
     it('should log an info message with the correct context', async () => {
         const fakeLogger = new FakeRawLogger();
-        const span = new Span(fakeLogger);
+        const span:ILogger = new Span(fakeLogger);
         await span.log("info message", { test: "value" });
         // Expect two entries: one from span creation and one from the info log.
         expect(fakeLogger.logs.length).toBe(2);
@@ -76,6 +76,8 @@ describe('Span Integration Tests', () => {
         expect(infoLog.context).toEqual({ test: "value" });
         // Verify that the log entry uses the same trace id as the span's start event.
         expect(infoLog.meta.span.id).toBe(fakeLogger.logs[0].meta.span.id);
+
+        //span.log('hi', {any: 1}, {oh: 2})
     });
 
     it('should log warn and error messages correctly', async () => {

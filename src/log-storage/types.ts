@@ -13,7 +13,7 @@ export function isLogEntrySimple(x: unknown):x is LogEntry {
     return typeof x==='object' && x!==null && "ulid" in x && "type" in x;
 }
 
-export type BaseLogEntry<C extends MinimumContext = any, M extends MinimumContext = any> = {
+export type BaseLogEntry<C = any, M extends MinimumContext = any> = {
     
     /**
      * The Universally Unique Lexicographically Sortable Identifier. 
@@ -41,19 +41,19 @@ export type BaseLogEntry<C extends MinimumContext = any, M extends MinimumContex
     
     stack_trace?: string
 }
-type InfoLogEntry<C extends MinimumContext = any, M extends MinimumContext = any> = BaseLogEntry<C, M> & {
+type InfoLogEntry<C = any, M extends MinimumContext = any> = BaseLogEntry<C, M> & {
     type: 'info',
     message: string
 };
-type WarnLogEntry<C extends MinimumContext = any, M extends MinimumContext = any> = BaseLogEntry<C, M> & {
+type WarnLogEntry<C = any, M extends MinimumContext = any> = BaseLogEntry<C, M> & {
     type: 'warn',
     message: string
 };
-type ErrorLogEntry<C extends MinimumContext = any, M extends MinimumContext = any> = BaseLogEntry<C, M> & {
+type ErrorLogEntry<C = any, M extends MinimumContext = any> = BaseLogEntry<C, M> & {
     type: 'error',
     message: string
 };
-type CriticalLogEntry<C extends MinimumContext = any, M extends MinimumContext = any> = BaseLogEntry<C, M> & {
+type CriticalLogEntry<C = any, M extends MinimumContext = any> = BaseLogEntry<C, M> & {
     type: 'critical',
     message: string
 };
@@ -69,7 +69,7 @@ type EndEventDetail = BaseEventDetail & {
 }
 export type EventDetail = StartEventDetail | EndEventDetail;
 
-export type EventLogEntry<C extends MinimumContext = any, M extends MinimumContext = any, E extends EventDetail = EventDetail> = BaseLogEntry<C, M> & {
+export type EventLogEntry<C = any, M extends MinimumContext = any, E extends EventDetail = EventDetail> = BaseLogEntry<C, M> & {
     type: 'event',
     message?: string
     event: E
@@ -82,7 +82,7 @@ export function isEventLogEntry(x: unknown): x is EventLogEntry {
 /**
  * Union of all possible entry types
  */
-export type LogEntry<C extends MinimumContext = any, M extends MinimumContext = any> = 
+export type LogEntry<C = any, M extends MinimumContext = any> = 
     InfoLogEntry<C, M> | 
     WarnLogEntry<C, M> | 
     ErrorLogEntry<C, M> |
@@ -94,7 +94,7 @@ export type LogEntry<C extends MinimumContext = any, M extends MinimumContext = 
 /**
  * Like LogEntry, but context can be anything (not yet serialised down)
  */
-export type AcceptLogEntry<C extends MinimumContext = any, M extends MinimumContext = any> =
+export type AcceptLogEntry<C = any, M extends MinimumContext = any> =
   | (Omit<InfoLogEntry<C, M>, 'timestamp' | 'ulid'> & { ulid?: string })
   | (Omit<WarnLogEntry<C, M>, 'timestamp' | 'ulid'> & { ulid?: string })
   | (Omit<ErrorLogEntry<C, M>, 'timestamp' | 'ulid'> & { ulid?: string })

@@ -4,7 +4,8 @@ import type { AcceptLogEntry, ILogStorage, LogEntry } from "../log-storage/types
 
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import type { ISpan, SpanMeta,  SpanId } from "./types.ts";
-import type { MinimumContext } from "../types.ts";
+import type { InferContextTypeFromLogArgsWithoutMessage } from "../types.ts";
+import { normalizeArgs } from "../utils/normalizeArgs.ts";
 
 
 
@@ -64,39 +65,48 @@ export class Span implements ISpan {
         return logEntry;
     }
     
-    async log<C extends MinimumContext = any>(message: string, context?: any): Promise<LogEntry<C, SpanMeta>> {
+    
+    async debug<T extends any[]>(message: any, ...context: T): Promise<LogEntry<InferContextTypeFromLogArgsWithoutMessage<T>, SpanMeta>> {
+        
+        return await this.#addToStorage({
+            type: 'info', // TODO
+            ...normalizeArgs([message, ...context]), // message + context
+            meta: this.#getMeta()
+        })
+    }
+
+    async log<T extends any[]>(message: any, ...context: T): Promise<LogEntry<InferContextTypeFromLogArgsWithoutMessage<T>, SpanMeta>> {
+        
         return await this.#addToStorage({
             type: 'info',
-            message,
-            context, 
+            ...normalizeArgs([message, ...context]), // message + context
             meta: this.#getMeta()
         })
     }
 
-    async warn<C extends MinimumContext = any>(message: string, context?: any): Promise<LogEntry<C, SpanMeta>> {
+    async warn<T extends any[]>(message: any, ...context: T): Promise<LogEntry<InferContextTypeFromLogArgsWithoutMessage<T>, SpanMeta>> {
+        
         return await this.#addToStorage({
             type: 'warn',
-            message,
-            context, 
+            ...normalizeArgs([message, ...context]), // message + context
             meta: this.#getMeta()
         })
     }
 
-    async error<C extends MinimumContext = any>(message: string, context?: any): Promise<LogEntry<C, SpanMeta>> {
+    async error<T extends any[]>(message: any, ...context: T): Promise<LogEntry<InferContextTypeFromLogArgsWithoutMessage<T>, SpanMeta>> {
+        
         return await this.#addToStorage({
             type: 'error',
-            message,
-            context, 
+            ...normalizeArgs([message, ...context]), // message + context
             meta: this.#getMeta()
         })
     }
 
-
-    async critical<C extends MinimumContext = any>(message: string, context?: any): Promise<LogEntry<C, SpanMeta>> {
+    async critical<T extends any[]>(message: any, ...context: T): Promise<LogEntry<InferContextTypeFromLogArgsWithoutMessage<T>, SpanMeta>> {
+        
         return await this.#addToStorage({
             type: 'critical',
-            message,
-            context, 
+            ...normalizeArgs([message, ...context]), // message + context
             meta: this.#getMeta()
         })
     }

@@ -1,7 +1,8 @@
 
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import type { AcceptLogEntry, ILogStorage, LogEntry } from "../log-storage/types.ts";
-import type { ILogger} from "../types.ts";
+import type { ILogger, InferContextTypeFromLogArgsWithoutMessage} from "../types.ts";
+import { normalizeArgs } from "../utils/normalizeArgs.ts";
 
 
 
@@ -25,38 +26,41 @@ export class Logger implements ILogger {
         return logEntry;
     }
 
-    async log(message: string, context?: any): Promise<LogEntry> {
+    async debug<T extends any[]>(message: any, ...context: T): Promise<LogEntry<InferContextTypeFromLogArgsWithoutMessage<T>>> {
+        return await this.#addToStorage({
+            type: 'info', // TODO
+            ...normalizeArgs([message, ...context]) // message + context
+        })
+    }
+
+    async log<T extends any[]>(message: any, ...context: T): Promise<LogEntry<InferContextTypeFromLogArgsWithoutMessage<T>>> {
         return await this.#addToStorage({
             type: 'info',
-            message,
-            context
+            ...normalizeArgs([message, ...context]) // message + context
         })
     }
 
-    async warn(message: string, context?: any): Promise<LogEntry> {
+    async warn<T extends any[]>(message: any, ...context: T): Promise<LogEntry<InferContextTypeFromLogArgsWithoutMessage<T>>> {
         return await this.#addToStorage({
             type: 'warn',
-            message,
-            context
+            ...normalizeArgs([message, ...context]) // message + context
         })
     }
 
-    async error(message: string, context?: any): Promise<LogEntry> {
+    async error<T extends any[]>(message: any, ...context: T): Promise<LogEntry<InferContextTypeFromLogArgsWithoutMessage<T>>> {
         return await this.#addToStorage({
             type: 'error',
-            message,
-            context
+            ...normalizeArgs([message, ...context]) // message + context
         })
     }
 
-
-    async critical(message: string, context?: any): Promise<LogEntry> {
+    async critical<T extends any[]>(message: any, ...context: T): Promise<LogEntry<InferContextTypeFromLogArgsWithoutMessage<T>>> {
         return await this.#addToStorage({
             type: 'critical',
-            message,
-            context
+            ...normalizeArgs([message, ...context]) // message + context
         })
     }
+
 
     async get(filter?:WhereFilterDefinition): Promise<LogEntry[]> {
         return await this.storage.get(filter);
