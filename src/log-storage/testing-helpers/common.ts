@@ -290,6 +290,7 @@ export async function commonRawLoggerTests(createLogger:CreateTestLogger) {
         
                 const logger = createLogger({
                     'include_stack_trace': {
+                        debug: false,
                         info: true, 
                         warn: true, 
                         error: true,

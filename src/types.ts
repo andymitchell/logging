@@ -7,19 +7,12 @@ export type MinimumContext = Record<string, any>;
 export interface ILogger {
 
     
-    debug(message: any, ...context: any[]): Promise<LogEntry>;
+    debug<T extends any[]>(message: any, ...context: T): Promise<LogEntry<InferContextTypeFromLogArgsWithoutMessage<T>>>;
+    log<T extends any[]>(message: any, ...context: T): Promise<LogEntry<InferContextTypeFromLogArgsWithoutMessage<T>>>;
+    warn<T extends any[]>(message: any, ...context: T): Promise<LogEntry<InferContextTypeFromLogArgsWithoutMessage<T>>>;
+    error<T extends any[]>(message: any, ...context: T): Promise<LogEntry<InferContextTypeFromLogArgsWithoutMessage<T>>>;
+    critical<T extends any[]>(message: any, ...context: T): Promise<LogEntry<InferContextTypeFromLogArgsWithoutMessage<T>>>;
 
-    log(message: any, ...context: any[]): Promise<LogEntry>;
-    
-
-    
-    warn(message: any, ...context: any[]): Promise<LogEntry>;
-    
-    
-    error(message: any, ...context: any[]): Promise<LogEntry>;
-
-    
-    critical(message: any, ...context: any[]): Promise<LogEntry>;
 
     get(filter?:WhereFilterDefinition<LogEntry>): Promise<LogEntry[]>;
 

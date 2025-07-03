@@ -5,7 +5,7 @@ import type { LogEntry } from "../../../../log-storage/types.ts";
 import Dropdown from "../../utils/Dropdown.tsx";
 
 const COMPONENT_ID = 'log-level';
-const levels = ["info", "warn", "error", "critical"] as const;
+const levels = ["debug", "info", "warn", "error", "critical"] as const;
 type Levels = (typeof levels)[number];
 
 

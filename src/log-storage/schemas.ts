@@ -22,6 +22,12 @@ export function createLogEntrySchema(context?:z.RecordType<any, any>, meta?:z.Re
         stack_trace: z.string().optional()
     });
     
+
+    const DebugLogEntrySchema = BaseLogEntrySchema.extend({
+        type: z.literal("debug"),
+        message: z.string()
+    });
+
     const InfoLogEntrySchema = BaseLogEntrySchema.extend({
         type: z.literal("info"),
         message: z.string()
@@ -66,6 +72,7 @@ export function createLogEntrySchema(context?:z.RecordType<any, any>, meta?:z.Re
     });
     
     const LogEntrySchema = z.discriminatedUnion("type", [
+        DebugLogEntrySchema,
         InfoLogEntrySchema,
         WarnLogEntrySchema,
         ErrorLogEntrySchema,

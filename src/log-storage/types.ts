@@ -41,6 +41,10 @@ export type BaseLogEntry<C = any, M extends MinimumContext = any> = {
     
     stack_trace?: string
 }
+type DebugLogEntry<C = any, M extends MinimumContext = any> = BaseLogEntry<C, M> & {
+    type: 'debug',
+    message: string
+};
 type InfoLogEntry<C = any, M extends MinimumContext = any> = BaseLogEntry<C, M> & {
     type: 'info',
     message: string
@@ -83,6 +87,7 @@ export function isEventLogEntry(x: unknown): x is EventLogEntry {
  * Union of all possible entry types
  */
 export type LogEntry<C = any, M extends MinimumContext = any> = 
+    DebugLogEntry<C, M> |
     InfoLogEntry<C, M> | 
     WarnLogEntry<C, M> | 
     ErrorLogEntry<C, M> |
@@ -95,6 +100,7 @@ export type LogEntry<C = any, M extends MinimumContext = any> =
  * Like LogEntry, but context can be anything (not yet serialised down)
  */
 export type AcceptLogEntry<C = any, M extends MinimumContext = any> =
+  | (Omit<DebugLogEntry<C, M>, 'timestamp' | 'ulid'> & { ulid?: string })
   | (Omit<InfoLogEntry<C, M>, 'timestamp' | 'ulid'> & { ulid?: string })
   | (Omit<WarnLogEntry<C, M>, 'timestamp' | 'ulid'> & { ulid?: string })
   | (Omit<ErrorLogEntry<C, M>, 'timestamp' | 'ulid'> & { ulid?: string })
@@ -142,6 +148,7 @@ export interface ILogStorage {
 
 export interface LogStorageOptions {
     include_stack_trace?: {
+        debug: boolean;
         info: boolean;
         warn: boolean;
         error: boolean;
