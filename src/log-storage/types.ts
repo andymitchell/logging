@@ -117,7 +117,7 @@ export type LogEntryType = LogEntry['type'];
  */
 export interface ILogStorage {
 
-    breakpoints: IBreakpoints,
+    breakpoints?: IBreakpoints | null,
 
     /**
      * Add an entry to the data store
@@ -173,5 +173,5 @@ export interface LogStorageOptions {
     /**
      * Set a custom IBreakpoints implementation (e.g. a different storage area). Defaults to in-memory if not provided.
      */
-    breakpoints?: IBreakpoints
+    breakpoints?: IBreakpoints | null
 }

@@ -5,7 +5,6 @@ import type {  MaxAge, MinimumContext } from "../types.ts";
 import type { AcceptLogEntry, ILogStorage, LogEntry, LogStorageOptions } from "./types.ts";
 import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
 import { monotonicFactory } from "ulid";
-import { MemoryBreakpoints } from "../breakpoints/MemoryBreakpoints.ts";
 import type { IBreakpoints } from "../breakpoints/types.ts";
 
 
@@ -27,7 +26,7 @@ export class BaseLogStorage implements ILogStorage {
      */
     protected ulid:Function;
     
-    breakpoints:IBreakpoints;
+    breakpoints?:IBreakpoints | null;
 
     constructor(dbNamespace:string, options?: LogStorageOptions) {
         const safeOptions = Object.assign({}, DEFAULT_LOGGER_OPTIONS, options);
@@ -93,7 +92,7 @@ export class BaseLogStorage implements ILogStorage {
         }
         
         await this.commitEntry(logEntry);
-        this.breakpoints.test(logEntry);
+        this.breakpoints?.test(logEntry);
 
         if( this.logToConsole && logEntry.type!=='event') {
             console.log(`[Log ${this.dbNamespace}] ${logEntry.message}`, logEntry.context);
@@ -132,6 +131,7 @@ export class BaseLogStorage implements ILogStorage {
 
 const DEFAULT_LOGGER_OPTIONS:Required<LogStorageOptions> = {
     include_stack_trace: {
+        debug: false,
         info: false,
         warn: true,
         error: true,
@@ -141,5 +141,5 @@ const DEFAULT_LOGGER_OPTIONS:Required<LogStorageOptions> = {
     log_to_console: false,
     permit_dangerous_context_properties: false,
     max_age: [],
-    breakpoints: new MemoryBreakpoints()
+    breakpoints: null
 }
