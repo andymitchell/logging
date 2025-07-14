@@ -130,7 +130,7 @@ export interface ILogStorage {
      * @param filter Match any entries with a precise spec
      * @param fullTextFilter Match entries that, when serialised, contain this text 
      */
-    get(filter?:WhereFilterDefinition<LogEntry>, fullTextFilter?: string): Promise<LogEntry[]>;
+    get<T extends LogEntry = LogEntry>(filter?:WhereFilterDefinition<T>, fullTextFilter?: string): Promise<T[]>;
 
     /**
      * Remove items older than the max age stated in LogStorageOptions

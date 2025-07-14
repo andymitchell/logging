@@ -119,7 +119,7 @@ export class IDBLogStorage extends BaseLogStorage implements ILogStorage {
     }
 
 
-    public override async get(filter?: WhereFilterDefinition<LogEntry>, fullTextFilter?: string): Promise<LogEntry[]> {
+    public override async get<T extends LogEntry = LogEntry>(filter?: WhereFilterDefinition<T>, fullTextFilter?: string): Promise<T[]> {
         return new Promise(async (resolve, reject) => {
             const db = await this.#dbPromise;
             const transaction = db.transaction('logs', 'readonly');
@@ -127,7 +127,7 @@ export class IDBLogStorage extends BaseLogStorage implements ILogStorage {
             const request = store.getAll();
 
             request.onsuccess = (event) => {
-                let entries = (event.target as IDBRequest).result as LogEntry[];
+                let entries = (event.target as IDBRequest).result as T[];
                 // TODO Filter IndexedDb properly
                 entries = filter? entries.filter(x => matchJavascriptObject(x, filter)) : entries;
                 if( fullTextFilter ) {

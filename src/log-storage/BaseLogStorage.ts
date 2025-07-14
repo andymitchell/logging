@@ -122,7 +122,7 @@ export class BaseLogStorage implements ILogStorage {
     }
 
 
-    public async get(filter?:WhereFilterDefinition<LogEntry>, fullTextFilter?: string): Promise<LogEntry[]> {
+    public async get<T extends LogEntry = LogEntry>(filter?:WhereFilterDefinition<T>, fullTextFilter?: string): Promise<T[]> {
         throw new Error("Method not implemented");
     }
 

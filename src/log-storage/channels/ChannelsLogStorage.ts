@@ -101,7 +101,7 @@ export class ChannelsLogStorage extends BaseLogStorage implements ILogStorage {
      * @param fullTextFilter A full-text search string to apply.
      * @returns A unified, sorted array of log entries.
      */
-    public override async get(filter?: WhereFilterDefinition<LogEntry>, fullTextFilter?: string): Promise<LogEntry[]> {
+    public override async get<T extends LogEntry = LogEntry>(filter?: WhereFilterDefinition<T>, fullTextFilter?: string): Promise<T[]> {
         const getPromises = this.channels.map(channel => 
             channel.storage.get(filter, fullTextFilter)
         );
@@ -110,7 +110,7 @@ export class ChannelsLogStorage extends BaseLogStorage implements ILogStorage {
         const allEntries = resultsFromAllChannels.flat();
 
         // De-duplicate using the ULID, which is unique per entry
-        const uniqueEntriesMap = new Map<string, LogEntry>();
+        const uniqueEntriesMap = new Map<string, T>();
         for (const entry of allEntries) {
             uniqueEntriesMap.set(entry.ulid, entry);
         }

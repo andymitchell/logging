@@ -37,8 +37,8 @@ export class MemoryLogStorage extends BaseLogStorage implements ILogStorage {
         this.#log = entries ?? [];
     }
 
-    public override async get(filter?: WhereFilterDefinition<LogEntry>, fullTextFilter?: string): Promise<LogEntry[]> {
-        let entries = structuredClone(this.#log) as LogEntry[];
+    public override async get<T extends LogEntry = LogEntry>(filter?: WhereFilterDefinition<T>, fullTextFilter?: string): Promise<T[]> {
+        let entries = structuredClone(this.#log) as T[];
         entries = filter? entries.filter(x => matchJavascriptObject(x, filter)) : entries;
 
         if( fullTextFilter ) {
