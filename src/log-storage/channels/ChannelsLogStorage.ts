@@ -9,7 +9,7 @@ import type { ILogStorage, LogEntry } from "../types.ts";
  */
 export interface Channel {
     /**
-     * The underlying storage instance (e.g., MemoryRawLogger, IDBRawLogger) for this channel.
+     * The underlying storage instance (e.g., MemoryLogStorage, IDBLogStorage) for this channel.
      */
     storage: ILogStorage;
 
@@ -29,7 +29,7 @@ export interface Channel {
 type LogStorageOptionsWithoutSensitive = Omit<LogStorageOptions, 'permit_dangerous_context_properties'>;
 
 /**
- * A facade RawLogger that distributes log entries to multiple "channels" based on a set of rules.
+ * A facade LogStorage that distributes log entries to multiple "channels" based on a set of rules.
  * 
  * Each channel consists of an underlying ILogStorage (the storage) and optional rules for accepting
  * and transforming entries. This allows for complex logging strategies, such as:

@@ -1,7 +1,7 @@
 import "fake-indexeddb/auto"; // Prevent any long-term IDB storage
 import { IDBLogStorage } from "./IDBLogStorage.ts";
 import { IDBFactory } from "fake-indexeddb";
-import { commonRawLoggerTests } from "../testing-helpers/common.ts";
+import { commonLogStorageTests } from "../testing-helpers/common.ts";
 import { uuidV4 } from "@andyrmitchell/utils/uid";
 import type { LogStorageOptions } from "../types.ts";
 
@@ -22,7 +22,7 @@ const makeLogger = (options?:LogStorageOptions) => {
 
 describe('IDBLogStorage', () => {
 
-    commonRawLoggerTests(makeLogger);
+    commonLogStorageTests(makeLogger);
 
     
 })

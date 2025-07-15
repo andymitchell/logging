@@ -1,6 +1,6 @@
 
 
-import { commonRawLoggerTests } from "../testing-helpers/common.ts";
+import { commonLogStorageTests } from "../testing-helpers/common.ts";
 import { ChannelsLogStorage } from "./ChannelsLogStorage.ts";
 import { MemoryLogStorage } from "../memory/MemoryLogStorage.ts";
 
@@ -9,7 +9,7 @@ import { MemoryLogStorage } from "../memory/MemoryLogStorage.ts";
 
 describe('MemoryLogStorage', () => {
 
-    commonRawLoggerTests((options) => ({
+    commonLogStorageTests((options) => ({
         logger: new ChannelsLogStorage('testing', [
             {
                 storage: new MemoryLogStorage('', options)

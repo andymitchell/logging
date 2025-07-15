@@ -18,7 +18,7 @@ type CreateTestLogger = (options?: LogStorageOptions) => {
     recreateWithSameData: () => ILogStorage
 }
 
-export async function commonRawLoggerTests(createLogger: CreateTestLogger) {
+export async function commonLogStorageTests(createLogger: CreateTestLogger) {
 
     describe('Common Logger Tests', () => {
 

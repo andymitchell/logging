@@ -11,7 +11,7 @@ import { MemoryBreakpoints } from '../breakpoints/MemoryBreakpoints.ts';
  * A fake implementation of ILogStorage to be used in tests.
  * It records every log entry in an array and can be configured to fail on add() or get().
  */
-class FakeRawLogger<T extends MinimumContext = any> implements ILogStorage {
+class FakeLogStorage<T extends MinimumContext = any> implements ILogStorage {
     
     logs: any[] = [];
     shouldFailAdd = false;
@@ -53,7 +53,7 @@ class FakeRawLogger<T extends MinimumContext = any> implements ILogStorage {
 describe('Span Integration Tests', () => {
 
     it('should record span_start on creation', () => {
-        const fakeLogger = new FakeRawLogger();
+        const fakeLogger = new FakeLogStorage();
         // When a span is created, its constructor should record a span_start event.
         new Span(fakeLogger);
         expect(fakeLogger.logs.length).toBe(1);
@@ -65,7 +65,7 @@ describe('Span Integration Tests', () => {
     });
 
     it('should log an info message with the correct context', async () => {
-        const fakeLogger = new FakeRawLogger();
+        const fakeLogger = new FakeLogStorage();
         const span:ILogger = new Span(fakeLogger);
         await span.log("info message", { test: "value" });
         // Expect two entries: one from span creation and one from the info log.
@@ -81,7 +81,7 @@ describe('Span Integration Tests', () => {
     });
 
     it('should log warn and error messages correctly', async () => {
-        const fakeLogger = new FakeRawLogger();
+        const fakeLogger = new FakeLogStorage();
         const span = new Span(fakeLogger);
         await span.warn("warn message", { level: "moderate" });
         await span.error("error message", { critical: true });
@@ -100,7 +100,7 @@ describe('Span Integration Tests', () => {
     });
 
     it('should retrieve all log entries via get()', async () => {
-        const fakeLogger = new FakeRawLogger();
+        const fakeLogger = new FakeLogStorage();
         const span = new Span(fakeLogger);
         await span.log("test log", { data: 123 });
         const allLogs = await span.get();
@@ -114,7 +114,7 @@ describe('Span Integration Tests', () => {
 
 
         it('should create a child span with the parent id and top id set correctly', async () => {
-            const fakeLogger = new FakeRawLogger();
+            const fakeLogger = new FakeLogStorage();
             const parentSpan = new Span(fakeLogger);
             // Get the parent's trace id from its span_start event.
             const parentSpanId = fakeLogger.logs[0].meta.span.id;
@@ -148,7 +148,7 @@ describe('Span Integration Tests', () => {
         });
 
         it('should create a child span with name and context set', async () => {
-            const fakeLogger = new FakeRawLogger();
+            const fakeLogger = new FakeLogStorage();
             const parentSpan = new Span(fakeLogger);
             // Get the parent's trace id from its span_start event.
             const parentSpanId = fakeLogger.logs[0].meta.span.id;
@@ -167,7 +167,7 @@ describe('Span Integration Tests', () => {
     })
 
     it('should record a span_end event when end() is called', () => {
-        const fakeLogger = new FakeRawLogger();
+        const fakeLogger = new FakeLogStorage();
         const span = new Span(fakeLogger);
         span.end();
         // After calling end(), we should have a span_start event and a span_end event.
@@ -178,7 +178,7 @@ describe('Span Integration Tests', () => {
     });
 
     it('get will return everything', async () => {
-        const fakeLogger = new FakeRawLogger();
+        const fakeLogger = new FakeLogStorage();
         const span = new Span(fakeLogger);
         span.log("abc1");
         span.end();
@@ -190,7 +190,7 @@ describe('Span Integration Tests', () => {
     });
 
     it('get will filter', async () => {
-        const fakeLogger = new FakeRawLogger();
+        const fakeLogger = new FakeLogStorage();
         const span = new Span(fakeLogger);
         span.log("abc1");
         span.end();
@@ -211,7 +211,7 @@ describe('Span Integration Tests', () => {
     describe('Failure Scenarios', () => {
 
         it('should propagate errors when storage.add fails', async () => {
-            const fakeLogger = new FakeRawLogger();
+            const fakeLogger = new FakeLogStorage();
             const span = new Span(fakeLogger);
             // Set the fake logger to simulate failure on subsequent add() calls.
             fakeLogger.shouldFailAdd = true;
@@ -225,7 +225,7 @@ describe('Span Integration Tests', () => {
         });
 
         it('should propagate errors when storage.get fails', async () => {
-            const fakeLogger = new FakeRawLogger();
+            const fakeLogger = new FakeLogStorage();
             const span = new Span(fakeLogger);
             fakeLogger.shouldFailGetAll = true;
             await expect(span.get()).rejects.toThrow("get failure");

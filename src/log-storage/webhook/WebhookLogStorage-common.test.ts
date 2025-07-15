@@ -1,6 +1,6 @@
 
 import { vi } from "vitest";
-import { commonRawLoggerTests } from "../testing-helpers/common.ts";
+import { commonLogStorageTests } from "../testing-helpers/common.ts";
 import { FetchEmitter } from "./testing-helpers/FetchEmitter.ts";
 import { WebhookLogStorageForTesting } from "./testing-helpers/WebhookLogStorageForTesting.ts";
 
@@ -20,7 +20,7 @@ afterEach(() => {
 
 describe('MemoryLogStorage', () => {
 
-    commonRawLoggerTests((options) => ({
+    commonLogStorageTests((options) => ({
         logger: new WebhookLogStorageForTesting('testing', 'https://www.whereever.com', interceptor, options),
         cannot_recreate_with_same_data: true,
         recreateWithSameData() { throw new Error("Cannot") }
