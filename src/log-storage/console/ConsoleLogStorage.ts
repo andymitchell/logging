@@ -9,7 +9,7 @@ interface ConsoleLogStorageOptions extends LogStorageOptions {
     /**
      * If true, rather than logging a LogEntry, it'll only log the arguments passed to it. 
      */
-    onlyData?: boolean
+    only_logger_args?: boolean
 }
 
 /**
@@ -26,7 +26,7 @@ export class ConsoleLogStorage extends BaseLogStorage implements ILogStorage {
         super('', options);
 
         if( !console || !console.log ) throw new Error("No global 'console' found");
-        
+
         this.#options = options;
     }
 
@@ -51,7 +51,7 @@ export class ConsoleLogStorage extends BaseLogStorage implements ILogStorage {
         
         const logFunction = console[consoleFunction as keyof Console] as (...args:any) => void;
 
-        if( this.#options?.onlyData ) {
+        if( this.#options?.only_logger_args ) {
             if( Array.isArray(logEntry.context) ) {
                 logFunction(logEntry.message, ...logEntry.context);
             } else {

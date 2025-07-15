@@ -22,8 +22,8 @@ afterAll(() => {
 describe('ConsoleLogStorage', () => {
 
 
-    it('should log the entire LogEntry when onlyData is false', async () => {
-        const storage = new ConsoleLogStorage({ onlyData: false });
+    it('should log the entire LogEntry when only_logger_args is false', async () => {
+        const storage = new ConsoleLogStorage({ only_logger_args: false });
         
         const logEntry: LogEntry = {
             type: 'info',
@@ -42,8 +42,8 @@ describe('ConsoleLogStorage', () => {
         expect(consoleLogSpy).toHaveBeenCalledWith(finalLogEntry);
     });
 
-    it('should log only the message and context when onlyData is true and context is an array', async () => {
-        const storage = new ConsoleLogStorage({ onlyData: true });
+    it('should log only the message and context when only_logger_args is true and context is an array', async () => {
+        const storage = new ConsoleLogStorage({ only_logger_args: true });
         
         const logEntry: LogEntry = {
             type: 'info',
@@ -64,8 +64,8 @@ describe('ConsoleLogStorage', () => {
 
     });
 
-    it('should log only the message and context when onlyData is true and context is not an array', async () => {
-        const storage = new ConsoleLogStorage({ onlyData: true });
+    it('should log only the message and context when only_logger_args is true and context is not an array', async () => {
+        const storage = new ConsoleLogStorage({ only_logger_args: true });
         
         const logEntry: LogEntry = {
             type: 'info',
@@ -86,8 +86,8 @@ describe('ConsoleLogStorage', () => {
 
 
 
-    it('should call error with the entire LogEntry when onlyData is false, and logEntry is an error type', async () => {
-        const storage = new ConsoleLogStorage({ onlyData: false });
+    it('should call error with the entire LogEntry when only_logger_args is false, and logEntry is an error type', async () => {
+        const storage = new ConsoleLogStorage({ only_logger_args: false });
         
         const logEntry: LogEntry = {
             type: 'error',
