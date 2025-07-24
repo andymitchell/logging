@@ -69,8 +69,8 @@
         "vitest": "^3.2.4"
     },
     "dependencies": {
-        "@andyrmitchell/objects": "^0.10.0",
-        "@andyrmitchell/utils": "^0.16.7",
+        "@andyrmitchell/objects": "^0.11.6",
+        "@andyrmitchell/utils": "^0.21.1",
         "material-symbols": "^0.31.9",
         "react-json-view-lite": "^2.4.1",
         "ulid": "^3.0.1"
