@@ -29,7 +29,6 @@ export interface NormalizedLogArgs<TContext = any> {
  * @example normalizeArgs({c: 3}) // {message: '{"c": 3}', context: undefined} note it was turned to json
  */
 export function normalizeArgs<T extends any[]>(args:[...T]): NormalizedLogArgs<InferContextTypeFromLogArgs<T>> {
-    console.log({args})
     const message = args.shift() as any;
     const context = args; // The remaining args after message removed 
 

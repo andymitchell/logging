@@ -23,13 +23,11 @@ export function useTraceResults(
 
         (async () => {
             
-            console.log("Load trace results for ", query)
             
             try {
                 let data:TraceSearchResults<any>;
                 if( source instanceof TraceViewer ) {
                     data = await source.getTraces(query, includeAllTraceEntries);
-                    console.log("Got trace results: ", data);
                 } else {
                     data = await source(query, includeAllTraceEntries);
                 }
