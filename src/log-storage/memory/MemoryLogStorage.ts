@@ -8,14 +8,14 @@ import createMaxAgeTest from "../createMaxAgeTest.ts";
 
 export class MemoryLogStorage extends BaseLogStorage implements ILogStorage {
 
-    #log:LogEntry[]
+    private _log:LogEntry[]
     
     
 
     constructor(dbNamespace:string, options?: LogStorageOptions) {
         super(dbNamespace, options);
 
-        this.#log = [];
+        this._log = [];
         
         this.clearOldEntries();
     }
@@ -23,22 +23,22 @@ export class MemoryLogStorage extends BaseLogStorage implements ILogStorage {
     
 
     protected override async commitEntry(logEntry: LogEntry): Promise<void> {
-        this.#log.push(logEntry);
+        this._log.push(logEntry);
         
     }
 
     protected override async clearOldEntries(): Promise<void> {
         const filter = createMaxAgeTest(this.maxAge);
-        this.#log = this.#log.filter(filter)
+        this._log = this._log.filter(filter)
     }
 
 
     public override async reset(entries?: LogEntry[]):Promise<void> {
-        this.#log = entries ?? [];
+        this._log = entries ?? [];
     }
 
     public override async get<T extends LogEntry = LogEntry>(filter?: WhereFilterDefinition<T>, fullTextFilter?: string): Promise<T[]> {
-        let entries = structuredClone(this.#log) as T[];
+        let entries = structuredClone(this._log) as T[];
         entries = filter? entries.filter(x => matchJavascriptObject(x, filter)) : entries;
 
         if( fullTextFilter ) {
