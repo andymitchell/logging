@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo } from "react";
 import { useFilterContext } from "./FilterContext.tsx";
 import { isPartialObjectFilter } from "@andymitchell/objects/where-filter";
+import { literalContains } from "./escapeRegExp.ts";
 import type { LogEntry } from "../../../../log-storage/types.ts";
 import Dropdown from "../../utils/Dropdown.tsx";
 import DelayedInput from "../../utils/DelayedInput.tsx";
@@ -20,23 +21,22 @@ export const MessageDropdown: React.FC = () => {
     const inputValue: string = useMemo(() => {
         const componentEntriesFilter = componentEntriesFilters[COMPONENT_ID];
 
-        if( componentEntriesFilter && isPartialObjectFilter(componentEntriesFilter) && typeof componentEntriesFilter.message==='object' ) {
-            return (componentEntriesFilter.message as {$regex?: string}).$regex ?? '';
-        } else {
-            return '';
+        if( componentEntriesFilter && isPartialObjectFilter(componentEntriesFilter) ) {
+            const message = componentEntriesFilter.message;
+            if( typeof message==='object' && message!==null && '$regex' in message && typeof message.$regex==='string' ) {
+                return message.$regex;
+            }
         }
+        return '';
     }, [componentEntriesFilters])
 
 
 
     const onChange = useCallback((value:string) => {
-        setComponentEntriesFilter(COMPONENT_ID, 
-            value? 
-            {
-                message: {$regex: value}
-            }
-            :
-            undefined
+        setComponentEntriesFilter(COMPONENT_ID,
+            value
+                ? { message: literalContains(value) }   // case-sensitive default; { caseInsensitive: true } available
+                : undefined
         )
     }, []);
     

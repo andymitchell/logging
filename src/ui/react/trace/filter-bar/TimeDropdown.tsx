@@ -23,10 +23,15 @@ export const TimeDropdown: React.FC = () => {
     useEffect(() => {
         const componentEntriesFilter = componentEntriesFilters[COMPONENT_ID];
 
-        if( componentEntriesFilter && isPartialObjectFilter(componentEntriesFilter) && typeof componentEntriesFilter.timestamp==='object' ) {
-            setInputValueGte(((componentEntriesFilter.timestamp as {$gte?: number, $lte?: number}).$gte ?? '')+'');
-            setInputValueLte(((componentEntriesFilter.timestamp as {$gte?: number, $lte?: number}).$lte ?? '')+'');
-            return;
+        if( componentEntriesFilter && isPartialObjectFilter(componentEntriesFilter) ) {
+            const timestamp = componentEntriesFilter.timestamp;
+            if( typeof timestamp==='object' && timestamp!==null ) {
+                const gte = ('$gte' in timestamp && typeof timestamp.$gte==='number')? timestamp.$gte : undefined;
+                const lte = ('$lte' in timestamp && typeof timestamp.$lte==='number')? timestamp.$lte : undefined;
+                setInputValueGte(gte!==undefined? gte+'' : '');
+                setInputValueLte(lte!==undefined? lte+'' : '');
+                return;
+            }
         }
         setInputValueGte('');
         setInputValueLte('');
@@ -49,7 +54,6 @@ export const TimeDropdown: React.FC = () => {
             
             data = {timestamp};
         }
-        console.log("Time filter", data, {currentValueGte, currentValueLte});
         setComponentEntriesFilter(COMPONENT_ID, data);
     }, [currentValueGte, currentValueLte]);
     
