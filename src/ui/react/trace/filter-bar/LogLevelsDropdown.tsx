@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo } from "react";
 import { useFilterContext } from "./FilterContext.tsx";
-import { isLogicFilter, isPartialObjectFilter } from "@andyrmitchell/objects/where-filter";
+import { isLogicFilter, isPartialObjectFilter } from "@andymitchell/objects/where-filter";
 import type { LogEntry } from "../../../../log-storage/types.ts";
 import Dropdown from "../../utils/Dropdown.tsx";
 
@@ -23,9 +23,9 @@ export const LogLevelsDropdown: React.FC = () => {
         
         const componentEntriesFilter = componentEntriesFilters[COMPONENT_ID];
         
-        if (componentEntriesFilter && isLogicFilter(componentEntriesFilter) && componentEntriesFilter['OR']) {
+        if (componentEntriesFilter && isLogicFilter(componentEntriesFilter) && componentEntriesFilter['$or']) {
             
-            const result = componentEntriesFilter['OR'].map(orFilter => {
+            const result = componentEntriesFilter['$or'].map(orFilter => {
                 if (isPartialObjectFilter<LogEntry>(orFilter)) {
                     return orFilter.type;
                 }
@@ -50,7 +50,7 @@ export const LogLevelsDropdown: React.FC = () => {
         setComponentEntriesFilter(COMPONENT_ID, 
             updated.length?
             {
-                OR: updated.map(type => ({type}))
+                $or: updated.map(type => ({type}))
             }
             :
             undefined

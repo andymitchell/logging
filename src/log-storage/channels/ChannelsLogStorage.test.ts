@@ -203,7 +203,7 @@ describe('ChannelsLogStorage: commitEntry (via add)', () => {
 
     it('should handle complex accept filters (e.g., NOT operator)', async () => {
         const channels: Channel[] = [
-            { storage: memoryLogger1, accept: { NOT: [{type: 'info' }]} }, // Everything BUT info
+            { storage: memoryLogger1, accept: { $nor: [{type: 'info' }]} }, // Everything BUT info
         ];
         const channelsLogger = new ChannelsLogStorage('test-app', channels);
 

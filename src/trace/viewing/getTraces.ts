@@ -1,4 +1,4 @@
-import { matchJavascriptObject, type WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
+import { matchJavascriptObject, type WhereFilterDefinition } from "@andymitchell/objects/where-filter";
 import type { ILogStorage, LogEntry } from "../../log-storage/types.ts";
 import type { MinimumContext } from "../../types.ts";
 import type { TraceEntryFilter, TraceFilter, TraceSearchResult, TraceSearchResults } from "./types.ts";
@@ -43,7 +43,7 @@ export async function getTraces<T extends MinimumContext = any>(rawLogger:ILogSt
     // Find all entries for each trace
     if( includeAllTraceEntries ) {
         const tracesFilter:WhereFilterDefinition<LogEntry<any, SpanMeta>> = {
-            OR: Object.keys(traceEntries).map(x => ({
+            $or: Object.keys(traceEntries).map(x => ({
                 'meta.span.top_id': x
             }))
         }

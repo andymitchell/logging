@@ -1,5 +1,5 @@
-import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
-import { matchJavascriptObject } from "@andyrmitchell/objects/where-filter"; 
+import type { WhereFilterDefinition } from "@andymitchell/objects/where-filter";
+import { matchJavascriptObject } from "@andymitchell/objects/where-filter"; 
 import type { LogStorageOptions } from "../types.ts";
 import { BaseLogStorage } from "../BaseLogStorage.ts";
 import type { ILogStorage, LogEntry } from "../types.ts";
@@ -74,7 +74,7 @@ export class ChannelsLogStorage extends BaseLogStorage implements ILogStorage {
 
         for (const channel of this.channels) {
             // 1. Check if the channel should accept this entry
-            const isMatch = !channel.accept || matchJavascriptObject(logEntry, channel.accept);
+            const isMatch = !channel.accept || matchJavascriptObject<LogEntry>(logEntry, channel.accept);
 
             if (isMatch) {
                 // 2. Clone the entry to prevent transforms in one channel affecting another.
@@ -143,7 +143,7 @@ export class ChannelsLogStorage extends BaseLogStorage implements ILogStorage {
         const resetPromises: Promise<void>[] = [];
         for (const channel of this.channels) {
             
-            const channelEntries = entries? entries.filter(x => !channel.accept || matchJavascriptObject(x, channel.accept)) : undefined;
+            const channelEntries = entries? entries.filter(x => !channel.accept || matchJavascriptObject<LogEntry>(x, channel.accept)) : undefined;
             
             resetPromises.push(channel.storage.reset(channelEntries));
         }

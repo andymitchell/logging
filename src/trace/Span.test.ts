@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { Span } from './Span.ts';
 import type { ILogStorage, LogEntry } from '../log-storage/types.ts';
 import type { ILogger, MinimumContext } from '../types.ts';
-import { WhereFilter, type WhereFilterDefinition } from '@andyrmitchell/objects';
+import { matchJavascriptObject, type WhereFilterDefinition } from '@andymitchell/objects/where-filter';
 import type { SpanMeta } from './types.ts';
 
 import { MemoryBreakpoints } from '../breakpoints/MemoryBreakpoints.ts';
@@ -36,7 +36,7 @@ class FakeLogStorage<T extends MinimumContext = any> implements ILogStorage {
             throw new Error("get failure");
         }
         if( filter ) {
-            return this.logs.filter(x => WhereFilter.matchJavascriptObject(x, filter));
+            return this.logs.filter(x => matchJavascriptObject(x, filter));
         }
         return this.logs;
     }

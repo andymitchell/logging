@@ -1,6 +1,6 @@
 import React, {  useEffect, useState } from "react";
 import { useFilterContext, type ComponentEntriesFilterData } from "./FilterContext.tsx";
-import { isPartialObjectFilter } from "@andyrmitchell/objects/where-filter";
+import { isPartialObjectFilter } from "@andymitchell/objects/where-filter";
 import type { LogEntry } from "../../../../log-storage/types.ts";
 import Dropdown from "../../utils/Dropdown.tsx";
 import DelayedInput from "../../utils/DelayedInput.tsx";
@@ -24,8 +24,8 @@ export const TimeDropdown: React.FC = () => {
         const componentEntriesFilter = componentEntriesFilters[COMPONENT_ID];
 
         if( componentEntriesFilter && isPartialObjectFilter(componentEntriesFilter) && typeof componentEntriesFilter.timestamp==='object' ) {
-            setInputValueGte((componentEntriesFilter.timestamp.gte ?? '')+'');
-            setInputValueLte((componentEntriesFilter.timestamp.lte ?? '')+'');
+            setInputValueGte(((componentEntriesFilter.timestamp as {$gte?: number, $lte?: number}).$gte ?? '')+'');
+            setInputValueLte(((componentEntriesFilter.timestamp as {$gte?: number, $lte?: number}).$lte ?? '')+'');
             return;
         }
         setInputValueGte('');
@@ -43,9 +43,9 @@ export const TimeDropdown: React.FC = () => {
         let data:ComponentEntriesFilterData<LogEntry> | undefined = undefined;
 
         if( currentValueGteInt!==undefined || currentValueLteInt!==undefined) {
-            const timestamp:{gte?: number, lte?: number} = {};
-            if( currentValueGteInt!==undefined ) timestamp.gte = currentValueGteInt;
-            if( currentValueLteInt!==undefined ) timestamp.lte = currentValueLteInt;
+            const timestamp:{$gte?: number, $lte?: number} = {};
+            if( currentValueGteInt!==undefined ) timestamp.$gte = currentValueGteInt;
+            if( currentValueLteInt!==undefined ) timestamp.$lte = currentValueLteInt;
             
             data = {timestamp};
         }

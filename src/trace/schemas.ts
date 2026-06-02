@@ -20,20 +20,31 @@ isTypeEqual<z.infer<typeof SpanIdSchema>, SpanId>(true);
 isTypeEqual<z.infer<typeof SpanMetaSchema>, SpanMeta>(true);
 
 
+/**
+ * A function member of a logger/span schema.
+ *
+ * Why: Zod 4 removed `z.function()` as a `ZodType` (it is now a standalone
+ * function factory that cannot sit inside `z.object`). `z.custom` preserves the
+ * v3 runtime contract — the member must be a function (`typeof === 'function'`) —
+ * and a loose callable type. Return-typed members encode intent in the generic;
+ * like v3, the return is not validated at parse time.
+ */
+const FunctionSchema = z.custom<(...args: any[]) => any>((v) => typeof v === 'function');
+
 export const ILoggerSchema = z.object({
-    debug: z.function(),
-    log: z.function(),
-    warn: z.function(),
-    error: z.function(),
-    critical: z.function(),
-    get: z.function(),
+    debug: FunctionSchema,
+    log: FunctionSchema,
+    warn: FunctionSchema,
+    error: FunctionSchema,
+    critical: FunctionSchema,
+    get: FunctionSchema,
 });
 
 export const ISpanSchema = ILoggerSchema.extend({
-    startSpan: z.function(),
-    end: z.function(),
-    getId: z.function().returns(z.string()),
-    getFullId: z.function().returns(SpanIdSchema),
+    startSpan: FunctionSchema,
+    end: FunctionSchema,
+    getId: z.custom<() => string>((v) => typeof v === 'function'),
+    getFullId: z.custom<() => SpanId>((v) => typeof v === 'function'),
 });
 isTypeEqualLooseFunctions<z.infer<typeof ILoggerSchema>, ILogger>(true);
 isTypeEqualLooseFunctions<z.infer<typeof ISpanSchema>, ISpan>(true);

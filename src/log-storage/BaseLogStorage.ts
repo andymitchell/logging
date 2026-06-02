@@ -3,7 +3,7 @@
 import { cloneDeepScalarValuesAny } from "@andyrmitchell/utils/deep-clone-scalar-values";
 import type {  MaxAge } from "../types.ts";
 import type { AcceptLogEntry, ILogStorage, LogEntry, LogStorageOptions } from "./types.ts";
-import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
+import type { WhereFilterDefinition } from "@andymitchell/objects/where-filter";
 import { monotonicFactory } from "ulid";
 import type { IBreakpoints } from "../breakpoints/types.ts";
 
@@ -72,8 +72,10 @@ export class BaseLogStorage implements ILogStorage {
         if( context ) {
             return cloneDeepScalarValuesAny(
                 context,
-                true, 
-                this.permitDangerousContextProperties
+                {
+                    strip_sensitive_info: true,
+                    allow_sensitive_in_dangerous_properties: this.permitDangerousContextProperties
+                }
             )
         } else {
             return undefined;

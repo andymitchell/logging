@@ -22,7 +22,7 @@ export function commonBreakpointsTest(createBreakpointsClass:CreateBreakpointsCl
         type TestObjectType = Partial<AcceptLogEntry>;
         const testObject:TestObjectType = {message:"Hi abc!"};
 
-        mb.addBreakpoint({'message': {contains: 'abc'}});
+        mb.addBreakpoint({'message': {$regex: 'abc'}});
 
         mb.test(testObject)
 
@@ -43,7 +43,7 @@ export function commonBreakpointsTest(createBreakpointsClass:CreateBreakpointsCl
 
         
 
-        mb.addBreakpoint({'message': {contains: 'def'}});
+        mb.addBreakpoint({'message': {$regex: 'def'}});
 
         mb.test(testObject)
 
@@ -66,7 +66,7 @@ export function commonBreakpointsTest(createBreakpointsClass:CreateBreakpointsCl
         
         
 
-        const bp = await mb.addBreakpoint({'message': {contains: 'abc'}});
+        const bp = await mb.addBreakpoint({'message': {$regex: 'abc'}});
         mb.removeBreakpoint(bp.id);
 
         mb.test(testObject)

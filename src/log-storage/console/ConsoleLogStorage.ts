@@ -1,4 +1,4 @@
-import { type WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
+import { type WhereFilterDefinition } from "@andymitchell/objects/where-filter";
 import type { LogStorageOptions } from "../types.ts";
 import { BaseLogStorage } from "../BaseLogStorage.ts";
 import type { LogEntry, ILogStorage } from "../types.ts";

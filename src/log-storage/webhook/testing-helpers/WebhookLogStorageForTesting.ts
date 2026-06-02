@@ -4,7 +4,7 @@ import type { LogEntry, ILogStorage } from "../../types.ts";
 import { WebhookLogStorage } from "../WebhookLogStorage.ts";
 import type { FetchEmitter } from "./FetchEmitter.ts";
 import createMaxAgeTest from "../../createMaxAgeTest.ts";
-import { matchJavascriptObject, type WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
+import { matchJavascriptObject, type WhereFilterDefinition } from "@andymitchell/objects/where-filter";
 
 
 /**

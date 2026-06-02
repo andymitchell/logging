@@ -2,7 +2,7 @@
 import { uuidV4 } from "@andyrmitchell/utils/uid";
 import type { AcceptLogEntry, ILogStorage, LogEntry } from "../log-storage/types.ts";
 
-import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
+import type { WhereFilterDefinition } from "@andymitchell/objects/where-filter";
 import type { ISpan, SpanMeta,  SpanId } from "./types.ts";
 import type { InferContextTypeFromLogArgsWithoutMessage } from "../types.ts";
 import { normalizeArgs } from "../utils/normalizeArgs.ts";

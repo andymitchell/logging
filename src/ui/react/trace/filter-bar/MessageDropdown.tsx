@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo } from "react";
 import { useFilterContext } from "./FilterContext.tsx";
-import { isPartialObjectFilter } from "@andyrmitchell/objects/where-filter";
+import { isPartialObjectFilter } from "@andymitchell/objects/where-filter";
 import type { LogEntry } from "../../../../log-storage/types.ts";
 import Dropdown from "../../utils/Dropdown.tsx";
 import DelayedInput from "../../utils/DelayedInput.tsx";
@@ -21,7 +21,7 @@ export const MessageDropdown: React.FC = () => {
         const componentEntriesFilter = componentEntriesFilters[COMPONENT_ID];
 
         if( componentEntriesFilter && isPartialObjectFilter(componentEntriesFilter) && typeof componentEntriesFilter.message==='object' ) {
-            return componentEntriesFilter.message.contains ?? '';
+            return (componentEntriesFilter.message as {$regex?: string}).$regex ?? '';
         } else {
             return '';
         }
@@ -33,7 +33,7 @@ export const MessageDropdown: React.FC = () => {
         setComponentEntriesFilter(COMPONENT_ID, 
             value? 
             {
-                message: {contains: value}
+                message: {$regex: value}
             }
             :
             undefined

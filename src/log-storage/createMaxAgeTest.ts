@@ -1,4 +1,4 @@
-import { matchJavascriptObject } from "@andyrmitchell/objects/where-filter";
+import { matchJavascriptObject } from "@andymitchell/objects/where-filter";
 import type { MaxAge } from "../types.ts";
 import type { LogEntry } from "./types.ts";
 
@@ -17,7 +17,7 @@ export default function createMaxAgeTest(maxAge:MaxAge):(entry:LogEntry) => bool
 
         for(const maxAge of maxAgeAfters ) {
             if( maxAge.filter ) {
-                if( matchJavascriptObject(entry, maxAge.filter) ) {
+                if( matchJavascriptObject<LogEntry>(entry, maxAge.filter) ) {
                     return entry.timestamp >= maxAge.afterTs
                 }
             } else {

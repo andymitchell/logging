@@ -1,7 +1,7 @@
-import type { WhereFilterDefinition } from "@andyrmitchell/objects";
+import type { WhereFilterDefinition } from "@andymitchell/objects/where-filter";
 import type { AcceptLogEntry } from "../log-storage/types.ts";
 
-import { matchJavascriptObject } from "@andyrmitchell/objects/where-filter";
+import { matchJavascriptObject } from "@andymitchell/objects/where-filter";
 import {  type Breakpoint, type BreakpointCallback, type IBreakpoints } from "./types.ts";
 
 
@@ -45,7 +45,7 @@ export class BaseBreakpoints implements IBreakpoints {
         const breakpoints = await this.listBreakpoints();
         for( const breakpoint of breakpoints ) {
             const filter = breakpoint.filter;
-            if( matchJavascriptObject(entry, filter) ) {
+            if( matchJavascriptObject<Partial<AcceptLogEntry>, AcceptLogEntry>(entry, filter) ) {
                 match = true;
                 break;
             }

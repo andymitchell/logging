@@ -1,4 +1,4 @@
-import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter";
+import type { WhereFilterDefinition } from "@andymitchell/objects/where-filter";
 import type { IBreakpoints } from "../breakpoints/types.ts";
 import type { MaxAge, MinimumContext } from "../types.ts";
 

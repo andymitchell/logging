@@ -1,4 +1,4 @@
-import type { WhereFilterDefinition } from "@andyrmitchell/objects";
+import type { WhereFilterDefinition } from "@andymitchell/objects/where-filter";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { TraceFilter } from "../../../../trace/viewing/types.ts";
 
@@ -129,7 +129,7 @@ export const FilterProvider: React.FC<FilterProviderProps> = ({
         const componentEntriesFiltersArr = Object.values(componentEntriesFilters).filter(x => !!x);
         const newFilter = componentEntriesFiltersArr.length>0? 
             {
-                AND: componentEntriesFiltersArr
+                $and: componentEntriesFiltersArr
             }
             :
             undefined; // {}

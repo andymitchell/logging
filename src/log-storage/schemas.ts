@@ -10,7 +10,7 @@ import type { LogEntry } from "./types.ts";
  * @param meta 
  * @returns 
  */
-export function createLogEntrySchema(context?:z.RecordType<any, any>, meta?:z.RecordType<any, any>) {
+export function createLogEntrySchema(context?:z.ZodType<any>, meta?:z.ZodType<any>) {
     context = context ?? z.record(z.string(), z.any());
     meta = meta ?? z.record(z.string(), z.any());
 

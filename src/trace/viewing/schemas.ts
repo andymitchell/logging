@@ -3,9 +3,9 @@ import { createLogEntrySchema } from "../../log-storage/schemas.ts";
 import { SpanMetaSchema } from "../schemas.ts";
 import type { TraceFilter, TraceSearchResults } from "./types.ts";
 import { isTypeEqual } from "@andyrmitchell/utils";
-import { WhereFilterSchema } from "@andyrmitchell/objects/where-filter";
+import { WhereFilterSchema } from "@andymitchell/objects/where-filter";
 
-export function createTraceSearchResultsSchema(context?:z.RecordType<any, any>) {
+export function createTraceSearchResultsSchema(context?:z.ZodType<any>) {
     return z.array(z.object({
         id: z.string(),
         timestamp: z.number(),

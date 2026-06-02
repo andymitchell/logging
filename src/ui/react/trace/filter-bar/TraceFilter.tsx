@@ -34,7 +34,7 @@ export const TraceFilter: React.FC<TraceFilterProps> = ({  }) => {
 
     const handleSearch = () => {
         // Create a basic filter that searches by message.
-        const filter: WhereFilterDefinition<{message?:string}> = { message: {contains: inputValue} };
+        const filter: WhereFilterDefinition<{message?:string}> = { message: {$regex: inputValue} };
         onSearch(filter);
     };
     

@@ -1,4 +1,4 @@
-import type { WhereFilterDefinition } from "@andyrmitchell/objects/where-filter"
+import type { WhereFilterDefinition } from "@andymitchell/objects/where-filter"
 import type { AcceptLogEntry } from "../log-storage/types.ts"
 
 
