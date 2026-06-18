@@ -71,7 +71,7 @@
     },
     "dependencies": {
         "@andymitchell/objects": "^1.6.0",
-        "@andyrmitchell/utils": "^0.29.0",
+        "@andyrmitchell/utils": "^0.30.0",
         "material-symbols": "^0.31.9",
         "react-json-view-lite": "^2.4.1",
         "ulid": "^3.0.1"

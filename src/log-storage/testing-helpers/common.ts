@@ -133,7 +133,9 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                 const entry = all[0]!;
 
 
-                expect(entry.context).toEqual([{ a: 1, b: { c: "12...34" } }, { message: "hello world" }, "string"]);
+                // The Error's `stack` is an accessor; under the context redactor it is traced as
+                // `redact:Getter` (never executed) rather than dropped, leaving evidence it was present.
+                expect(entry.context).toEqual([{ a: 1, b: { c: "12...34" } }, { message: "hello world", stack: "redact:Getter" }, "string"]);
             })
         })
 

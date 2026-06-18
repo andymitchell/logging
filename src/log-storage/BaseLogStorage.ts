@@ -1,6 +1,6 @@
 
 
-import { cloneDeepScalarValuesAny } from "@andyrmitchell/utils/deep-clone-scalar-values";
+import { cloneToJsonSafeUnknown } from "@andyrmitchell/utils/clone-to-json-safe";
 import type {  MaxAge } from "../types.ts";
 import type { AcceptLogEntry, ILogStorage, LogEntry, LogStorageOptions } from "./types.ts";
 import type { WhereFilterDefinition } from "@andymitchell/objects/where-filter";
@@ -70,9 +70,12 @@ export class BaseLogStorage implements ILogStorage {
      */
     protected prepareContext(context?: any) {
         if( context ) {
-            return cloneDeepScalarValuesAny(
+            return cloneToJsonSafeUnknown(
                 context,
                 {
+                    // Leave a `redact:<Type>` trace for values that cannot be logged as JSON (bigint, Date, …),
+                    // so debugging context shows something was there rather than silently dropping it.
+                    non_serialisable_handling: 'redact',
                     strip_sensitive_info: true,
                     allow_sensitive_in_dangerous_properties: this.permitDangerousContextProperties
                 }
