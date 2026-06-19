@@ -410,6 +410,48 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
 
             })
 
+            it('Logger - circular context is safe', async () => {
+
+                const logger = createLogger().logger;
+
+                // A real-world context can be circular (e.g. a parent/child pair) while also carrying values
+                // that cannot be logged as JSON (bigint, Date, Map). Logging must survive both at once.
+                const message = 'circular context safe entry';
+                const context: Record<string, unknown> = {
+                    kept: 1,
+                    when: new Date('2020-01-01T00:00:00.000Z'),
+                    big: 10n,
+                    map: new Map([['k', 'v']])
+                };
+                context.self = context; // the back-edge that would otherwise break serialisation
+
+                await logger.add({
+                    type: 'info',
+                    message,
+                    context
+                });
+
+                // Storing a circular submission neither throws nor loses the entry.
+                const all = await logger.get();
+                const entry = all[0]!;
+
+                // A plain value survives, a non-serialisable value is redacted to a string, and the back-edge
+                // is dropped — so the stored entry holds the context but is acyclic.
+                expect(entry.context!.kept).toBe(1);
+                expect(typeof entry.context!.big).toBe('string');
+                expect('self' in entry.context!).toBe(false);
+
+                // The entry losslessly round-trips JSON — the contract every adapter relies on to transmit.
+                expect(() => JSON.stringify(entry)).not.toThrow();
+                expect(JSON.parse(JSON.stringify(entry))).toEqual(entry);
+
+                // Full-text search serialises every entry to match; a surviving cycle would throw here.
+                const found = await logger.get(undefined, message);
+                expect(found.length).toBe(1);
+                expect(found[0]!.message).toBe(message);
+
+            })
+
             it('Logger - stack trace', async () => {
 
                 const logger = createLogger({

@@ -76,6 +76,9 @@ export class BaseLogStorage implements ILogStorage {
                     // Leave a `redact:<Type>` trace for values that cannot be logged as JSON (bigint, Date, …),
                     // so debugging context shows something was there rather than silently dropping it.
                     non_serialisable_handling: 'redact',
+                    // A circular context must never throw while being logged: the back-edge is dropped so the
+                    // rest of the context is still captured rather than losing the whole entry.
+                    skip_circular: true,
                     strip_sensitive_info: true,
                     allow_sensitive_in_dangerous_properties: this.permitDangerousContextProperties
                 }
