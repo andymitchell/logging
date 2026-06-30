@@ -13,7 +13,7 @@ beforeEach(async () => {
 })
 
 const makeLogger = (options?:LogStorageOptions) => {
-    const id = `testing_${uuidV4}`;
+    const id = `testing_${uuidV4()}`;
     return {
         logger: new IDBLogStorage(id, options),
         recreateWithSameData: () => new IDBLogStorage(id, options)

@@ -3,7 +3,22 @@ import { ChannelsLogStorage, type Channel } from "./ChannelsLogStorage.ts"
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-import type { AcceptLogEntry, LogEntry } from '../types.ts'; 
+import type { AcceptLogEntry, LogCallMaskingOptions, LogEntry } from '../types.ts';
+
+
+/**
+ * A hostile child that tries to grow the forwarded per-call directive IN PLACE before delegating, so a test
+ * can prove the mutation can never reach a sibling (whether the facade defends by deep-freezing or by cloning
+ * per child — both are valid per the design, so the test asserts the OUTCOME, not the mechanism).
+ */
+class PoisoningStorage extends MemoryLogStorage {
+    override async add<C>(entry: AcceptLogEntry<C>, options?: LogCallMaskingOptions): Promise<LogEntry<C>> {
+        try {
+            options?.preserve_unmasked_context_paths?.push({ path: 'auth.token', shape: 'uuid' });
+        } catch { /* a frozen array throws here — exactly the defense we want */ }
+        return super.add(entry, options);
+    }
+}
 
 
 it('basic', async () => {
@@ -233,5 +248,148 @@ describe('ChannelsLogStorage: commitEntry (via add)', () => {
         // The channel's own commitEntry should be called by its own `add` method,
         // but ChannelsLogStorage should not call it directly.
         expect(commitSpy).toHaveBeenCalledTimes(1);
+    });
+});
+
+
+describe('ChannelsLogStorage: per-call unmasking propagation', () => {
+
+    const UUID = '550e8400-e29b-41d4-a716-446655440000';
+    const MASKED_UUID = '550....00';
+    const directive: LogCallMaskingOptions = { preserve_unmasked_context_paths: [{ path: 'user.id', shape: 'uuid' }] };
+    const entryWithId: AcceptLogEntry = { type: 'info', message: 'm', context: { user: { id: UUID } } };
+
+    it('fans a per-call directive out to every child, but each child honors it only if IT opted in', async () => {
+        const flagged = new MemoryLogStorage('A', { allow_per_call_unmasking: true });
+        const unflagged = new MemoryLogStorage('B'); // gate closed
+        const channels = new ChannelsLogStorage('app', [{ storage: flagged }, { storage: unflagged }]);
+
+        await channels.add(entryWithId, directive);
+
+        const a = (await flagged.get())[0]!;
+        const b = (await unflagged.get())[0]!;
+        // The blessed child keeps the id readable…
+        expect(a.context!.user.id).toBe(UUID);
+        // …the un-blessed sibling masks it, even though the very same directive reached it…
+        expect(b.context!.user.id).toBe(MASKED_UUID);
+        // …and it is unmistakably the SAME log event (shared ulid), not two divergent writes.
+        expect(a.ulid).toBe(b.ulid);
+    });
+
+    it('produces the same per-child outcome regardless of channel order (no cross-child contamination)', async () => {
+        // Same two children, reversed order: the flagged one still unmasks, the unflagged one still masks.
+        const flagged = new MemoryLogStorage('A', { allow_per_call_unmasking: true });
+        const unflagged = new MemoryLogStorage('B');
+        const channels = new ChannelsLogStorage('app', [{ storage: unflagged }, { storage: flagged }]);
+
+        await channels.add(entryWithId, directive);
+
+        expect((await flagged.get())[0]!.context!.user.id).toBe(UUID);
+        expect((await unflagged.get())[0]!.context!.user.id).toBe(MASKED_UUID);
+    });
+
+    it('hands the directive to an un-blessed remote-like sink yet it is never honored there', async () => {
+        // A webhook-like child (transforms/forwards entries off-box). Without its OWN flag it must stay masked,
+        // even though the facade physically handed it the directive.
+        const remote = new MemoryLogStorage('remote'); // gate closed
+        const addSpy = vi.spyOn(remote, 'add');
+        const channels = new ChannelsLogStorage('app', [{ storage: remote, transform: (e) => e }]);
+
+        await channels.add(entryWithId, directive);
+
+        // The directive DID arrive at the sink (a 2nd arg was passed)…
+        expect(addSpy).toHaveBeenCalledTimes(1);
+        expect(addSpy.mock.calls[0]![1]).toBeDefined();
+        // …yet, un-blessed, the sink masked the id anyway.
+        expect((await remote.get())[0]!.context!.user.id).toBe(MASKED_UUID);
+    });
+
+    it('forwards the directive to children without mutating or freezing the caller’s own object', async () => {
+        const sink = new MemoryLogStorage('sink', { allow_per_call_unmasking: true });
+        const channels = new ChannelsLogStorage('app', [{ storage: sink }]);
+
+        const callerDirective: LogCallMaskingOptions = { preserve_unmasked_context_paths: [{ path: 'user.id', shape: 'uuid' }] };
+        await channels.add(entryWithId, callerDirective);
+
+        // The blessed sink honored the forwarded directive…
+        expect((await sink.get())[0]!.context!.user.id).toBe(UUID);
+        // …and the caller's own object was never frozen or mutated (immutability of caller-owned input).
+        expect(Object.isFrozen(callerDirective)).toBe(false);
+        expect(callerDirective.preserve_unmasked_context_paths!.length).toBe(1);
+    });
+
+    it('prevents a poisoned child from making a sibling honor an injected path (no cross-child poisoning)', async () => {
+        // The hostile child tries to push {path:'auth.token',shape:'uuid'} onto the shared directive before a
+        // flagged sibling runs. auth.token holds a UUID-shaped value, so IF the injection took hold it would pass
+        // the shape gate and leak — a masked token therefore proves the injection never reached the sibling.
+        const poisoner = new PoisoningStorage('poison');
+        const sibling = new MemoryLogStorage('sibling', { allow_per_call_unmasking: true });
+        const channels = new ChannelsLogStorage('app', [{ storage: poisoner }, { storage: sibling }]);
+
+        const callerDirective: LogCallMaskingOptions = { preserve_unmasked_context_paths: [{ path: 'user.id', shape: 'uuid' }] };
+        await channels.add({ type: 'info', message: 'm', context: { user: { id: UUID }, auth: { token: UUID } } }, callerDirective);
+
+        const stored = (await sibling.get())[0]!;
+        expect(stored.context!.auth.token).toBe(MASKED_UUID); // injected path NOT honored by the sibling
+        expect(stored.context!.user.id).toBe(UUID);           // the legitimately-listed path still is
+        expect(callerDirective.preserve_unmasked_context_paths!.length).toBe(1); // caller's array never grew
+    });
+
+    it('never exposes per-call options to a channel transform, nor lets them ride onto the stored entry', async () => {
+        const sink = new MemoryLogStorage('sink', { allow_per_call_unmasking: true });
+        let transformSawKeys: string[] = [];
+        const channels = new ChannelsLogStorage('app', [{
+            storage: sink,
+            transform: (e) => { transformSawKeys = Object.keys(e); return e; },
+        }]);
+
+        await channels.add(entryWithId, directive);
+
+        // The transform is handed the entry only — never the masking directive.
+        expect(transformSawKeys).not.toContain('preserve_unmasked_context_paths');
+        expect(transformSawKeys).not.toContain('allow_per_call_unmasking');
+        // The directive WAS in effect (so this isn't trivially green)…
+        const stored = (await sink.get())[0]!;
+        expect(stored.context!.user.id).toBe(UUID);
+        // …yet it never rode onto the persisted entry through the Channels path.
+        const serialised = JSON.stringify(stored);
+        expect(serialised).not.toContain('preserve_unmasked_context_paths');
+        expect(serialised).not.toContain('allow_per_call_unmasking');
+    });
+
+    it('propagates the frozen directive through NESTED Channels to a deep flagged leaf', async () => {
+        const deepLeaf = new MemoryLogStorage('leaf', { allow_per_call_unmasking: true });
+        const inner = new ChannelsLogStorage('inner', [{ storage: deepLeaf }]);
+        const outer = new ChannelsLogStorage('outer', [{ storage: inner }]);
+
+        await outer.add(entryWithId, directive);
+
+        // The directive survived two passthrough hops and the deep, blessed leaf honored it.
+        expect((await deepLeaf.get())[0]!.context!.user.id).toBe(UUID);
+    });
+
+});
+
+describe('ChannelsLogStorage: sensitive-data options are not part of the facade surface', () => {
+
+    // The facade forwards entries untouched to its sub-storages (see the prepareContext override), so it
+    // must not advertise data-unmasking escape hatches — callers configure preservation on the sub-storage
+    // that actually masks. These are compile-time guards: vitest strips types, so only `tsc` enforces them.
+    it('rejects preserve_unmasked_context_paths, permit_dangerous_context_properties, and allow_per_call_unmasking at construction', () => {
+        const channels: Channel[] = [{ storage: new MemoryLogStorage('') }];
+
+        // @ts-expect-error preserve_unmasked_context_paths is stripped from ChannelsLogStorage's options
+        const withPreserve = new ChannelsLogStorage('ns', channels, { preserve_unmasked_context_paths: [{ path: 'user.id', shape: 'uuid' }] });
+
+        // @ts-expect-error permit_dangerous_context_properties is likewise stripped
+        const withDangerous = new ChannelsLogStorage('ns', channels, { permit_dangerous_context_properties: true });
+
+        // @ts-expect-error allow_per_call_unmasking is a masking-config gate, meaningless on the non-masking facade
+        const withPerCall = new ChannelsLogStorage('ns', channels, { allow_per_call_unmasking: true });
+
+        // Construction still succeeds at runtime — the options are simply absent from the facade's surface.
+        expect(withPreserve).toBeInstanceOf(ChannelsLogStorage);
+        expect(withDangerous).toBeInstanceOf(ChannelsLogStorage);
+        expect(withPerCall).toBeInstanceOf(ChannelsLogStorage);
     });
 });

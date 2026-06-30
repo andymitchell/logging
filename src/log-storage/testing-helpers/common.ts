@@ -1,5 +1,5 @@
 import { sleep } from "@andyrmitchell/utils";
-import type { LogStorageOptions } from "../types.ts";
+import type { LogCallMaskingOptions, LogStorageOptions } from "../types.ts";
 import type { ILogStorage, LogEntry } from "../types.ts";
 import { it } from 'vitest';
 
@@ -383,6 +383,243 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
 
                 expect(entry.context!.obj.abc).toEqual("12...89");
                 expect(entry.context!.obj._dangerousDef).toEqual("123456789123456789");
+
+            })
+
+            describe('preserve_unmasked_context_paths (path + shape unmasking)', () => {
+
+                // A canonical UUID and ULID alongside their known masked forms when scrubbed. Asserting the
+                // exact value lets each test prove an identifier is either fully readable or genuinely masked,
+                // not merely that the field exists.
+                const UUID = '550e8400-e29b-41d4-a716-446655440000';
+                const MASKED_UUID = '550....00';
+                const ULID = '01ARZ3NDEKTSV4RRFFQ69G5FAV';
+
+                it('masks identifiers by default — preservation is strictly opt-in', async () => {
+
+                    const logger = createLogger().logger;
+
+                    await logger.add({
+                        type: 'info',
+                        message: 'identifier with no allow-list',
+                        context: { user: { id: UUID } }
+                    });
+
+                    const all = await logger.get();
+                    const entry = all[0]!;
+
+                    // Fail-closed: with no exemption a UUID is treated like any other suspicious string and
+                    // scrubbed, so logs never leak ids the operator did not explicitly opt into.
+                    expect(entry.context!.user.id).toBe(MASKED_UUID);
+                })
+
+                it('keeps a UUID readable only at the allow-listed path, masking the same value elsewhere', async () => {
+
+                    const logger = createLogger({
+                        preserve_unmasked_context_paths: [{ path: 'user.id', shape: 'uuid' }]
+                    }).logger;
+
+                    // The identical UUID sits at the allow-listed `user.id` and at a non-listed `audit.id`.
+                    await logger.add({
+                        type: 'info',
+                        message: 'same id at two paths',
+                        context: { user: { id: UUID }, audit: { id: UUID } }
+                    });
+
+                    const all = await logger.get();
+                    const entry = all[0]!;
+
+                    // Path-gated, and paths are context-root-relative (`user.id`, not `context.user.id`):
+                    // readable where opted in…
+                    expect(entry.context!.user.id).toBe(UUID);
+                    // …and still masked everywhere else, so a stray copy can't ride along unmasked.
+                    expect(entry.context!.audit.id).toBe(MASKED_UUID);
+                })
+
+                it('masks an allow-listed path when the value drifts off the declared shape', async () => {
+
+                    const logger = createLogger({
+                        preserve_unmasked_context_paths: [{ path: 'user.id', shape: 'uuid' }]
+                    }).logger;
+
+                    // `user.id` is allow-listed for UUIDs, but post-refactor it now holds a token-shaped secret.
+                    await logger.add({
+                        type: 'info',
+                        message: 'value drifted off shape',
+                        context: { user: { id: '123456789123456789' } }
+                    });
+
+                    const all = await logger.get();
+                    const entry = all[0]!;
+
+                    // Shape-gated: a non-UUID value at the allow-listed path is masked exactly as any other
+                    // secret would be (`12...89`), so the path can't be silently left wide open on the wrong type.
+                    expect(entry.context!.user.id).toBe('12...89');
+                })
+
+                it('preserves a ULID when its shape is allow-listed', async () => {
+
+                    const logger = createLogger({
+                        preserve_unmasked_context_paths: [{ path: 'trace.id', shape: 'ulid' }]
+                    }).logger;
+
+                    await logger.add({
+                        type: 'info',
+                        message: 'correlatable trace id',
+                        context: { trace: { id: ULID } }
+                    });
+
+                    const all = await logger.get();
+                    const entry = all[0]!;
+
+                    // ULIDs are our own time-ordered ids; preserving them keeps traces correlatable in logs.
+                    expect(entry.context!.trace.id).toBe(ULID);
+                })
+
+            })
+
+            describe('allow_per_call_unmasking (per-call path + shape unmasking)', () => {
+
+                // Same canonical identifiers as the storage-level suite, plus a token-shaped secret with its
+                // known masked form. Asserting exact values proves a value is genuinely readable or genuinely
+                // masked — never merely present.
+                const UUID = '550e8400-e29b-41d4-a716-446655440000';
+                const MASKED_UUID = '550....00';
+                const ULID = '01ARZ3NDEKTSV4RRFFQ69G5FAV';
+                const SECRET = '123456789123456789';
+                const MASKED_SECRET = '12...89';
+
+                it('honors a per-call allow-list ONLY when the storage opted into per-call unmasking', async () => {
+
+                    const directive: LogCallMaskingOptions = { preserve_unmasked_context_paths: [{ path: 'user.id', shape: 'uuid' }] };
+
+                    const optedIn = createLogger({ allow_per_call_unmasking: true }).logger;
+                    await optedIn.add({ type: 'info', message: 'per-call id', context: { user: { id: UUID } } }, directive);
+                    const inEntry = (await optedIn.get())[0]!;
+                    // The storage blessed dynamic call-site directives, so this one log keeps the id readable.
+                    expect(inEntry.context!.user.id).toBe(UUID);
+
+                    const notOptedIn = createLogger().logger; // default: gate closed
+                    await notOptedIn.add({ type: 'info', message: 'per-call id', context: { user: { id: UUID } } }, directive);
+                    const outEntry = (await notOptedIn.get())[0]!;
+                    // Identical directive at an un-blessed storage: ignored, so the id is masked like any secret.
+                    expect(outEntry.context!.user.id).toBe(MASKED_UUID);
+                })
+
+                it('treats a per-call directive at a closed gate as a strict no-op — identical to passing none', async () => {
+
+                    const context = { user: { id: UUID }, auth: { token: SECRET } };
+                    const directive: LogCallMaskingOptions = { preserve_unmasked_context_paths: [{ path: 'user.id', shape: 'uuid' }, { path: 'auth.token', shape: 'uuid' }] };
+
+                    const withDirective = createLogger().logger; // gate closed (default)
+                    await withDirective.add({ type: 'info', message: 'inert', context }, directive);
+                    const without = createLogger().logger;
+                    await without.add({ type: 'info', message: 'inert', context });
+
+                    const a = (await withDirective.get())[0]!.context;
+                    const b = (await without.get())[0]!.context;
+                    // A closed gate makes the directive inert: the stored context is exactly what you'd get without it.
+                    expect(a).toEqual(b);
+                    expect(a!.user.id).toBe(MASKED_UUID); // anchored: genuinely masked, not coincidentally equal-and-unmasked
+                })
+
+                it('unmasks ONLY the exact per-call allow-listed path, leaving every other secret masked', async () => {
+
+                    const context = { user: { id: UUID }, auth: { token: SECRET }, audit: { id: UUID } };
+                    const directive: LogCallMaskingOptions = { preserve_unmasked_context_paths: [{ path: 'user.id', shape: 'uuid' }] };
+
+                    const opted = createLogger({ allow_per_call_unmasking: true }).logger;
+                    await opted.add({ type: 'info', message: 'surgical', context }, directive);
+                    const withOpts = (await opted.get())[0]!.context;
+
+                    // Only the named path is readable…
+                    expect(withOpts!.user.id).toBe(UUID);
+                    // …a different secret is untouched by the exemption…
+                    expect(withOpts!.auth.token).toBe(MASKED_SECRET);
+                    // …and the SAME id value at a non-listed path stays masked (a stray copy can't ride along).
+                    expect(withOpts!.audit.id).toBe(MASKED_UUID);
+
+                    // Metamorphic: versus no directive, the exemption changes EXACTLY one field (user.id) and nothing else.
+                    const baseline = createLogger({ allow_per_call_unmasking: true }).logger;
+                    await baseline.add({ type: 'info', message: 'surgical', context });
+                    const withoutOpts = (await baseline.get())[0]!.context;
+                    expect(withoutOpts!.user.id).toBe(MASKED_UUID);
+                    expect({ ...withOpts, user: { id: MASKED_UUID } }).toEqual(withoutOpts);
+                })
+
+                it('applies storage-level and per-call allow-lists independently, unioning them only when the gate is open', async () => {
+
+                    const context = { trace: { id: ULID }, user: { id: UUID } };
+                    const callDirective: LogCallMaskingOptions = { preserve_unmasked_context_paths: [{ path: 'user.id', shape: 'uuid' }] };
+
+                    // Gate CLOSED: the storage-level trace.id is honored; the per-call user.id is ignored.
+                    const closed = createLogger({ preserve_unmasked_context_paths: [{ path: 'trace.id', shape: 'ulid' }] }).logger;
+                    await closed.add({ type: 'info', message: 'independent', context }, callDirective);
+                    const closedCtx = (await closed.get())[0]!.context;
+                    expect(closedCtx!.trace.id).toBe(ULID);        // storage-level allow-list: always on
+                    expect(closedCtx!.user.id).toBe(MASKED_UUID);   // per-call: gated off
+
+                    // Gate OPEN: both allow-lists apply (union), each value readable at its own path.
+                    const open = createLogger({ preserve_unmasked_context_paths: [{ path: 'trace.id', shape: 'ulid' }], allow_per_call_unmasking: true }).logger;
+                    await open.add({ type: 'info', message: 'independent', context }, callDirective);
+                    const openCtx = (await open.get())[0]!.context;
+                    expect(openCtx!.trace.id).toBe(ULID);
+                    expect(openCtx!.user.id).toBe(UUID);
+                })
+
+                it('consumes the per-call directive at masking time without ever persisting it onto the entry', async () => {
+
+                    const directive: LogCallMaskingOptions = { preserve_unmasked_context_paths: [{ path: 'user.id', shape: 'uuid' }] };
+                    const logger = createLogger({ allow_per_call_unmasking: true }).logger;
+                    await logger.add({ type: 'info', message: 'not persisted', context: { user: { id: UUID } } }, directive);
+
+                    const entry = (await logger.get())[0]!;
+                    // Half 1 — the directive was genuinely in effect (so this isn't trivially green): the id is readable.
+                    expect(entry.context!.user.id).toBe(UUID);
+                    // Half 2 — yet the control metadata survives nowhere in the stored entry (out-of-band, never serialised).
+                    const serialised = JSON.stringify(entry);
+                    expect(serialised).not.toContain('preserve_unmasked_context_paths');
+                    expect(serialised).not.toContain('allow_per_call_unmasking');
+                })
+
+                it('honors EVERY path in a multi-path per-call directive, masking only the unlisted secret', async () => {
+
+                    // Proves the merge spreads the WHOLE call array, not just its first entry.
+                    const directive: LogCallMaskingOptions = { preserve_unmasked_context_paths: [{ path: 'user.id', shape: 'uuid' }, { path: 'trace.id', shape: 'ulid' }] };
+                    const logger = createLogger({ allow_per_call_unmasking: true }).logger;
+                    await logger.add({ type: 'info', message: 'multi', context: { user: { id: UUID }, trace: { id: ULID }, auth: { token: SECRET } } }, directive);
+
+                    const entry = (await logger.get())[0]!;
+                    expect(entry.context!.user.id).toBe(UUID);          // first listed path honored
+                    expect(entry.context!.trace.id).toBe(ULID);         // second listed path honored too
+                    expect(entry.context!.auth.token).toBe(MASKED_SECRET); // unlisted secret still masked
+                })
+
+                it('masks a per-call allow-listed path when the value drifts off the declared shape, even with the gate open', async () => {
+
+                    const directive: LogCallMaskingOptions = { preserve_unmasked_context_paths: [{ path: 'user.id', shape: 'uuid' }] };
+                    const logger = createLogger({ allow_per_call_unmasking: true }).logger;
+                    // The path is allow-listed for UUIDs, but the value is a token-shaped secret.
+                    await logger.add({ type: 'info', message: 'drift', context: { user: { id: SECRET } } }, directive);
+
+                    const entry = (await logger.get())[0]!;
+                    // Fail-closed on the per-call surface too: a non-UUID at the listed path is masked like any secret.
+                    expect(entry.context!.user.id).toBe(MASKED_SECRET);
+                })
+
+                it('treats an empty per-call directive as a no-op identical to passing none, even with the gate open', async () => {
+
+                    const empty: LogCallMaskingOptions = { preserve_unmasked_context_paths: [] };
+                    const withEmpty = createLogger({ allow_per_call_unmasking: true }).logger;
+                    await withEmpty.add({ type: 'info', message: 'empty', context: { user: { id: UUID } } }, empty);
+                    const without = createLogger({ allow_per_call_unmasking: true }).logger;
+                    await without.add({ type: 'info', message: 'empty', context: { user: { id: UUID } } });
+
+                    const a = (await withEmpty.get())[0]!.context;
+                    const b = (await without.get())[0]!.context;
+                    expect(a).toEqual(b);
+                    expect(a!.user.id).toBe(MASKED_UUID); // anchored: genuinely masked, gate-open empty directive added nothing
+                })
 
             })
         })

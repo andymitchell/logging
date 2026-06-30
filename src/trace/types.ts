@@ -1,6 +1,6 @@
 
 
-import { isEventLogEntry, type EventLogEntry, type LogEntry, type StartEventDetail } from "../log-storage/types.ts";
+import { isEventLogEntry, type EventLogEntry, type LogCallMaskingOptions, type LogEntry, type StartEventDetail } from "../log-storage/types.ts";
 import type { ILogger, MinimumContext } from "../types.ts"
 
 
@@ -18,7 +18,15 @@ export interface ISpan extends ILogger {
     startSpan(name?: string, context?: any): ISpan;
 
     /**
-     * Adds a final timestamp for duration logging. 
+     * Like {@link ISpan.startSpan}, but `options` may keep specific values in the NEW span's OWN context (the
+     * span_start entry) UNMASKED — gated by path AND value-shape, honored only by a storage with
+     * `allow_per_call_unmasking`. Scope is the span's own context only; logs emitted later within the span are
+     * NOT affected. @see LogCallMaskingOptions
+     */
+    startSpanWithOptions<C extends MinimumContext>(options: LogCallMaskingOptions<C>, name?: string, context?: C): ISpan;
+
+    /**
+     * Adds a final timestamp for duration logging.
      * 
      * Optional.
      */

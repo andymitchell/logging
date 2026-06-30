@@ -1,5 +1,5 @@
 import type { WhereFilterDefinition } from "@andymitchell/objects/where-filter";
-import type {  LogEntry } from "./log-storage/types.ts";
+import type { LogCallMaskingOptions, LogEntry } from "./log-storage/types.ts";
 
 
 export type MinimumContext = Record<string, any>;
@@ -12,6 +12,23 @@ export interface ILogger {
     warn<T extends any[]>(message: any, ...context: T): Promise<LogEntry<InferContextTypeFromLogArgsWithoutMessage<T>>>;
     error<T extends any[]>(message: any, ...context: T): Promise<LogEntry<InferContextTypeFromLogArgsWithoutMessage<T>>>;
     critical<T extends any[]>(message: any, ...context: T): Promise<LogEntry<InferContextTypeFromLogArgsWithoutMessage<T>>>;
+
+
+    /**
+     * Like {@link ILogger.debug}, but a leading `options` may keep specific context values UNMASKED for this
+     * one log — gated by path AND value-shape (fail-closed) and honored only by a storage with
+     * `allow_per_call_unmasking`. A separate method with options in the LEADING positional slot, never a
+     * sniffed argument, so a logged value can never be mistaken for options. @see LogCallMaskingOptions
+     */
+    debugWithOptions<C extends MinimumContext>(options: LogCallMaskingOptions<C>, message: any, context: C): Promise<LogEntry<C>>;
+    /** Like {@link ILogger.log}, with per-call masking options in the leading slot. @see LogCallMaskingOptions */
+    logWithOptions<C extends MinimumContext>(options: LogCallMaskingOptions<C>, message: any, context: C): Promise<LogEntry<C>>;
+    /** Like {@link ILogger.warn}, with per-call masking options in the leading slot. @see LogCallMaskingOptions */
+    warnWithOptions<C extends MinimumContext>(options: LogCallMaskingOptions<C>, message: any, context: C): Promise<LogEntry<C>>;
+    /** Like {@link ILogger.error}, with per-call masking options in the leading slot. @see LogCallMaskingOptions */
+    errorWithOptions<C extends MinimumContext>(options: LogCallMaskingOptions<C>, message: any, context: C): Promise<LogEntry<C>>;
+    /** Like {@link ILogger.critical}, with per-call masking options in the leading slot. @see LogCallMaskingOptions */
+    criticalWithOptions<C extends MinimumContext>(options: LogCallMaskingOptions<C>, message: any, context: C): Promise<LogEntry<C>>;
 
 
     get(filter?:WhereFilterDefinition<LogEntry>): Promise<LogEntry[]>;

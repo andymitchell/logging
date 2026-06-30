@@ -37,11 +37,18 @@ export const ILoggerSchema = z.object({
     warn: FunctionSchema,
     error: FunctionSchema,
     critical: FunctionSchema,
+    // Per-call-masking variants — keep in lockstep with ILogger or `isTypeEqualLooseFunctions` below fails `tsc`.
+    debugWithOptions: FunctionSchema,
+    logWithOptions: FunctionSchema,
+    warnWithOptions: FunctionSchema,
+    errorWithOptions: FunctionSchema,
+    criticalWithOptions: FunctionSchema,
     get: FunctionSchema,
 });
 
 export const ISpanSchema = ILoggerSchema.extend({
     startSpan: FunctionSchema,
+    startSpanWithOptions: FunctionSchema,
     end: FunctionSchema,
     getId: z.custom<() => string>((v) => typeof v === 'function'),
     getFullId: z.custom<() => SpanId>((v) => typeof v === 'function'),

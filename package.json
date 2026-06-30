@@ -70,8 +70,9 @@
         "zod": "^4.1.8"
     },
     "dependencies": {
-        "@andymitchell/objects": "^1.6.0",
-        "@andyrmitchell/utils": "^0.30.0",
+        "@andymitchell/clone-to-json-safe": "^0.2.0",
+        "@andymitchell/objects": "^1.12.0",
+        "@andyrmitchell/utils": "^0.30.1",
         "material-symbols": "^0.31.9",
         "react-json-view-lite": "^2.4.1",
         "ulid": "^3.0.1"

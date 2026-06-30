@@ -1,8 +1,8 @@
 
 
-import { cloneToJsonSafeUnknown } from "@andyrmitchell/utils/clone-to-json-safe";
+import { cloneToJsonSafeUnknown } from "@andymitchell/clone-to-json-safe";
 import type {  MaxAge } from "../types.ts";
-import type { AcceptLogEntry, ILogStorage, LogEntry, LogStorageOptions } from "./types.ts";
+import type { AcceptLogEntry, ILogStorage, LogCallMaskingOptions, LogEntry, LogStorageOptions } from "./types.ts";
 import type { WhereFilterDefinition } from "@andymitchell/objects/where-filter";
 import { monotonicFactory } from "ulid";
 import type { IBreakpoints } from "../breakpoints/types.ts";
@@ -16,6 +16,8 @@ export class BaseLogStorage implements ILogStorage {
     protected includeStackTrace: Required<LogStorageOptions>['include_stack_trace'];
     protected logToConsole:boolean;
     protected permitDangerousContextProperties: boolean;
+    protected preserveUnmaskedContextPaths: Required<LogStorageOptions>['preserve_unmasked_context_paths'];
+    protected allowPerCallUnmasking: boolean;
     protected maxAge: MaxAge;
     protected dbNamespace:string;
 
@@ -29,10 +31,16 @@ export class BaseLogStorage implements ILogStorage {
     breakpoints?:IBreakpoints | null;
 
     constructor(dbNamespace:string, options?: LogStorageOptions) {
-        const safeOptions = Object.assign({}, DEFAULT_LOGGER_OPTIONS, options);
+        // Strip explicit-`undefined` keys so each falls back to its default. Callers build options
+        // programmatically (`{ preserve_unmasked_context_paths: cfg.paths }` where `cfg.paths` may be
+        // undefined); a raw `Object.assign` would let that `undefined` clobber the default `[]`, and a
+        // later spread (`[...paths]`) / index-access (`include_stack_trace[type]`) would then throw.
+        const safeOptions = Object.assign({}, DEFAULT_LOGGER_OPTIONS, stripUndefinedValues(options));
         this.includeStackTrace = safeOptions.include_stack_trace;
         this.logToConsole = safeOptions.log_to_console;
         this.permitDangerousContextProperties = safeOptions.permit_dangerous_context_properties;
+        this.preserveUnmaskedContextPaths = safeOptions.preserve_unmasked_context_paths;
+        this.allowPerCallUnmasking = safeOptions.allow_per_call_unmasking;
         this.dbNamespace = dbNamespace;
         this.maxAge = safeOptions.max_age;
         this.ulid = monotonicFactory();
@@ -44,7 +52,7 @@ export class BaseLogStorage implements ILogStorage {
      * This is the main thing a sub class is expected to provide. Commit to storage / transport it somewhere.
      * @param _entry 
      */
-    protected commitEntry(_entry:LogEntry):Promise<void> {
+    protected commitEntry(_entry:LogEntry, _options?: LogCallMaskingOptions):Promise<void> {
         throw new Error("Method not implemented");
     }
 
@@ -65,11 +73,17 @@ export class BaseLogStorage implements ILogStorage {
     }
 
     /**
-     * (Optionally) remove sensitive information from the context during `add`
-     * @param context 
+     * (Optionally) remove sensitive information from the context during `add`.
+     * @param context
+     * @param options Per-call masking directives; their `preserve_unmasked_context_paths` are merged with the
+     * storage-level allowlist ONLY when this storage has `allow_per_call_unmasking: true` (fail-closed gate).
      */
-    protected prepareContext(context?: any) {
+    protected prepareContext(context?: any, options?: LogCallMaskingOptions) {
         if( context ) {
+            // Per-call directives are honored ONLY when this storage explicitly opted in; otherwise they are
+            // dropped and context is masked exactly as if none were supplied. The storage-level allowlist is
+            // always applied; per-call paths only ever ADD to it, never replace or loosen the gate.
+            const callPaths = this.allowPerCallUnmasking ? (options?.preserve_unmasked_context_paths ?? []) : [];
             return cloneToJsonSafeUnknown(
                 context,
                 {
@@ -80,7 +94,11 @@ export class BaseLogStorage implements ILogStorage {
                     // rest of the context is still captured rather than losing the whole entry.
                     skip_circular: true,
                     strip_sensitive_info: true,
-                    allow_sensitive_in_dangerous_properties: this.permitDangerousContextProperties
+                    allow_sensitive_in_dangerous_properties: this.permitDangerousContextProperties,
+                    // Path+shape allowlist: keep chosen non-secret identifiers (e.g. a UUID at `user.id`)
+                    // correlatable in logs while everything else is still scrubbed. Context-root-relative
+                    // because the cloned root IS the context object.
+                    preserve_unmasked_paths: [...this.preserveUnmaskedContextPaths, ...callPaths]
                 }
             )
         } else {
@@ -88,18 +106,18 @@ export class BaseLogStorage implements ILogStorage {
         }
     }
 
-    async add<C extends any>(acceptEntry: AcceptLogEntry<C>): Promise<LogEntry<C>> {
+    async add<C extends any>(acceptEntry: AcceptLogEntry<C>, options?: LogCallMaskingOptions): Promise<LogEntry<C>> {
         let stackTrace:string | undefined = this.includeStackTrace[acceptEntry.type]? this.generateStackTrace() : undefined;
 
         const logEntry:LogEntry = {
             ...acceptEntry,
             timestamp: Date.now(),
-            context: this.prepareContext(acceptEntry.context),
+            context: this.prepareContext(acceptEntry.context, options),
             stack_trace: acceptEntry.stack_trace ?? stackTrace,
             ulid: acceptEntry.ulid ?? this.ulid()
         }
-        
-        await this.commitEntry(logEntry);
+
+        await this.commitEntry(logEntry, options);
         this.breakpoints?.test(logEntry);
 
         if( this.logToConsole && logEntry.type!=='event') {
@@ -137,6 +155,24 @@ export class BaseLogStorage implements ILogStorage {
     
 }
 
+/**
+ * Shallow copy of `obj` with any explicitly-`undefined` properties dropped.
+ *
+ * Why: lets `Object.assign({}, DEFAULTS, stripUndefinedValues(options))` keep the default for any
+ * option the caller passed as `undefined`, rather than overwriting it — the merge footgun that
+ * otherwise crashed the first log via `[...preserve_unmasked_context_paths]` / `include_stack_trace[type]`.
+ */
+function stripUndefinedValues<T extends object>(obj: T | undefined): Partial<T> {
+    if( !obj ) return {};
+    const out: Partial<T> = {};
+    for( const key of Object.getOwnPropertyNames(obj) as (keyof T)[] ) {
+        if( obj[key] !== undefined ) {
+            out[key] = obj[key];
+        }
+    }
+    return out;
+}
+
 const DEFAULT_LOGGER_OPTIONS:Required<LogStorageOptions> = {
     include_stack_trace: {
         debug: false,
@@ -148,6 +184,8 @@ const DEFAULT_LOGGER_OPTIONS:Required<LogStorageOptions> = {
     },
     log_to_console: false,
     permit_dangerous_context_properties: false,
+    preserve_unmasked_context_paths: [],
+    allow_per_call_unmasking: false,
     max_age: [],
     breakpoints: null
 }

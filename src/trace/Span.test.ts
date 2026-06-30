@@ -208,6 +208,21 @@ describe('Span Integration Tests', () => {
 
 
 
+    describe('debug level', () => {
+
+        it('records debug() and debugWithOptions() as debug entries, not info', async () => {
+            const fakeLogger = new FakeLogStorage();
+            const span = new Span(fakeLogger);
+            await span.debug('plain debug', { a: 1 });
+            await span.debugWithOptions({ preserve_unmasked_context_paths: [] }, 'options debug', { a: 1 });
+
+            const debugLogs = fakeLogger.logs.filter(l => l.message === 'plain debug' || l.message === 'options debug');
+            expect(debugLogs.length).toBe(2);
+            expect(debugLogs.map(l => l.type)).toEqual(['debug', 'debug']);
+        });
+
+    });
+
     describe('Failure Scenarios', () => {
 
         it('should propagate errors when storage.add fails', async () => {

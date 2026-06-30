@@ -1,4 +1,5 @@
 import type { WhereFilterDefinition } from "@andymitchell/objects/where-filter";
+import type { PreserveUnmaskedPath } from "@andymitchell/clone-to-json-safe";
 import type { IBreakpoints } from "../breakpoints/types.ts";
 import type { MaxAge, MinimumContext } from "../types.ts";
 
@@ -112,8 +113,37 @@ export type AcceptLogEntry<C = any, M extends MinimumContext = any> =
 
 export type LogEntryType = LogEntry['type'];
 
+
 /**
- * The storage area for loggers. An implementation of this will always be passed into a Logger/Trace class. 
+ * Per-call ("per-log") masking directives, supplied at a single call site via a `*WithOptions` method
+ * (e.g. {@link ILogger.logWithOptions}) and carried **out-of-band** — never written onto the entry, so
+ * never persisted and untouched by `structuredClone`.
+ *
+ * Why a dedicated options type rather than just more context: it lets one log say "this specific value is
+ * safe to keep unmasked here" without weakening the storage's standing config. It is honored **only** by a
+ * storage built with `allow_per_call_unmasking: true` (see {@link LogStorageOptions.allow_per_call_unmasking});
+ * every other sink ignores it. It deliberately CANNOT carry `permit_dangerous_context_properties`: per-call
+ * must never reach the value-agnostic `_dangerous` escape hatch — its only power is the fail-closed
+ * path+shape allowlist.
+ *
+ * @typeParam C - The logged context shape. `preserve_unmasked_context_paths` is narrowed to the real scalar
+ * dot-paths of `C` (arrays-of-objects spread to their elements, e.g. `orders.items.ref`), so a typo or a
+ * renamed field is a COMPILE error. Untyped callers (no `C`) get `path: string`, unchanged.
+ * @example
+ * logger.logWithOptions({ preserve_unmasked_context_paths: [{ path: 'user.id', shape: 'uuid' }] }, 'hi', { user: { id } });
+ */
+export type LogCallMaskingOptions<C extends MinimumContext = MinimumContext> = {
+    /**
+     * Keep specific context values UNMASKED for THIS log only, gated by BOTH dot-path AND value-shape
+     * (fail-closed) — exactly like {@link LogStorageOptions.preserve_unmasked_context_paths} but scoped to
+     * the single call. Paths are relative to the context object root (`user.id`, not `context.user.id`) and
+     * are narrowed to `C`'s real scalar paths (incl. array spreads); see {@link PreserveUnmaskedPath}.
+     */
+    preserve_unmasked_context_paths?: PreserveUnmaskedPath<C>[];
+};
+
+/**
+ * The storage area for loggers. An implementation of this will always be passed into a Logger/Trace class.
  */
 export interface ILogStorage {
 
@@ -121,9 +151,12 @@ export interface ILogStorage {
 
     /**
      * Add an entry to the data store
-     * @param entry 
+     * @param entry
+     * @param options Optional per-call masking directives (out-of-band; honored only when this storage has
+     * `allow_per_call_unmasking: true`). Non-generic on purpose — typed paths live at the `*WithOptions`
+     * call sites; `C` cannot be reliably inferred from the entry's union here.
      */
-    add<T extends any>(entry:AcceptLogEntry<T>):Promise<LogEntry<T>>;
+    add<T extends any>(entry:AcceptLogEntry<T>, options?: LogCallMaskingOptions):Promise<LogEntry<T>>;
 
     /**
      * Retrieve entries from the data store
@@ -169,6 +202,40 @@ export interface LogStorageOptions {
      * Allow context properties that are prefixed with '_dangerous' to not be stripped of sensitive data. Useful to allow some tracking IDs through.
      */
     permit_dangerous_context_properties?: boolean,
+
+    /**
+     * Keep specific context values UNMASKED, gated by BOTH their dot-path AND their value-shape — e.g.
+     * preserve a UUID at `user.id` or a ULID at `trace.id` so identifiers stay correlatable, while
+     * everything else is still scrubbed. Paths are relative to the **context object root** (`user.id`,
+     * not `context.user.id`). A value is preserved only where its path matches AND it is a whole-value
+     * match for the declared shape; a non-matching value at that same path is still masked.
+     *
+     * Why path AND shape, never "allow any value at a path": a field's contents drift (a `user.id` that
+     * holds a UUID today may hold an email after a refactor), so a path-only exemption would be silently
+     * left wide open on the wrong type. Pairing with a shape is fail-closed. Like
+     * {@link permit_dangerous_context_properties}, this is masking **config**: the {@link ChannelsLogStorage}
+     * facade omits it from its options type (a pure fan-out facade never masks), while each child storage
+     * still applies its own.
+     *
+     * @default [] (no exemptions)
+     * @example
+     * { preserve_unmasked_context_paths: [{ path: 'user.id', shape: 'uuid' }, { path: 'trace.id', shape: 'ulid' }] }
+     */
+    preserve_unmasked_context_paths?: PreserveUnmaskedPath[],
+
+    /**
+     * Opt in to honoring **per-call** masking directives ({@link LogCallMaskingOptions}) passed at the log
+     * call site (e.g. via `logWithOptions`). When `false` (default), per-call directives reaching this
+     * storage are ignored entirely and context is masked as if none were supplied — so a dynamic call-site
+     * directive can only unmask into a sink whose owner explicitly blessed it.
+     *
+     * Gates **only** per-call directives; the storage-level {@link LogStorageOptions.preserve_unmasked_context_paths}
+     * is unaffected. Asymmetric on purpose: per-call directives fan out through {@link ChannelsLogStorage} to
+     * every child (incl. remote sinks), so each sink must opt in to trusting them; static local config does not.
+     *
+     * @default false
+     */
+    allow_per_call_unmasking?: boolean,
 
     /**
      * Set a custom IBreakpoints implementation (e.g. a different storage area). Defaults to in-memory if not provided.

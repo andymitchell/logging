@@ -1,5 +1,6 @@
 
 import type { ILogStorage } from "../index-browser.ts";
+import type { LogCallMaskingOptions } from "../log-storage/types.ts";
 import { Span } from "./Span.ts";
 import type { ISpan } from "./types.ts";
 
@@ -14,9 +15,9 @@ export class Trace extends Span implements ISpan {
 
     
 
-    constructor(storage:ILogStorage, name?: string, context?: any) {
-        super(storage, undefined, name, context);
-        
+    constructor(storage:ILogStorage, name?: string, context?: any, options?: LogCallMaskingOptions) {
+        super(storage, undefined, name, context, options);
+
     }
 
 }

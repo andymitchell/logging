@@ -2,7 +2,7 @@ import type { WhereFilterDefinition } from "@andymitchell/objects/where-filter";
 import { matchJavascriptObject } from "@andymitchell/objects/where-filter"; 
 import type { LogStorageOptions } from "../types.ts";
 import { BaseLogStorage } from "../BaseLogStorage.ts";
-import type { ILogStorage, LogEntry } from "../types.ts";
+import type { ILogStorage, LogCallMaskingOptions, LogEntry } from "../types.ts";
 
 /**
  * Defines the configuration for a single channel within the ChannelsLogStorage.
@@ -26,7 +26,11 @@ export interface Channel {
     transform?: (entry: LogEntry) => LogEntry;
 }
 
-type LogStorageOptionsWithoutSensitive = Omit<LogStorageOptions, 'permit_dangerous_context_properties'>;
+// The fan-out sink must not carry sensitive-data masking CONFIG of its own: it forwards entries untouched to
+// its sub-storages (see prepareContext override), so any unmasking — standing config OR the per-call gate — is
+// decided there, per-sub-storage, intentionally. (Per-call DIRECTIVES still propagate through, via commitEntry;
+// it's only the facade's own masking config that would be meaningless here.)
+type LogStorageOptionsWithoutSensitive = Omit<LogStorageOptions, 'permit_dangerous_context_properties' | 'preserve_unmasked_context_paths' | 'allow_per_call_unmasking'>;
 
 /**
  * A facade LogStorage that distributes log entries to multiple "channels" based on a set of rules.
@@ -55,13 +59,14 @@ export class ChannelsLogStorage extends BaseLogStorage implements ILogStorage {
     }
 
     /**
-     * Do nothing - let the sub storage we pass it to handle it. 
-     * We want to pass objects intact so they don't double strip sensitive info.
-     * @param context 
-     * @returns 
+     * Pure passthrough: forward the raw context unchanged so each sub-storage masks ONCE, with its own config
+     * and gate (avoids double-stripping). Per-call options are forwarded separately in {@link commitEntry}, not
+     * consumed here.
+     * @param context
+     * @returns the context, untouched.
      */
-    protected override prepareContext(context?: any) {
-        return context; 
+    protected override prepareContext(context?: any, _options?: LogCallMaskingOptions) {
+        return context;
     }
 
     /**
@@ -69,8 +74,13 @@ export class ChannelsLogStorage extends BaseLogStorage implements ILogStorage {
      * This method is called internally by the `add` method in `BaseLogStorage`.
      * @param logEntry The complete log entry to be committed.
      */
-    protected override async commitEntry(logEntry: LogEntry): Promise<void> {
+    protected override async commitEntry(logEntry: LogEntry, options?: LogCallMaskingOptions): Promise<void> {
         const commitPromises: Promise<unknown>[] = [];
+
+        // One options object is forwarded BY REFERENCE to every child. Clone-then-deep-freeze it so (a) the
+        // caller's own object is never mutated, and (b) no child can poison the shared directive — e.g. push an
+        // extra `preserve_unmasked_context_paths` entry that a concurrent sibling would then honor.
+        const frozenOptions = options ? deepFreeze(structuredClone(options)) : undefined;
 
         for (const channel of this.channels) {
             // 1. Check if the channel should accept this entry
@@ -81,12 +91,15 @@ export class ChannelsLogStorage extends BaseLogStorage implements ILogStorage {
                 // The `structuredClone` is important for isolation.
                 const entryForChannel = structuredClone(logEntry);
 
-                // 3. Transform the entry if a transformer is provided
+                // 3. Transform the entry if a transformer is provided. Per-call options are deliberately NOT
+                // passed to `transform`: they are a masking directive, not entry data, and must never be
+                // attached to the entry (which would persist them).
                 const entryToSend:LogEntry = channel.transform ? channel.transform(entryForChannel) : entryForChannel;
 
-                // 4. Send to the channel's storage. We call .add() to adhere to the ILogStorage interface.
-                // The underlying BaseLogStorage.add() will use the existing ulid.
-                commitPromises.push(channel.storage.add(entryToSend));
+                // 4. Send to the channel's storage, forwarding the frozen per-call options so a flagged child
+                // (allow_per_call_unmasking) can honor them. We call .add() to adhere to the ILogStorage
+                // interface. The underlying BaseLogStorage.add() will use the existing ulid.
+                commitPromises.push(channel.storage.add(entryToSend, frozenOptions));
             }
         }
 
@@ -150,4 +163,19 @@ export class ChannelsLogStorage extends BaseLogStorage implements ILogStorage {
 
         await Promise.all(resetPromises);
     }
+}
+
+/**
+ * Recursively freeze a value so a forwarded options object — shared by reference across all children — cannot
+ * be mutated by any one child (e.g. pushing an extra path entry a concurrent sibling would then honor). Freezes
+ * before recursing so a cyclic reference cannot loop.
+ */
+function deepFreeze<T>(value: T): T {
+    if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+        Object.freeze(value);
+        for (const key of Reflect.ownKeys(value)) {
+            deepFreeze((value as Record<PropertyKey, unknown>)[key]);
+        }
+    }
+    return value;
 }

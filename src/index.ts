@@ -9,14 +9,15 @@ import { initiateBreakpointCommandsInDevTools } from "./breakpoints/initiateBrea
 import { KvStorageBreakpoints } from "./breakpoints/KvStorageBreakpoints.ts";
 import  { MemoryBreakpoints } from "./breakpoints/MemoryBreakpoints.ts";
 import { BaseLogStorage } from "./log-storage/BaseLogStorage.ts";
-import { startTrace } from "./trace/startTrace.ts";
+import { startTrace, startTraceWithOptions } from "./trace/startTrace.ts";
 
 export {
     Trace,
     Span,
     Logger,
     BaseLogStorage,
-    startTrace
+    startTrace,
+    startTraceWithOptions
 }
 
 export * from './index-universal-logstorage.ts';

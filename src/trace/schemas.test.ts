@@ -14,8 +14,12 @@ import { SpanIdSchema, SpanMetaSchema, ILoggerSchema, ISpanSchema } from './sche
 
 const validSpanId = { id: 's1', top_id: 't1' };
 
-const loggerMembers = { debug() {}, log() {}, warn() {}, error() {}, critical() {}, get() {} };
-const spanMembers = { ...loggerMembers, startSpan() {}, end() {}, getId() { return ''; }, getFullId() { return validSpanId; } };
+const loggerMembers = {
+    debug() {}, log() {}, warn() {}, error() {}, critical() {},
+    debugWithOptions() {}, logWithOptions() {}, warnWithOptions() {}, errorWithOptions() {}, criticalWithOptions() {},
+    get() {},
+};
+const spanMembers = { ...loggerMembers, startSpan() {}, startSpanWithOptions() {}, end() {}, getId() { return ''; }, getFullId() { return validSpanId; } };
 
 describe('Span identity schema', () => {
 
