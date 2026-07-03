@@ -83,14 +83,17 @@ describe('per-call masking: the options slot cannot be spoofed by a logged value
         const storage = new MemoryLogStorage('', { allow_per_call_unmasking: true });
         const logger = new Logger(storage);
 
-        // A hostile payload shaped EXACTLY like masking options, but passed in the context (data) slot of plain `log`.
-        const hostilePayload = { preserve_unmasked_context_paths: [{ path: 'ssn', shape: 'uuid' }], ssn: UUID };
+        // A hostile payload shaped EXACTLY like masking options, but passed in the context (data) slot of plain
+        // `log`. The carried field uses a BENIGN key (`ref`) so the test isolates the options-spoofing guarantee:
+        // its UUID would be readable only if the fake options were honored. (A sensitive key would be key-redacted
+        // regardless, masking the very regression this test guards against.)
+        const hostilePayload = { preserve_unmasked_context_paths: [{ path: 'ref', shape: 'uuid' }], ref: UUID };
         await logger.log('incoming', hostilePayload);
 
         const e = (await storage.get())[0]!;
         // It was treated as ordinary data and masked — the look-alike "options" had no power, because options
         // only ever arrive in the dedicated leading slot of a `*WithOptions` method, never sniffed from data.
-        expect(e.context!.ssn).toBe(MASKED_UUID);
+        expect(e.context!.ref).toBe(MASKED_UUID);
     });
 
 });

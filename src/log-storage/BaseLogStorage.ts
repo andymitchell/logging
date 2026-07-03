@@ -1,6 +1,6 @@
 
 
-import { cloneToJsonSafeUnknown } from "@andymitchell/clone-to-json-safe";
+import { cloneToJsonSafeUnknown, BUILT_IN_SENSITIVE_KEYS } from "@andymitchell/clone-to-json-safe";
 import type {  MaxAge } from "../types.ts";
 import type { AcceptLogEntry, ILogStorage, LogCallMaskingOptions, LogEntry, LogStorageOptions } from "./types.ts";
 import type { WhereFilterDefinition } from "@andymitchell/objects/where-filter";
@@ -16,6 +16,8 @@ export class BaseLogStorage implements ILogStorage {
     protected includeStackTrace: Required<LogStorageOptions>['include_stack_trace'];
     protected logToConsole:boolean;
     protected permitDangerousContextProperties: boolean;
+    protected redactSensitiveContextKeys: Required<LogStorageOptions>['redact_sensitive_context_keys'];
+    protected sensitiveContextKeyNames: Required<LogStorageOptions>['sensitive_context_key_names'];
     protected preserveUnmaskedContextPaths: Required<LogStorageOptions>['preserve_unmasked_context_paths'];
     protected allowPerCallUnmasking: boolean;
     protected maxAge: MaxAge;
@@ -39,6 +41,8 @@ export class BaseLogStorage implements ILogStorage {
         this.includeStackTrace = safeOptions.include_stack_trace;
         this.logToConsole = safeOptions.log_to_console;
         this.permitDangerousContextProperties = safeOptions.permit_dangerous_context_properties;
+        this.redactSensitiveContextKeys = safeOptions.redact_sensitive_context_keys;
+        this.sensitiveContextKeyNames = safeOptions.sensitive_context_key_names;
         this.preserveUnmaskedContextPaths = safeOptions.preserve_unmasked_context_paths;
         this.allowPerCallUnmasking = safeOptions.allow_per_call_unmasking;
         this.dbNamespace = dbNamespace;
@@ -95,6 +99,11 @@ export class BaseLogStorage implements ILogStorage {
                     skip_circular: true,
                     strip_sensitive_info: true,
                     allow_sensitive_in_dangerous_properties: this.permitDangerousContextProperties,
+                    // Key-name redaction: mask a value because its KEY names a secret (password/apiKey/…),
+                    // regardless of the value's shape — catches weak secrets the value-shape net leaves readable.
+                    // On by default; `sensitive_context_key_names` replaces the built-in list when supplied.
+                    redact_sensitive_keys: this.redactSensitiveContextKeys,
+                    sensitive_key_names: this.sensitiveContextKeyNames,
                     // Path+shape allowlist: keep chosen non-secret identifiers (e.g. a UUID at `user.id`)
                     // correlatable in logs while everything else is still scrubbed. Context-root-relative
                     // because the cloned root IS the context object.
@@ -184,6 +193,8 @@ const DEFAULT_LOGGER_OPTIONS:Required<LogStorageOptions> = {
     },
     log_to_console: false,
     permit_dangerous_context_properties: false,
+    redact_sensitive_context_keys: true,
+    sensitive_context_key_names: BUILT_IN_SENSITIVE_KEYS,
     preserve_unmasked_context_paths: [],
     allow_per_call_unmasking: false,
     max_age: [],

@@ -204,6 +204,35 @@ export interface LogStorageOptions {
     permit_dangerous_context_properties?: boolean,
 
     /**
+     * Redact a context value purely because its KEY names a secret — `password`, `apiKey`, `secret`, `ssn`, …
+     * — regardless of the value's shape or strength. The key-name counterpart to the value-shape masker: it
+     * catches a weak secret (`{ password: 'Password1' }`) that no shape rule would flag. The matched value —
+     * and any subtree beneath a sensitive key — is replaced with a `redact:sensitive-key` marker WITHOUT being
+     * read, so a getter under a sensitive key never runs and nested field names never leak.
+     *
+     * Matched WHOLE-TOKEN and case-insensitively: `dbPassword`, `password_hash` and `x-api-key` match; a benign
+     * `passwordless` or a bare `key` do not. Set `false` to disable key-name redaction while keeping value-shape
+     * masking. Like {@link permit_dangerous_context_properties} this is masking **config**, so the
+     * {@link ChannelsLogStorage} facade omits it and each child storage applies its own.
+     *
+     * @default true
+     */
+    redact_sensitive_context_keys?: boolean,
+
+    /**
+     * The key-names treated as sensitive by {@link redact_sensitive_context_keys}. When set, this REPLACES the
+     * conservative built-in list; omit it to use the built-ins. To EXTEND rather than replace, spread the
+     * re-exported built-ins: `sensitive_context_key_names: [...BUILT_IN_SENSITIVE_KEYS, 'myOrgToken']`.
+     *
+     * Matched whole-token and case-insensitively against a key tokenized on camelCase / acronym / snake / kebab
+     * boundaries, so one entry covers every spelling (`password` catches `dbPassword` and `password_hash`).
+     *
+     * @default the built-in conservative list — password, passwd, passphrase, pwd, secret, apiKey, accessToken,
+     * refreshToken, privateKey, clientSecret, credential, credentials, authorization, ssn, cvv, otp
+     */
+    sensitive_context_key_names?: readonly string[],
+
+    /**
      * Keep specific context values UNMASKED, gated by BOTH their dot-path AND their value-shape — e.g.
      * preserve a UUID at `user.id` or a ULID at `trace.id` so identifiers stay correlatable, while
      * everything else is still scrubbed. Paths are relative to the **context object root** (`user.id`,

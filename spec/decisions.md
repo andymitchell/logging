@@ -224,6 +224,13 @@ result — but a *throwing* getter would crash the clone, so resolution catches 
 nothing. Residual: a getter still fires during resolution despite `allow_getters:false` — a documented, bounded
 interaction (the firing is limited to caller-chosen pattern paths, never attacker-chosen).
 
+**Refined in 0.4.0 (key-based redaction, dec-key-based-redaction).** Resolution now SKIPS any preserve path whose
+segment the walk would key-redact — using the FULL activation predicate, not a bare name match — so a getter
+beneath a *sensitive* key is never fired even here (the walk would redact that subtree unread, so the leaf is
+unreachable; skipping is output-preserving). A `_dangerous`-hatched segment is NOT skipped (the walk does not
+redact it), so its path still resolves and preserves. This narrows the residual to getters on NON-sensitive
+caller-chosen preserve paths.
+
 **Cleared — no secret leak (review).** `matchesValueShape` is the sole exemption backstop and is unbreakable for
 non-uuid/ulid values: anchored `^…$` regexes (a trailing newline fails the match), string-only (numbers rejected),
 and an `Object.hasOwn` guard rejecting inherited shape names (`toString`/`constructor`/…). Substring smuggling,
@@ -416,3 +423,55 @@ host/path (the URL detector still shields its whole span); and further ideated d
 secret envs, wallet addresses, base64 blobs). **Known pre-existing (out of this review's scope):** the `email`
 regex `[A-Za-z0-9._%+-]+@` backtracks quadratically on a long dotted/alphanumeric run with no `@` (~2.6s on
 ~60KB) — unchanged by this work; flag for a separate ReDoS hardening pass.
+
+---
+
+## Key-based redaction (clone-to-json-safe 0.4.0, consumed by logging)
+
+Companion spec: `key-based-redaction.md`. Masks a value because its FIELD NAME is sensitive
+(`password`/`apiKey`/`ssn`/…), shape- and strength-agnostic — the compliance-grade primary control the
+high-precision shape net (dec-password-shape-high-precision-only) deliberately leaves to it.
+
+### dec-key-based-redaction
+When the clone walk meets a property whose KEY is sensitive it assigns the marker `redact:sensitive-key`
+**without reading the value** and does not recurse — a scalar and a whole subtree alike collapse to the one
+marker, so a getter under the key never runs and no field-name structure leaks. Gated hard by
+`strip_sensitive_info` (masking off ⇒ keys never inspected); **on by default** when stripping is on
+(`redact_sensitive_keys` defaults `true`), and an explicit `undefined` never disables it — `resolveOptions`
+guards every option whose default is non-`undefined`, so a programmatic `{ redact_sensitive_keys: cfg.x }` with
+an undefined `cfg.x` falls back to the default rather than failing open.
+
+**Matching is whole-token, contiguous-sublist** (tokenizing per dec-key-tokenizer-linear): a name matches iff its
+tokens are a contiguous run in the key's tokens, or a solid-lowercase key equals the name joined. This needs no
+Tier-1/Tier-2 word tiering (the originally-proposed scheme): multi-word names are inherently compound-safe
+(`apiKey`→`api_key`/`x-api-key` ✓, bare `key` ✗) and single-word names match as whole tokens
+(`password`→`dbPassword` ✓, `passwordless` ✗). The built-in list is a conservative core; supplying
+`sensitive_key_names` REPLACES it (spread `BUILT_IN_SENSITIVE_KEYS` to extend). Two supplied-name classes are
+dropped as unusable: empty/all-punctuation, and **purely numeric** — a bare number can only match a structural
+array index, never a secret FIELD (the same principle that treats an array's `length` slot as structural and
+bypasses redaction/masking for it, avoiding a `RangeError` from assigning a marker to `arr.length`).
+
+**Precedence:** the `_dangerous` hatch (`allow_sensitive_in_dangerous_properties`, default off) preserves a
+`_dangerous*` key; otherwise key-redaction **wins over the `preserve_unmasked_paths` allow-list** — structurally
+the key check precedes leaf resolution, so a secret KEY overrides value-shape preservation. This INVERTS the
+pipeline order in the original proposal; safe because the allow-list only preserves opaque `uuid`/`ulid`/`sha256`
+shapes a real secret ~never wears. logging surfaces it as `redact_sensitive_context_keys` /
+`sensitive_context_key_names` (masking config, so `ChannelsLogStorage` omits both), on by default for every sink;
+`BUILT_IN_SENSITIVE_KEYS` is re-exported from logging so consumers extend without a deep import.
+
+**Example — averted leak:** `log(ctx, { password: 'Password1' })` — a Word+Digits value the shape net leaves
+readable under a benign key — redacts to `{ password: 'redact:sensitive-key' }` because the KEY is sensitive;
+`{ credentials: { user, apiKey } }` collapses to one marker with no nested field-name leak; an allow-listed uuid
+at `{ apiKey }` is still redacted (key wins); a getter on `{ password: get x(){…} }` never fires.
+
+### dec-key-tokenizer-linear
+`tokenizeKey` is a single **O(n) character scanner**, not a regex. The obvious acronym rule
+`/([A-Z]+)([A-Z][a-z])/g` backtracks **quadratically** on a long all-caps key (≈6s on a 64k-char key) — a DoS on
+untrusted, attacker-controllable JSON keys. The scanner applies the same two boundary rules (open a token on
+lower/digit→Upper, and at an acronym tail Upper→Upper-before-lower) in one pass, and was proven token-for-token
+identical to the old regex across ~550k inputs (17 traced + 500k random + a near-exhaustive length-≤9 char-class
+proof of 349,525 strings). A perf regression test guards linearity, mirroring dec-ipv6-bounded-anchored-regex.
+Deleting the regex also removed a stray NUL sentinel byte that had made the source a git-binary file.
+
+**Example — averted DoS:** a 100k-char all-caps key tokenizes in <1ms (was seconds under the regex); output
+identical.

@@ -30,7 +30,7 @@ export interface Channel {
 // its sub-storages (see prepareContext override), so any unmasking — standing config OR the per-call gate — is
 // decided there, per-sub-storage, intentionally. (Per-call DIRECTIVES still propagate through, via commitEntry;
 // it's only the facade's own masking config that would be meaningless here.)
-type LogStorageOptionsWithoutSensitive = Omit<LogStorageOptions, 'permit_dangerous_context_properties' | 'preserve_unmasked_context_paths' | 'allow_per_call_unmasking'>;
+type LogStorageOptionsWithoutSensitive = Omit<LogStorageOptions, 'permit_dangerous_context_properties' | 'redact_sensitive_context_keys' | 'sensitive_context_key_names' | 'preserve_unmasked_context_paths' | 'allow_per_call_unmasking'>;
 
 /**
  * A facade LogStorage that distributes log entries to multiple "channels" based on a set of rules.
