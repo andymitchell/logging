@@ -110,8 +110,63 @@ describe('Span Integration Tests', () => {
         expect(allLogs[1]!.type).toBe('info');
     });
 
-    describe('child span', () => {
+    describe('relationship isolation', () => {
 
+        it('should retain the original parent relationship when the constructor input is mutated', async () => {
+            const fakeLogger = new FakeLogStorage();
+            const parent = {
+                parent_id: 'previous-span',
+                top_id: 'trace-root'
+            };
+            const span = new Span(fakeLogger, parent);
+            const originalSpanId = span.getFullId();
+
+            parent.parent_id = 'mutated-parent';
+            parent.top_id = 'mutated-root';
+            await span.log('after parent mutation');
+
+            expect(fakeLogger.logs[1].meta.span).toEqual(originalSpanId);
+            expect(fakeLogger.logs[1].meta.span).toEqual({
+                id: span.getId(),
+                parent_id: 'previous-span',
+                top_id: 'trace-root'
+            });
+        });
+
+        it('should retain its relationship when a getFullId result is mutated', async () => {
+            const fakeLogger = new FakeLogStorage();
+            const span = new Span(fakeLogger, {
+                parent_id: 'previous-span',
+                top_id: 'trace-root'
+            });
+            const originalSpanId = span.getFullId();
+
+            await span.log('before returned ID mutation');
+            const returnedSpanId = span.getFullId();
+            returnedSpanId.id = 'mutated-span';
+            returnedSpanId.parent_id = 'mutated-parent';
+            returnedSpanId.top_id = 'mutated-root';
+            await span.log('after returned ID mutation');
+
+            expect(fakeLogger.logs[1].meta.span).toEqual(originalSpanId);
+            expect(fakeLogger.logs[2].meta.span).toEqual(originalSpanId);
+            expect(span.getFullId()).toEqual(originalSpanId);
+        });
+
+        it('should freeze the internally owned relationship', () => {
+            const fakeLogger = new FakeLogStorage();
+
+            new Span(fakeLogger, {
+                parent_id: 'previous-span',
+                top_id: 'trace-root'
+            });
+
+            expect(Object.isFrozen(fakeLogger.logs[0].meta.span)).toBe(true);
+        });
+
+    });
+
+    describe('child span', () => {
 
         it('should create a child span with the parent id and top id set correctly', async () => {
             const fakeLogger = new FakeLogStorage();

@@ -8,6 +8,7 @@ import { Span } from "./trace/Span.ts";
 import { Trace } from "./trace/Trace.ts";
 import { BaseLogStorage } from "./log-storage/BaseLogStorage.ts";
 import { startTrace, startTraceWithOptions } from "./trace/startTrace.ts";
+import { continueTrace } from "./trace/continueTrace.ts";
 
 
 export {
@@ -15,6 +16,7 @@ export {
     Span,
     Logger,
     BaseLogStorage,
+    continueTrace,
     startTrace,
     startTraceWithOptions
 }

@@ -10,12 +10,14 @@ import { KvStorageBreakpoints } from "./breakpoints/KvStorageBreakpoints.ts";
 import  { MemoryBreakpoints } from "./breakpoints/MemoryBreakpoints.ts";
 import { BaseLogStorage } from "./log-storage/BaseLogStorage.ts";
 import { startTrace, startTraceWithOptions } from "./trace/startTrace.ts";
+import { continueTrace } from "./trace/continueTrace.ts";
 
 export {
     Trace,
     Span,
     Logger,
     BaseLogStorage,
+    continueTrace,
     startTrace,
     startTraceWithOptions
 }
