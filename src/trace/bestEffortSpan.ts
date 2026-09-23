@@ -7,7 +7,7 @@
  * that is synchronous — `startSpan` — which a time-cap cannot wrap, so it is suppress-only.
  */
 
-import { bestEffort } from "@andyrmitchell/utils";
+import { bestEffort } from "@andymitchell/utils";
 import type { ISpan } from "./types.ts";
 
 /** Wall-clock budget an ICollection operation waits on any one logging call before proceeding. */

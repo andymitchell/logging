@@ -1,4 +1,4 @@
-import { isTypeEqual, isTypeEqualLooseFunctions } from "@andyrmitchell/utils"
+import { isTypeEqual, isTypeEqualLooseFunctions } from "@andymitchell/utils"
 import { z } from "zod"
 import { type ISpan, type SpanId, type SpanMeta } from "./types.ts"
 import type { ILogger } from "../types.ts"

@@ -1,5 +1,5 @@
 
-import {  MemoryStorage } from '@andyrmitchell/utils/kv-storage';
+import {  MemoryStorage } from '@andymitchell/utils/kv-storage';
 import { KvStorageBreakpoints } from './KvStorageBreakpoints.ts';
 
 

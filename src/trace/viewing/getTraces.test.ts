@@ -1,7 +1,7 @@
 import { MemoryLogStorage } from "../../log-storage/memory/MemoryLogStorage.ts";
 import { getTraces } from "./getTraces.ts";
 import { Trace } from "../Trace.ts";
-import { convertArrayToRecord, sleep } from "@andyrmitchell/utils";
+import { convertArrayToRecord, sleep } from "@andymitchell/utils";
 
 
 describe('get-all', () => {

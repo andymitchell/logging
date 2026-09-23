@@ -1,8 +1,8 @@
-import { QueueMemory } from "@andyrmitchell/utils/queue-memory";
+import { QueueMemory } from "@andymitchell/utils/queue-memory";
 import type { LogStorageOptions } from "../types.ts";
 import { BaseLogStorage } from "../BaseLogStorage.ts";
 import type { LogEntry, ILogStorage } from "../types.ts";
-import { uid } from "@andyrmitchell/utils/uid";
+import { uid } from "@andymitchell/utils/uid";
 
 
 

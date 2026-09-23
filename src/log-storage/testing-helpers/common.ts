@@ -1,4 +1,4 @@
-import { sleep } from "@andyrmitchell/utils";
+import { sleep } from "@andymitchell/utils";
 import type { LogCallMaskingOptions, LogStorageOptions } from "../types.ts";
 import type { ILogStorage, LogEntry } from "../types.ts";
 import { it } from 'vitest';

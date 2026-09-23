@@ -6,7 +6,7 @@ fail-closed via the existing path+shape gate.
 
 Convention: `### dec-<slug>` = one decision; `#### dec-<slug>` = a sub-decision under it. Each carries an
 **Example** (often the *averted attack*). Spans the three packages `@andymitchell/objects` →
-`@andymitchell/clone-to-json-safe` → `@andyrmitchell/logging`.
+`@andymitchell/clone-to-json-safe` → `@andymitchell/logging`.
 
 ---
 

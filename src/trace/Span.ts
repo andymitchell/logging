@@ -1,6 +1,6 @@
 
-import { uuidV4 } from "@andyrmitchell/utils/uid";
-import { deepFreeze } from "@andyrmitchell/utils/deep-freeze";
+import { uuidV4 } from "@andymitchell/utils/uid";
+import { deepFreeze } from "@andymitchell/utils/deep-freeze";
 import { cloneToJsonSafe } from "@andymitchell/clone-to-json-safe";
 import type { AcceptLogEntry, ILogStorage, LogCallMaskingOptions, LogEntry } from "../log-storage/types.ts";
 
