@@ -73,7 +73,7 @@
     "dependencies": {
         "@andymitchell/clone-to-json-safe": "^0.4.0",
         "@andymitchell/objects": "^1.26.0",
-        "@andymitchell/utils": "^1.0.0",
+        "@andymitchell/utils": "^0.33.0",
         "material-symbols": "^0.31.9",
         "react-json-view-lite": "^2.4.1",
         "ulid": "^3.0.1"
