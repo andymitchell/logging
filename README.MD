@@ -5,6 +5,17 @@ Two reasons:
 2. We don't want heavyweight enterprise solutions, but still want the value of distributed tracing. 
 
 
+# React UI (`@andymitchell/logging/react`)
+
+The `/react` entry point renders traces in React. Its packages are optional peer dependencies, so npm doesn't install them. If you use this entry point, install them yourself:
+
+```bash
+npm install react react-json-view-lite
+```
+
+The other entry points don't need React.
+
+
 
 
 # Roadmap
