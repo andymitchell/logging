@@ -67,7 +67,7 @@
     },
     "dependencies": {
         "@andymitchell/clone-to-json-safe": "^0.4.0",
-        "@andymitchell/objects": "^1.26.0",
+        "@andymitchell/objects": "^1.30.0",
         "@andymitchell/utils": "^0.34.0",
         "ulid": "^3.0.1"
     },
