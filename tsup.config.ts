@@ -8,7 +8,6 @@ export default defineConfig({
     'index-node': 'src/index-node.ts',
     'index-get-traces': 'src/index-get-traces.ts',
     'index-schemas': 'src/index-schemas.ts',
-    'index-react': 'src/index-react.ts',
   },
   publicDir: false,
   clean: true,

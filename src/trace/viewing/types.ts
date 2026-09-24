@@ -36,8 +36,22 @@ export interface ITraceViewer {
 }
 
 
+/**
+ * One trace and every log entry recorded under it, across all of its spans.
+ *
+ * @example
+ * const [trace] = await new TraceViewer(storage).getTraces();
+ * console.log(trace.id, new Date(trace.timestamp), trace.logs.length);
+ */
 export type TraceResult<T extends MinimumContext = any> = {
-    id: string, 
+    /**
+     * The trace's id: the id of its root span, which every span in the trace carries as `top_id`.
+     */
+    id: string,
+
+    /**
+     * Timestamp of the trace's first entry, in epoch milliseconds.
+     */
     timestamp: number,
 
     /**
@@ -47,6 +61,9 @@ export type TraceResult<T extends MinimumContext = any> = {
 
 }
 
+/**
+ * A {@link TraceResult} returned by a search, plus the entries in it that matched the search filter.
+ */
 export type TraceSearchResult<T extends MinimumContext = any> = TraceResult<T> & {
     
     /**
@@ -62,6 +79,21 @@ export type TraceSearchResults<T extends MinimumContext = any> = TraceSearchResu
 
 
 
+/**
+ * Test if the variable is a {@link TraceResult}: an object with an `id` and a `logs` array of log entries.
+ *
+ * Useful when a value might be either a single trace or something else (e.g. a list of traces), such as a
+ * component prop that accepts both.
+ *
+ * @param x Any value.
+ * @returns `true` if `x` has an `id` and a `logs` array in which every item passes `isLogEntrySimple`.
+ *
+ * @example
+ * if (isTraceResult(value)) render(value.logs);
+ *
+ * @remarks
+ * A {@link TraceSearchResult} also passes, since it extends `TraceResult`.
+ */
 export function isTraceResult(x: unknown): x is TraceResult {
     if( typeof x==='object' && x!==null && "id" in x && "logs" in x && Array.isArray(x.logs) ) {
         return x.logs.every(isLogEntrySimple);

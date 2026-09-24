@@ -1,7 +1,7 @@
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { MemoryLogStorage } from '../../../src/raw-storage/memory/MemoryLogStorage';
+import { MemoryLogStorage } from '../../../src/log-storage/memory/MemoryLogStorage.ts';
 import { MemoryBreakpoints } from '../../../src/breakpoints/MemoryBreakpoints';
 import { initiateBreakpointCommandsInDevTools } from '../../../src/breakpoints/initiateBreakpointCommandsInDevTools';
 import { Trace } from '../../../src/index-browser';

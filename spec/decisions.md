@@ -475,3 +475,34 @@ Deleting the regex also removed a stray NUL sentinel byte that had made the sour
 
 **Example — averted DoS:** a 100k-char all-caps key tokenizes in <1ms (was seconds under the regex); output
 identical.
+
+---
+
+## Packaging on GitHub Packages
+
+### dec-no-optional-peers-on-github-packages
+**Never declare an optional peer in a package published to GitHub Packages.** The registry drops
+`peerDependenciesMeta` from the abbreviated packument that `npm install` reads (GitHub community discussions
+#41534, #51104; pnpm/pnpm#9814 — no fix planned). npm 7+ installs every peer it sees, so every declared peer is
+effectively **required**, and every consumer gets it whatever entry point they import. A subpath export is
+therefore not a dependency boundary npm respects; only a separate package is. Code with heavy, optional runtime
+needs (React UI) ships as its own package that declares them as ordinary required peers.
+
+Workarounds rejected: `--legacy-peer-deps` / `--omit=peer` push the fix onto every consumer and also drop the
+genuinely required `zod`; a devDependency-only react gives UI users no version contract; `optionalDependencies`
+are still installed; leaving GitHub Packages breaks the family's single registry.
+
+**Example — observed leak:** 0.12.0 declared `react` and `react-json-view-lite` as optional peers for its `/react`
+entry. A backend-only consumer's lockfile (authension) recorded logging's `peerDependencies` with **no**
+`peerDependenciesMeta` and installed `node_modules/react-json-view-lite` flagged `"peer": true`, although the
+consumer never imports the UI. 0.13.0 removes `/react`; `zod` is the only peer.
+
+#### dec-ui-consumes-logging-as-peer
+`@andymitchell/logging-ui-react` declares this package as a **peer** (`>=0.13.0 <1.0.0`), never a dependency: the
+UI accepts a `TraceViewer` instance or a plain function as its source and branches on `instanceof TraceViewer`, so
+a second nested copy of logging makes the check fail and the instance is then called as a function. The loose
+range stops every logging minor from forcing a UI republish (a strict caret would push consumers to `--force`,
+nesting that second copy). In return, the symbols the UI imports are a contract: `isLogEntrySimple`,
+`isEventLogEntry`, `isEventLogEntrySpanStart` (root entry, via `index-guards.ts`) and `isTraceResult`,
+`TraceResult` (`/get-traces`), alongside the long-public `TraceViewer`, `TraceFilter`, `TraceSearchResults`,
+`LogEntry`, `SpanMeta`, `TraceEntry`, `MinimumContext`. Renaming or removing one is a breaking change for the UI.

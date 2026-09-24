@@ -80,6 +80,22 @@ export type EventLogEntry<C = any, M extends MinimumContext = any, E extends Eve
     event: E
 };
 
+/**
+ * Test if the variable is an event entry (`type: 'event'`), such as the markers written when a span starts or ends.
+ *
+ * Event entries carry structural information about a trace rather than a message, so viewers usually
+ * handle them separately from debug/info/warn/error/critical entries.
+ *
+ * @param x Any value, typically an item from a list of log entries.
+ * @returns `true` if `x` is an object whose `type` is `'event'`.
+ *
+ * @example
+ * const events = entries.filter(isEventLogEntry);
+ * events.forEach(e => console.log(e.event.name)); // 'span_start' | 'span_end'
+ *
+ * @remarks
+ * Only the `type` discriminator is checked, not the full shape.
+ */
 export function isEventLogEntry(x: unknown): x is EventLogEntry {
     return (typeof x==='object') && !!x && "type" in x && x.type==='event';
 }

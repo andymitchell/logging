@@ -32,3 +32,4 @@ export {
 };
 
 export * from "./index-types.ts";
+export * from "./index-guards.ts";

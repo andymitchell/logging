@@ -5,15 +5,11 @@ Two reasons:
 2. We don't want heavyweight enterprise solutions, but still want the value of distributed tracing. 
 
 
-# React UI (`@andymitchell/logging/react`)
+# React UI
 
-The `/react` entry point renders traces in React. Its packages are optional peer dependencies, so npm doesn't install them. If you use this entry point, install them yourself:
+The React trace viewer is a separate package, `@andymitchell/logging-ui-react`. It takes this package, `react` and `react-json-view-lite` as peers, so apps that don't render traces never install React.
 
-```bash
-npm install react react-json-view-lite
-```
-
-The other entry points don't need React.
+The `@andymitchell/logging/react` entry point was removed in 0.13.0. Replace `from "@andymitchell/logging/react"` with `from "@andymitchell/logging-ui-react"`; the exported components are unchanged.
 
 
 
@@ -25,8 +21,6 @@ The other entry points don't need React.
 ### Work on the upstream @andyrmitchell/objects to make sure that importing @andyrmitchell/objects/where-filter will not import zod
 
 At least not after being tree-shaken. Try compiling this with iife and tree-shaking.
-
-### Split out react into its own package (logging-ui-react)
 
 ## Rethink the debugger
 

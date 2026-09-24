@@ -26,10 +26,6 @@
         "./schemas": {
             "types": "./dist/index-schemas.d.ts",
             "default": "./dist/index-schemas.js"
-        },
-        "./react": {
-            "types": "./dist/index-react.d.ts",
-            "default": "./dist/index-react.js"
         }
     },
     "module": "./dist/index.js",
@@ -63,10 +59,7 @@
     },
     "devDependencies": {
         "@types/jest": "^29.5.14",
-        "@types/react": "^19.0.12",
         "fake-indexeddb": "^6.0.0",
-        "react": "^19.2.7",
-        "react-json-view-lite": "^2.4.1",
         "tsup": "^8.3.5",
         "typescript": "^5.8.3",
         "vitest": "^3.2.4",
@@ -79,16 +72,6 @@
         "ulid": "^3.0.1"
     },
     "peerDependencies": {
-        "react": "^18.3.1 || ^19.0.0",
-        "react-json-view-lite": "^2.4.1",
         "zod": "^4.1.8"
-    },
-    "peerDependenciesMeta": {
-        "react": {
-            "optional": true
-        },
-        "react-json-view-lite": {
-            "optional": true
-        }
     }
 }

@@ -67,6 +67,22 @@ export type SpanMeta = {
 
 export type TraceEntry<C extends MinimumContext = any> = LogEntry<C, SpanMeta>;
 
+/**
+ * Test if the variable is the event entry that marks the start of a span.
+ *
+ * Every span writes one `span_start` event when it begins. Its `meta.span` holds the span's own id and its
+ * `parent_id`, which is what lets a viewer rebuild the span tree from a flat list of entries.
+ *
+ * @param x Any value, typically an entry from a trace.
+ * @returns `true` if `x` is an event entry whose `event.name` is `'span_start'`.
+ *
+ * @example
+ * const spanStarts = trace.logs.filter(isEventLogEntrySpanStart);
+ * const rootSpan = spanStarts.find(e => !e.meta.span.parent_id);
+ *
+ * @remarks
+ * Only the discriminators are checked. `meta` is typed as {@link SpanMeta} on the assumption the entry came from a trace.
+ */
 export function isEventLogEntrySpanStart(
   x: unknown,
 ): x is EventLogEntry<any, SpanMeta, StartEventDetail> {
