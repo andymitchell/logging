@@ -9,6 +9,22 @@ Two reasons:
 
 The React trace viewer is a separate package, `@andymitchell/logging-ui-react`. It takes this package, `react` and `react-json-view-lite` as peers, so apps that don't render traces never install React.
 
+```bash
+npm install @andymitchell/logging-ui-react @andymitchell/logging react react-json-view-lite
+```
+
+Wrap the storage your traces were written to in a `TraceViewer` and pass it to the UI:
+
+```tsx
+import { IDBLogStorage } from '@andymitchell/logging';
+import { TraceViewer } from '@andymitchell/logging/get-traces';
+import { TraceInspector } from '@andymitchell/logging-ui-react';
+
+const viewer = new TraceViewer(new IDBLogStorage('my-app'));
+
+export const Traces = () => <TraceInspector tracesSource={viewer} template="neutral" />;
+```
+
 The `@andymitchell/logging/react` entry point was removed in 0.13.0. Replace `from "@andymitchell/logging/react"` with `from "@andymitchell/logging-ui-react"`; the exported components are unchanged.
 
 
