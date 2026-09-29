@@ -19,6 +19,8 @@ import { guardedRead } from "../../failures/guardedCalls.ts";
  *
  * @param rawLogger The storage of the entries
  * @param filter Filter the traces
+ * @param includeAllTraceEntries Fill each trace's `logs` with every entry in the trace, not just the matching
+ * ones. Defaults to `true`.
  * @returns The traces, sorted by timestamp asc; each with an id, timestamp and containing an array of all
  * entries in the trace (and an optional 'matches' list of entries just matching the traceEntryFilter).
  * `ok` is `false` if either read failed or `results_filter` could not be applied to a trace (that trace is

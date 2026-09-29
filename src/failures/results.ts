@@ -23,8 +23,8 @@ export function ok(): LoggingOk {
  * result of a write, read or trace search.
  *
  * @example
- * failed({ source: 'IDBLogStorage:my-app', operation: 'write', message: 'Could not record the entry in IndexedDB.' });
- * // { ok: false, error: { message: '[IDBLogStorage:my-app] Could not record the entry in IndexedDB.', failures: [ … ] } }
+ * failed({ source: 'IDBLogStorage:my-app', operation: 'write', message: 'Could not record the entry.' });
+ * // { ok: false, error: { message: '[IDBLogStorage:my-app] Could not record the entry.', failures: [ … ] } }
  *
  * @example
  * return { ...failed(...childFailures), entries }; // a partial read

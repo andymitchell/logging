@@ -18,10 +18,10 @@ import { failed, isLogReadResult, isLoggingResult, resultFrom } from "../failure
  * The base does the shared work of every store (building and masking entries, stack traces, breakpoints,
  * failure listeners) and upholds the {@link ILogStorage} guarantee that no public method throws or rejects.
  * A subclass provides the hooks, which answer with a result rather than throwing:
- * - `commitEntry(entry)` → `ok()`, or `failed(...)` describing what went wrong.
+ * - `commitEntry(entry)` → `{ ok: true }`, or `{ ok: false, error }` describing what went wrong.
  * - `queryEntries(filter, fullTextFilter)` → `{ ok: true, entries }`, or a failed result with whatever
  *   entries were obtained.
- * - `resetEntries(entries)` and `clearOldEntries()` → `ok()` or `failed(...)`.
+ * - `resetEntries(entries)` and `clearOldEntries()` → `{ ok: true }` or `{ ok: false, error }`.
  *
  * A hook that throws or rejects anyway is caught and described by {@link BaseLogStorage.toFailure}.
  */
@@ -81,8 +81,8 @@ export class BaseLogStorage implements ILogStorage {
      *
      * @param _entry The finished entry, already masked by {@link prepareContext}.
      * @param _options The per-call masking directives the entry was built with.
-     * @returns `ok()` once the entry is committed, or `failed(...)` saying why it was not. Written by the
-     * store, never quoting the entry or a caught error's message.
+     * @returns `{ ok: true }` once the entry is committed, or `{ ok: false, error }` saying why it was not.
+     * Written by the store, never quoting the entry or a caught error's message.
      */
     protected commitEntry(_entry:LogEntry, _options?: LogCallMaskingOptions):Promise<LoggingResult> {
         throw new Error("Method not implemented");
@@ -134,7 +134,7 @@ export class BaseLogStorage implements ILogStorage {
     /**
      * Replace every entry with `_entries` (none if omitted). Called by {@link reset}.
      *
-     * @returns `ok()`, or `failed(...)` saying why the entries could not be reset.
+     * @returns `{ ok: true }`, or `{ ok: false, error }` saying why the entries could not be reset.
      */
     protected resetEntries(_entries?: LogEntry[]): Promise<LoggingResult> {
         throw new Error("Method not implemented");
@@ -143,7 +143,7 @@ export class BaseLogStorage implements ILogStorage {
     /**
      * Remove entries older than their maximum age (`max_age`). Called by {@link forceClearOldEntries}.
      *
-     * @returns `ok()`, or `failed(...)` saying why old entries could not be removed.
+     * @returns `{ ok: true }`, or `{ ok: false, error }` saying why old entries could not be removed.
      */
     protected clearOldEntries(): Promise<LoggingResult> {
         throw new Error("Method not implemented");

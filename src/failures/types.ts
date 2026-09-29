@@ -25,7 +25,7 @@ export type LoggingOperation = 'write' | 'read' | 'reset' | 'clear_old_entries' 
  * to any reporter as-is.
  *
  * @example
- * { source: 'IDBLogStorage:my-app', operation: 'write', message: 'Could not record the entry in IndexedDB.', details: { name: 'QuotaExceededError' } }
+ * { source: 'IDBLogStorage:my-app', operation: 'write', message: 'Could not record the entry.', details: { name: 'QuotaExceededError' } }
  *
  * @remarks
  * A record never contains logged data or a caught error's message, since either can quote the value that
@@ -68,7 +68,7 @@ export type LoggingFailure = {
  */
 export type LoggingError = {
     /**
-     * A one-line summary built from the failures, e.g. `[IDBLogStorage:my-app] Could not record the entry in IndexedDB.`
+     * A one-line summary built from the failures, e.g. `[IDBLogStorage:my-app] Could not record the entry.`
      */
     message: string,
 

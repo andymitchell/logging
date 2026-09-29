@@ -506,6 +506,13 @@ nesting that second copy). In return, the symbols the UI imports are a contract:
 `isEventLogEntry`, `isEventLogEntrySpanStart` (root entry, via `index-guards.ts`) and `isTraceResult`,
 `TraceResult` (`/get-traces`), alongside the long-public `TraceViewer`, `TraceFilter`, `TraceSearchResults`,
 `LogEntry`, `SpanMeta`, `TraceEntry`, `MinimumContext`. Renaming or removing one is a breaking change for the UI.
+- Changing the **signature** of a contract symbol breaks the UI just as a rename does, and the loose range
+  lets every published UI accept the new logging without complaint. Such a change ships only together with a
+  UI release that handles it, and the README says which UI version the logging release needs.
+
+**Example:** `TraceViewer.getTraces` resolving `{ ok, traces, error? }` instead of an array. A UI that calls
+`traces.map(...)` on the result fails at runtime, yet npm installs it without a warning. Logging 0.14.0 is
+therefore released together with a UI release that reads `.traces`.
 
 ---
 
