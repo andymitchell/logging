@@ -6,9 +6,9 @@ import type { AcceptLogEntry, ILogStorage, LogCallMaskingOptions, LogEntry, LogS
 import type { WhereFilterDefinition } from "@andymitchell/objects/where-filter";
 import { monotonicFactory } from "ulid";
 import type { IBreakpoints } from "../breakpoints/types.ts";
-import type { LogWriteResult, LoggingError, LoggingFailure, LoggingFailureListener, LoggingOperation, LoggingResult } from "../failures/types.ts";
+import type { LogReadResult, LogWriteResult, LoggingError, LoggingFailed, LoggingFailure, LoggingFailureListener, LoggingOperation, LoggingResult } from "../failures/types.ts";
 import { FailureListeners, isInsideFailureListener } from "../failures/FailureListeners.ts";
-import { failed, isLoggingResult, resultFrom } from "../failures/results.ts";
+import { failed, isLogReadResult, isLoggingResult, resultFrom } from "../failures/results.ts";
 
 
 
@@ -19,6 +19,9 @@ import { failed, isLoggingResult, resultFrom } from "../failures/results.ts";
  * failure listeners) and upholds the {@link ILogStorage} guarantee that no public method throws or rejects.
  * A subclass provides the hooks, which answer with a result rather than throwing:
  * - `commitEntry(entry)` → `ok()`, or `failed(...)` describing what went wrong.
+ * - `queryEntries(filter, fullTextFilter)` → `{ ok: true, entries }`, or a failed result with whatever
+ *   entries were obtained.
+ * - `resetEntries(entries)` and `clearOldEntries()` → `ok()` or `failed(...)`.
  *
  * A hook that throws or rejects anyway is caught and described by {@link BaseLogStorage.toFailure}.
  */
@@ -117,19 +120,71 @@ export class BaseLogStorage implements ILogStorage {
     }
 
     /**
-     * Remove old entries before the max age
+     * Retrieve the entries matching the filters. Called by {@link get}.
+     *
+     * @param _filter Match entries against this where-filter.
+     * @param _fullTextFilter Match entries whose JSON contains this text.
+     * @returns `{ ok: true, entries }`, or a failed result saying why the entries could not be read, with
+     * whatever entries were obtained (usually none).
      */
-    protected async clearOldEntries() {
+    protected queryEntries<T extends LogEntry = LogEntry>(_filter?: WhereFilterDefinition<T>, _fullTextFilter?: string): Promise<LogReadResult<T>> {
+        throw new Error("Method not implemented");
+    }
+
+    /**
+     * Replace every entry with `_entries` (none if omitted). Called by {@link reset}.
+     *
+     * @returns `ok()`, or `failed(...)` saying why the entries could not be reset.
+     */
+    protected resetEntries(_entries?: LogEntry[]): Promise<LoggingResult> {
+        throw new Error("Method not implemented");
+    }
+
+    /**
+     * Remove entries older than their maximum age (`max_age`). Called by {@link forceClearOldEntries}.
+     *
+     * @returns `ok()`, or `failed(...)` saying why old entries could not be removed.
+     */
+    protected clearOldEntries(): Promise<LoggingResult> {
         throw new Error("Method not implemented");
     }
 
 
-    public async forceClearOldEntries() {
-        return this.clearOldEntries();
+    /**
+     * Remove entries older than their maximum age (`max_age`) now, rather than waiting for the store to.
+     *
+     * @returns `{ ok: true }`, or `{ ok: false, error }`. Never rejects; a failure is also told to
+     * {@link onFailure} listeners.
+     */
+    public async forceClearOldEntries(): Promise<LoggingResult> {
+        const deliverFailure = !isInsideFailureListener();
+        return this.#settle(await this.#answer('clear_old_entries', () => this.clearOldEntries(), isLoggingResult, result => result), deliverFailure);
     }
 
-    public async reset() {
-        throw new Error("Method not implemented");
+    /**
+     * Replace every entry in the store with `entries`, or remove them all if omitted.
+     *
+     * @returns `{ ok: true }`, or `{ ok: false, error }`. Never rejects; a failure is also told to
+     * {@link onFailure} listeners.
+     */
+    public async reset(entries?: LogEntry[]): Promise<LoggingResult> {
+        const deliverFailure = !isInsideFailureListener();
+        return this.#settle(await this.#answer('reset', () => this.resetEntries(entries), isLoggingResult, result => result), deliverFailure);
+    }
+
+    /**
+     * Retrieve the entries matching the filters, oldest first.
+     *
+     * @param filter Match entries against this where-filter.
+     * @param fullTextFilter Match entries whose JSON contains this text.
+     * @returns `{ ok: true, entries }`, or `{ ok: false, entries, error }`, where `entries` holds whatever was
+     * obtained (e.g. the healthy children of a `ChannelsLogStorage`). Never rejects; a failure is also told
+     * to {@link onFailure} listeners.
+     */
+    public async get<T extends LogEntry = LogEntry>(filter?: WhereFilterDefinition<T>, fullTextFilter?: string): Promise<LogReadResult<T>> {
+        const deliverFailure = !isInsideFailureListener();
+        const read = await this.#answer('read', () => this.queryEntries(filter, fullTextFilter), isLogReadResult, result => ({ ...result, entries: [] }));
+        return this.#settle(read, deliverFailure);
     }
 
     /**
@@ -198,7 +253,7 @@ export class BaseLogStorage implements ILogStorage {
             return this.#settle(failed(this.toFailure('write', cause)), deliverFailure);
         }
 
-        const committed = await this.#answer('write', () => this.commitEntry(logEntry, options));
+        const committed = await this.#answer('write', () => this.commitEntry(logEntry, options), isLoggingResult, result => result);
         const afterwards = [...await this.#testBreakpoints(logEntry), ...this.#echoToConsole(logEntry)];
         const outcome = afterwards.length===0? committed : resultFrom([...(committed.error?.failures ?? []), ...afterwards]);
 
@@ -206,14 +261,15 @@ export class BaseLogStorage implements ILogStorage {
     }
 
     /**
-     * Run a hook, turning a throw, a rejection or an answer that is not a result into a failure.
+     * Run a hook, turning a throw, a rejection or a malformed answer into a failure described by
+     * {@link toFailure}, which `crashed` completes with the payload the caller always gets (e.g. no entries).
      */
-    async #answer(operation: LoggingOperation, hook: () => Promise<LoggingResult>): Promise<LoggingResult> {
+    async #answer<A extends LoggingResult>(operation: LoggingOperation, hook: () => Promise<A>, isWellFormed: (answer: unknown) => boolean, crashed: (failure: LoggingFailed) => A): Promise<A> {
         try {
-            const answer: unknown = await hook();
-            return isLoggingResult(answer)? answer : failed(this.toFailure(operation, answer));
+            const answer = await hook();
+            return isWellFormed(answer)? answer : crashed(failed(this.toFailure(operation, answer)));
         } catch(cause) {
-            return failed(this.toFailure(operation, cause));
+            return crashed(failed(this.toFailure(operation, cause)));
         }
     }
 
@@ -263,11 +319,6 @@ export class BaseLogStorage implements ILogStorage {
             }
             return 'Error object is not an instance of Error';
         }
-    }
-
-
-    public async get<T extends LogEntry = LogEntry>(filter?:WhereFilterDefinition<T>, fullTextFilter?: string): Promise<T[]> {
-        throw new Error("Method not implemented");
     }
 
 

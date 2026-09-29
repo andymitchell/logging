@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import type { AcceptLogEntry, LogCallMaskingOptions } from '../types.ts';
 import type { LogWriteResult } from '../../failures/types.ts';
-import { entryOf } from '../testing-helpers/results.ts';
+import { entriesOf, entryOf } from '../testing-helpers/results.ts';
 
 
 /**
@@ -44,7 +44,7 @@ it('basic', async () => {
 
 
 
-    const items = await memoryLogger.get();
+    const items = entriesOf(await memoryLogger.get());
     console.log(items);
 
     expect(entryOf(added).ulid).toBe(items[0]?.ulid);
@@ -75,8 +75,8 @@ describe('ChannelsLogStorage: commitEntry (via add)', () => {
         const entry: AcceptLogEntry = { type: 'info', message: 'broadcast message' };
         await channelsLogger.add(entry);
 
-        const logs1 = await memoryLogger1.get();
-        const logs2 = await memoryLogger2.get();
+        const logs1 = entriesOf(await memoryLogger1.get());
+        const logs2 = entriesOf(await memoryLogger2.get());
 
         expect(logs1).toHaveLength(1);
         expect(logs2).toHaveLength(1);
@@ -97,9 +97,9 @@ describe('ChannelsLogStorage: commitEntry (via add)', () => {
         await channelsLogger.add({ type: 'info', message: 'Just some info' });
         await channelsLogger.add({ type: 'error', message: 'An error occurred' });
 
-        const errorChannelLogs = await memoryLogger1.get();
-        const infoChannelLogs = await memoryLogger2.get();
-        const allChannelLogs = await memoryLogger3.get();
+        const errorChannelLogs = entriesOf(await memoryLogger1.get());
+        const infoChannelLogs = entriesOf(await memoryLogger2.get());
+        const allChannelLogs = entriesOf(await memoryLogger3.get());
 
         expect(errorChannelLogs).toHaveLength(1);
         expect(errorChannelLogs[0]!.type).toBe('error');
@@ -127,8 +127,8 @@ describe('ChannelsLogStorage: commitEntry (via add)', () => {
 
         await channelsLogger.add({ type: 'warn', message: 'A warning' });
 
-        const transformedLogs = await memoryLogger1.get();
-        const originalLogs = await memoryLogger2.get();
+        const transformedLogs = entriesOf(await memoryLogger1.get());
+        const originalLogs = entriesOf(await memoryLogger2.get());
 
         expect(transformedLogs).toHaveLength(1);
         expect(transformedLogs[0]!.message).toBe('[TRANSFORMED] A warning');
@@ -156,8 +156,8 @@ describe('ChannelsLogStorage: commitEntry (via add)', () => {
         await channelsLogger.add({ type: 'info', message: 'regular log' });
         await channelsLogger.add({ type: 'critical', message: 'System failure' });
 
-        const webhookLogs = await memoryLogger1.get();
-        const generalLogs = await memoryLogger2.get();
+        const webhookLogs = entriesOf(await memoryLogger1.get());
+        const generalLogs = entriesOf(await memoryLogger2.get());
 
         expect(webhookLogs).toHaveLength(1);
         expect(webhookLogs[0]!.message).toBe('[WEBHOOK] System failure');
@@ -189,8 +189,8 @@ describe('ChannelsLogStorage: commitEntry (via add)', () => {
 
         await channelsLogger.add({ type: 'info', message: 'test', context: {} });
 
-        const logs1 = await memoryLogger1.get();
-        const logs2 = await memoryLogger2.get();
+        const logs1 = entriesOf(await memoryLogger1.get());
+        const logs2 = entriesOf(await memoryLogger2.get());
 
         expect(logs1[0]!.context?.channel).toBe('A');
         expect(logs2[0]!.context?.channel).toBe('B');
@@ -209,8 +209,8 @@ describe('ChannelsLogStorage: commitEntry (via add)', () => {
 
         await channelsLogger.add({ type: 'info', message: 'This should go nowhere' });
 
-        const logs1 = await memoryLogger1.get();
-        const logs2 = await memoryLogger2.get();
+        const logs1 = entriesOf(await memoryLogger1.get());
+        const logs2 = entriesOf(await memoryLogger2.get());
 
         expect(logs1).toHaveLength(0);
         expect(logs2).toHaveLength(0);
@@ -228,7 +228,7 @@ describe('ChannelsLogStorage: commitEntry (via add)', () => {
         await channelsLogger.add({ type: 'warn', message: 'accepted' });
         await channelsLogger.add({ type: 'error', message: 'accepted too' });
 
-        const logs = await memoryLogger1.get();
+        const logs = entriesOf(await memoryLogger1.get());
 
         expect(logs).toHaveLength(2);
         expect(logs.find(l => l.type === 'info')).toBeUndefined();
@@ -268,8 +268,8 @@ describe('ChannelsLogStorage: per-call unmasking propagation', () => {
 
         await channels.add(entryWithId, directive);
 
-        const a = (await flagged.get())[0]!;
-        const b = (await unflagged.get())[0]!;
+        const a = entriesOf(await flagged.get())[0]!;
+        const b = entriesOf(await unflagged.get())[0]!;
         // The blessed child keeps the id readable…
         expect(a.context!.user.id).toBe(UUID);
         // …the un-blessed sibling masks it, even though the very same directive reached it…
@@ -286,8 +286,8 @@ describe('ChannelsLogStorage: per-call unmasking propagation', () => {
 
         await channels.add(entryWithId, directive);
 
-        expect((await flagged.get())[0]!.context!.user.id).toBe(UUID);
-        expect((await unflagged.get())[0]!.context!.user.id).toBe(MASKED_UUID);
+        expect(entriesOf(await flagged.get())[0]!.context!.user.id).toBe(UUID);
+        expect(entriesOf(await unflagged.get())[0]!.context!.user.id).toBe(MASKED_UUID);
     });
 
     it('hands the directive to an un-blessed remote-like sink yet it is never honored there', async () => {
@@ -303,7 +303,7 @@ describe('ChannelsLogStorage: per-call unmasking propagation', () => {
         expect(addSpy).toHaveBeenCalledTimes(1);
         expect(addSpy.mock.calls[0]![1]).toBeDefined();
         // …yet, un-blessed, the sink masked the id anyway.
-        expect((await remote.get())[0]!.context!.user.id).toBe(MASKED_UUID);
+        expect(entriesOf(await remote.get())[0]!.context!.user.id).toBe(MASKED_UUID);
     });
 
     it('forwards the directive to children without mutating or freezing the caller’s own object', async () => {
@@ -314,7 +314,7 @@ describe('ChannelsLogStorage: per-call unmasking propagation', () => {
         await channels.add(entryWithId, callerDirective);
 
         // The blessed sink honored the forwarded directive…
-        expect((await sink.get())[0]!.context!.user.id).toBe(UUID);
+        expect(entriesOf(await sink.get())[0]!.context!.user.id).toBe(UUID);
         // …and the caller's own object was never frozen or mutated (immutability of caller-owned input).
         expect(Object.isFrozen(callerDirective)).toBe(false);
         expect(callerDirective.preserve_unmasked_context_paths!.length).toBe(1);
@@ -331,7 +331,7 @@ describe('ChannelsLogStorage: per-call unmasking propagation', () => {
         const callerDirective: LogCallMaskingOptions = { preserve_unmasked_context_paths: [{ path: 'user.id', shape: 'uuid' }] };
         await channels.add({ type: 'info', message: 'm', context: { user: { id: UUID }, auth: { token: UUID } } }, callerDirective);
 
-        const stored = (await sibling.get())[0]!;
+        const stored = entriesOf(await sibling.get())[0]!;
         expect(stored.context!.auth.token).toBe(MASKED_UUID); // injected path NOT honored by the sibling
         expect(stored.context!.user.id).toBe(UUID);           // the legitimately-listed path still is
         expect(callerDirective.preserve_unmasked_context_paths!.length).toBe(1); // caller's array never grew
@@ -351,7 +351,7 @@ describe('ChannelsLogStorage: per-call unmasking propagation', () => {
         expect(transformSawKeys).not.toContain('preserve_unmasked_context_paths');
         expect(transformSawKeys).not.toContain('allow_per_call_unmasking');
         // The directive WAS in effect (so this isn't trivially green)…
-        const stored = (await sink.get())[0]!;
+        const stored = entriesOf(await sink.get())[0]!;
         expect(stored.context!.user.id).toBe(UUID);
         // …yet it never rode onto the persisted entry through the Channels path.
         const serialised = JSON.stringify(stored);
@@ -367,7 +367,7 @@ describe('ChannelsLogStorage: per-call unmasking propagation', () => {
         await outer.add(entryWithId, directive);
 
         // The directive survived two passthrough hops and the deep, blessed leaf honored it.
-        expect((await deepLeaf.get())[0]!.context!.user.id).toBe(UUID);
+        expect(entriesOf(await deepLeaf.get())[0]!.context!.user.id).toBe(UUID);
     });
 
 });

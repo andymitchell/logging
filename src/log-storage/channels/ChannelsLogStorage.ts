@@ -3,8 +3,8 @@ import { matchJavascriptObject } from "@andymitchell/objects/where-filter";
 import type { LogStorageOptions } from "../types.ts";
 import { BaseLogStorage } from "../BaseLogStorage.ts";
 import type { ILogStorage, LogCallMaskingOptions, LogEntry } from "../types.ts";
-import type { LoggingFailure, LoggingResult } from "../../failures/types.ts";
-import { isLogWriteResult, resultFrom } from "../../failures/results.ts";
+import type { LogReadResult, LogWriteResult, LoggingFailure, LoggingOperation, LoggingResult } from "../../failures/types.ts";
+import { isLogReadResult, isLogWriteResult, isLoggingResult, resultFrom } from "../../failures/results.ts";
 
 /**
  * Defines the configuration for a single channel within the ChannelsLogStorage.
@@ -42,6 +42,15 @@ type LogStorageOptionsWithoutSensitive = Omit<LogStorageOptions, 'permit_dangero
  * - Sending only errors to a Webhook logger.
  * - Sending all logs to an in-memory logger for quick access.
  * - Redacting sensitive information before sending logs to a persistent IndexedDB store.
+ *
+ * Every call reaches every channel, even when one fails, and succeeds only if they all do. A failed result
+ * lists each failing channel's failures, in channel order, alongside whatever the healthy channels produced:
+ * a read returns their merged entries.
+ *
+ * @example
+ * const r = await storage.get();
+ * setRows(r.entries); // the healthy channels' entries
+ * setBroken(r.error?.failures.map(f => f.source) ?? []); // e.g. ['IDBLogStorage:my-app']
  */
 export class ChannelsLogStorage extends BaseLogStorage implements ILogStorage {
 
@@ -90,69 +99,83 @@ export class ChannelsLogStorage extends BaseLogStorage implements ILogStorage {
         // extra `preserve_unmasked_context_paths` entry that a concurrent sibling would then honor.
         const frozenOptions = options ? deepFreeze(structuredClone(options)) : undefined;
 
-        const perChannel = this.channels.map((channel, index) => this.#sendToChannel(channel, index, logEntry, frozenOptions));
-        return resultFrom((await Promise.all(perChannel)).flat());
+        const perChannel = this.channels.map((channel, index) => this.#askChannel(index, WRITE, () => this.#handOver(channel, logEntry, frozenOptions), isLogWriteResult));
+        return resultFrom((await Promise.all(perChannel)).flatMap(asked => asked.failures));
     }
 
     /**
-     * Send the entry to one channel, if it accepts it.
+     * Give one channel its own copy of the entry, if it accepts it.
      *
-     * @returns The channel's failures: none if it recorded the entry (or does not accept it). Never rejects.
+     * @returns The channel's answer, or {@link NOT_ACCEPTED} if its filter rejects the entry.
      */
-    async #sendToChannel(channel: Channel, index: number, logEntry: LogEntry, frozenOptions?: LogCallMaskingOptions): Promise<LoggingFailure[]> {
-        let answer: Promise<unknown>;
-        try {
-            // 1. Check if the channel should accept this entry
-            if (channel.accept && !matchJavascriptObject<LogEntry>(logEntry, channel.accept)) return [];
+    #handOver(channel: Channel, logEntry: LogEntry, frozenOptions?: LogCallMaskingOptions): Promise<LogWriteResult> | typeof NOT_ACCEPTED {
+        // 1. Check if the channel should accept this entry
+        if (channel.accept && !matchJavascriptObject<LogEntry>(logEntry, channel.accept)) return NOT_ACCEPTED;
 
-            // 2. Clone the entry to prevent transforms in one channel affecting another.
-            // The `structuredClone` is important for isolation.
-            const entryForChannel = structuredClone(logEntry);
+        // 2. Clone the entry to prevent transforms in one channel affecting another.
+        // The `structuredClone` is important for isolation.
+        const entryForChannel = structuredClone(logEntry);
 
-            // 3. Transform the entry if a transformer is provided. Per-call options are deliberately NOT
-            // passed to `transform`: they are a masking directive, not entry data, and must never be
-            // attached to the entry (which would persist them).
-            const entryToSend:LogEntry = channel.transform ? channel.transform(entryForChannel) : entryForChannel;
+        // 3. Transform the entry if a transformer is provided. Per-call options are deliberately NOT
+        // passed to `transform`: they are a masking directive, not entry data, and must never be
+        // attached to the entry (which would persist them).
+        const entryToSend:LogEntry = channel.transform ? channel.transform(entryForChannel) : entryForChannel;
 
-            // 4. Send to the channel's storage, forwarding the frozen per-call options so a flagged child
-            // (allow_per_call_unmasking) can honor them. We call .add() to adhere to the ILogStorage
-            // interface. The underlying BaseLogStorage.add() will use the existing ulid.
-            answer = channel.storage.add(entryToSend, frozenOptions);
-        } catch(cause) {
-            return [this.#channelFailure(index, cause, 'threw while filtering, cloning, transforming or handing over the entry.')];
-        }
-
-        try {
-            const result = await answer;
-            if (!isLogWriteResult(result)) return [this.#channelFailure(index, result, 'answered with something that is not a write result.')];
-            return result.error?.failures ?? [];
-        } catch(cause) {
-            return [this.#channelFailure(index, cause, 'rejected instead of answering with a result.')];
-        }
-    }
-
-    #channelFailure(index: number, cause: unknown, what: string): LoggingFailure {
-        return { ...this.toFailure('write', cause), message: `channels[${index}] ${what}` };
+        // 4. Send to the channel's storage, forwarding the frozen per-call options so a flagged child
+        // (allow_per_call_unmasking) can honor them. We call .add() to adhere to the ILogStorage
+        // interface. The underlying BaseLogStorage.add() will use the existing ulid.
+        return channel.storage.add(entryToSend, frozenOptions);
     }
 
     /**
-     * Retrieves log entries from all configured channels, merges them,
-     * de-duplicates them, and returns a sorted list.
+     * Ask one channel something, and collect its failures.
+     *
+     * `ask` runs synchronously, so every channel is asked before any answer is awaited. A throw while asking,
+     * a rejection, or an answer `isWellFormed` rejects becomes this facade's own failure naming the channel.
+     *
+     * @returns The channel's answer (absent if it failed to give one, or did not accept the entry) and its
+     * failures: the answer's own, passed on unchanged, or the facade's description. Never rejects.
+     */
+    async #askChannel<A extends LoggingResult>(index: number, question: ChannelQuestion, ask: () => Promise<A> | typeof NOT_ACCEPTED, isWellFormed: (answer: unknown) => boolean): Promise<{ answer?: A, failures: LoggingFailure[] }> {
+        let answering: Promise<A> | typeof NOT_ACCEPTED;
+        try {
+            answering = ask();
+        } catch(cause) {
+            return { failures: [this.#channelFailure(question.operation, index, cause, question.threw)] };
+        }
+        if (answering === NOT_ACCEPTED) return { failures: [] };
+
+        try {
+            const answer = await answering;
+            if (!isWellFormed(answer)) return { failures: [this.#channelFailure(question.operation, index, answer, `answered with something that is not ${question.answer}.`)] };
+            return { answer, failures: answer.error?.failures ?? [] };
+        } catch(cause) {
+            return { failures: [this.#channelFailure(question.operation, index, cause, 'rejected instead of answering with a result.')] };
+        }
+    }
+
+    #channelFailure(operation: LoggingOperation, index: number, cause: unknown, what: string): LoggingFailure {
+        return { ...this.toFailure(operation, cause), message: `channels[${index}] ${what}` };
+    }
+
+    /**
+     * Ask every channel for its entries, and merge them.
+     *
+     * Every channel is asked, even when another fails. The result is `ok` only if every channel answered in
+     * full; otherwise it lists every failure, in channel order, alongside the entries the healthy channels
+     * returned.
+     *
      * @param filter A filter to apply to the query in each channel.
      * @param fullTextFilter A full-text search string to apply.
-     * @returns A unified, sorted array of log entries.
+     * @returns The channels' entries, de-duplicated by ULID and sorted oldest first.
      */
-    public override async get<T extends LogEntry = LogEntry>(filter?: WhereFilterDefinition<T>, fullTextFilter?: string): Promise<T[]> {
-        const getPromises = this.channels.map(channel => 
-            channel.storage.get(filter, fullTextFilter)
-        );
-
-        const resultsFromAllChannels = await Promise.all(getPromises);
-        const allEntries = resultsFromAllChannels.flat();
+    protected override async queryEntries<T extends LogEntry = LogEntry>(filter?: WhereFilterDefinition<T>, fullTextFilter?: string): Promise<LogReadResult<T>> {
+        const perChannel = this.channels.map((channel, index) => this.#askChannel(index, READ, () => channel.storage.get(filter, fullTextFilter), isLogReadResult));
+        const asked = await Promise.all(perChannel);
 
         // De-duplicate using the ULID, which is unique per entry
         const uniqueEntriesMap = new Map<string, T>();
-        for (const entry of allEntries) {
+        for (const entry of asked.flatMap(({ answer }) => answer?.entries ?? [])) {
             uniqueEntriesMap.set(entry.ulid, entry);
         }
 
@@ -161,37 +184,55 @@ export class ChannelsLogStorage extends BaseLogStorage implements ILogStorage {
         // Sort by ULID to ensure chronological order across all sources
         uniqueEntries.sort((a, b) => a.ulid.localeCompare(b.ulid));
 
-        return uniqueEntries;
+        return { ...resultFrom(asked.flatMap(({ failures }) => failures)), entries: uniqueEntries };
     }
 
 
     /**
-     * Clears old entries from all configured channels.
+     * Clear old entries from every channel, each by its own `max_age`.
+     *
+     * @returns `ok()` only if every channel cleared; otherwise every failure, in channel order.
      */
-    public override async forceClearOldEntries(): Promise<void> {
-        const clearPromises = this.channels.map(channel => channel.storage.forceClearOldEntries());
-        await Promise.all(clearPromises);
+    protected override async clearOldEntries(): Promise<LoggingResult> {
+        const perChannel = this.channels.map((channel, index) => this.#askChannel(index, CLEAR_OLD_ENTRIES, () => channel.storage.forceClearOldEntries(), isLoggingResult));
+        return resultFrom((await Promise.all(perChannel)).flatMap(({ failures }) => failures));
     }
-    
-    /**
-     * Resets all configured channels.
-     * @param entries - **WARNING:** Providing entries is not supported and will throw an error,
-     * as it's ambiguous which channel should receive the data. To populate a specific
-     * channel, call `.reset(entries)` directly on its storage instance.
-     */
-    public override async reset(entries?: LogEntry[]): Promise<void> {
 
-        const resetPromises: Promise<void>[] = [];
-        for (const channel of this.channels) {
-            
+    /**
+     * Reset every channel. Each channel is given only the `entries` its `accept` filter matches.
+     *
+     * @returns `ok()` only if every channel reset; otherwise every failure, in channel order.
+     */
+    protected override async resetEntries(entries?: LogEntry[]): Promise<LoggingResult> {
+        const perChannel = this.channels.map((channel, index) => this.#askChannel(index, RESET, () => {
             const channelEntries = entries? entries.filter(x => !channel.accept || matchJavascriptObject<LogEntry>(x, channel.accept)) : undefined;
-            
-            resetPromises.push(channel.storage.reset(channelEntries));
-        }
-
-        await Promise.all(resetPromises);
+            return channel.storage.reset(channelEntries);
+        }, isLoggingResult));
+        return resultFrom((await Promise.all(perChannel)).flatMap(({ failures }) => failures));
     }
 }
+
+
+/**
+ * What {@link ChannelsLogStorage} asks a channel, as named in the failure when the channel does not answer.
+ */
+type ChannelQuestion = {
+    operation: LoggingOperation,
+    /** Completes "channels[i] …" when asking threw. */
+    threw: string,
+    /** Completes "channels[i] answered with something that is not …". */
+    answer: string,
+};
+
+const WRITE: ChannelQuestion = { operation: 'write', threw: 'threw while filtering, cloning, transforming or handing over the entry.', answer: 'a write result' };
+const READ: ChannelQuestion = { operation: 'read', threw: 'threw instead of answering the read with a result.', answer: 'a read result' };
+const RESET: ChannelQuestion = { operation: 'reset', threw: 'threw while filtering or handing over the entries.', answer: 'a result' };
+const CLEAR_OLD_ENTRIES: ChannelQuestion = { operation: 'clear_old_entries', threw: 'threw instead of answering with a result.', answer: 'a result' };
+
+/**
+ * A channel whose `accept` filter rejects the entry is not asked to record it.
+ */
+const NOT_ACCEPTED = Symbol('not accepted');
 
 /**
  * Recursively freeze a value so a forwarded options object — shared by reference across all children — cannot

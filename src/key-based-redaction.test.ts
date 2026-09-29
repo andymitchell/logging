@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { entriesOf } from './log-storage/testing-helpers/results.ts';
 import { MemoryLogStorage } from "./log-storage/memory/MemoryLogStorage.ts";
 import { BUILT_IN_SENSITIVE_KEYS } from "./index-universal-logstorage.ts";
 import type { LogStorageOptions } from "./log-storage/types.ts";
@@ -21,7 +22,7 @@ const MARKER = 'redact:sensitive-key';
 async function loggedContext(context: unknown, options?: LogStorageOptions): Promise<any> {
     const storage = new MemoryLogStorage('', options);
     await storage.add({ type: 'info', message: 'm', context });
-    return (await storage.get())[0]!.context;
+    return entriesOf(await storage.get())[0]!.context;
 }
 
 describe('key-name redaction is ON by default for logged context', () => {

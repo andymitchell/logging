@@ -1,4 +1,5 @@
 import { sleep } from "@andymitchell/utils";
+import { entriesOf } from "./results.ts";
 import type { LogCallMaskingOptions, LogStorageOptions } from "../types.ts";
 import type { ILogStorage, LogEntry } from "../types.ts";
 import { it } from 'vitest';
@@ -37,7 +38,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
             });
 
 
-            const all = await logger.get();
+            const all = entriesOf(await logger.get());
 
 
             // Check values
@@ -64,7 +65,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                     context
                 });
 
-                const all = await logger.get();
+                const all = entriesOf(await logger.get());
 
                 // Check values
                 const entry = all[0]!;
@@ -84,7 +85,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                     context
                 });
 
-                const all = await logger.get();
+                const all = entriesOf(await logger.get());
 
                 // Check values
                 const entry = all[0]!;
@@ -105,7 +106,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                     context
                 });
 
-                const all = await logger.get();
+                const all = entriesOf(await logger.get());
 
                 // Check values
                 const entry = all[0]!;
@@ -127,7 +128,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                     context
                 });
 
-                const all = await logger.get();
+                const all = entriesOf(await logger.get());
 
                 // Check values
                 const entry = all[0]!;
@@ -163,7 +164,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
 
                 await logger.forceClearOldEntries();
 
-                const all = await logger.get();
+                const all = entriesOf(await logger.get());
                 expect(all.length).toBe(1);
                 const entry = all[0]!;
 
@@ -197,7 +198,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
 
                 const logger2 = loggerTest.recreateWithSameData();
 
-                const all = await logger2.get();
+                const all = entriesOf(await logger2.get());
                 expect(all.length).toBe(1);
                 const entry = all[0]!;
 
@@ -225,7 +226,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                     });
 
 
-                    const filtered = await logger.get({ message: DETAIL_ITEM_MESSAGE });
+                    const filtered = entriesOf(await logger.get({ message: DETAIL_ITEM_MESSAGE }));
                     expect(filtered.length).toBe(1);
                 });
 
@@ -243,7 +244,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                     });
 
 
-                    const filtered = await logger.get({ message: 'nomatchplease' });
+                    const filtered = entriesOf(await logger.get({ message: 'nomatchplease' }));
                     expect(filtered.length).toBe(0);
                 });
 
@@ -265,7 +266,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
 
                     await logger.add(errorObj);
 
-                    const filtered = await logger.get({ type: 'error', 'context.type': 'time-out'});
+                    const filtered = entriesOf(await logger.get({ type: 'error', 'context.type': 'time-out'}));
                     expect(filtered[0]?.context.description).toContain('Timed out');
 
                 })
@@ -286,7 +287,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                     });
 
 
-                    const filtered = await logger.get(undefined, DETAIL_ITEM_MESSAGE);
+                    const filtered = entriesOf(await logger.get(undefined, DETAIL_ITEM_MESSAGE));
                     expect(filtered.length).toBe(1);
                 });
 
@@ -304,7 +305,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                     });
 
 
-                    const filtered = await logger.get(undefined, 'nomatchplease');
+                    const filtered = entriesOf(await logger.get(undefined, 'nomatchplease'));
                     expect(filtered.length).toBe(0);
                 });
             })
@@ -345,7 +346,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                 });
 
 
-                const all = await logger.get();
+                const all = entriesOf(await logger.get());
 
 
                 // Check values
@@ -374,7 +375,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                 });
 
 
-                const all = await logger.get();
+                const all = entriesOf(await logger.get());
 
 
                 // Check values
@@ -405,7 +406,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                         context: { user: { id: UUID } }
                     });
 
-                    const all = await logger.get();
+                    const all = entriesOf(await logger.get());
                     const entry = all[0]!;
 
                     // Fail-closed: with no exemption a UUID is treated like any other suspicious string and
@@ -426,7 +427,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                         context: { user: { id: UUID }, audit: { id: UUID } }
                     });
 
-                    const all = await logger.get();
+                    const all = entriesOf(await logger.get());
                     const entry = all[0]!;
 
                     // Path-gated, and paths are context-root-relative (`user.id`, not `context.user.id`):
@@ -449,7 +450,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                         context: { user: { id: '123456789123456789' } }
                     });
 
-                    const all = await logger.get();
+                    const all = entriesOf(await logger.get());
                     const entry = all[0]!;
 
                     // Shape-gated: a non-UUID value at the allow-listed path is masked exactly as any other
@@ -469,7 +470,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                         context: { trace: { id: ULID } }
                     });
 
-                    const all = await logger.get();
+                    const all = entriesOf(await logger.get());
                     const entry = all[0]!;
 
                     // ULIDs are our own time-ordered ids; preserving them keeps traces correlatable in logs.
@@ -495,13 +496,13 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
 
                     const optedIn = createLogger({ allow_per_call_unmasking: true }).logger;
                     await optedIn.add({ type: 'info', message: 'per-call id', context: { user: { id: UUID } } }, directive);
-                    const inEntry = (await optedIn.get())[0]!;
+                    const inEntry = entriesOf(await optedIn.get())[0]!;
                     // The storage blessed dynamic call-site directives, so this one log keeps the id readable.
                     expect(inEntry.context!.user.id).toBe(UUID);
 
                     const notOptedIn = createLogger().logger; // default: gate closed
                     await notOptedIn.add({ type: 'info', message: 'per-call id', context: { user: { id: UUID } } }, directive);
-                    const outEntry = (await notOptedIn.get())[0]!;
+                    const outEntry = entriesOf(await notOptedIn.get())[0]!;
                     // Identical directive at an un-blessed storage: ignored, so the id is masked like any secret.
                     expect(outEntry.context!.user.id).toBe(MASKED_UUID);
                 })
@@ -516,8 +517,8 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                     const without = createLogger().logger;
                     await without.add({ type: 'info', message: 'inert', context });
 
-                    const a = (await withDirective.get())[0]!.context;
-                    const b = (await without.get())[0]!.context;
+                    const a = entriesOf(await withDirective.get())[0]!.context;
+                    const b = entriesOf(await without.get())[0]!.context;
                     // A closed gate makes the directive inert: the stored context is exactly what you'd get without it.
                     expect(a).toEqual(b);
                     expect(a!.user.id).toBe(MASKED_UUID); // anchored: genuinely masked, not coincidentally equal-and-unmasked
@@ -530,7 +531,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
 
                     const opted = createLogger({ allow_per_call_unmasking: true }).logger;
                     await opted.add({ type: 'info', message: 'surgical', context }, directive);
-                    const withOpts = (await opted.get())[0]!.context;
+                    const withOpts = entriesOf(await opted.get())[0]!.context;
 
                     // Only the named path is readable…
                     expect(withOpts!.user.id).toBe(UUID);
@@ -542,7 +543,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                     // Metamorphic: versus no directive, the exemption changes EXACTLY one field (user.id) and nothing else.
                     const baseline = createLogger({ allow_per_call_unmasking: true }).logger;
                     await baseline.add({ type: 'info', message: 'surgical', context });
-                    const withoutOpts = (await baseline.get())[0]!.context;
+                    const withoutOpts = entriesOf(await baseline.get())[0]!.context;
                     expect(withoutOpts!.user.id).toBe(MASKED_UUID);
                     expect({ ...withOpts, user: { id: MASKED_UUID } }).toEqual(withoutOpts);
                 })
@@ -555,14 +556,14 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                     // Gate CLOSED: the storage-level trace.id is honored; the per-call user.id is ignored.
                     const closed = createLogger({ preserve_unmasked_context_paths: [{ path: 'trace.id', shape: 'ulid' }] }).logger;
                     await closed.add({ type: 'info', message: 'independent', context }, callDirective);
-                    const closedCtx = (await closed.get())[0]!.context;
+                    const closedCtx = entriesOf(await closed.get())[0]!.context;
                     expect(closedCtx!.trace.id).toBe(ULID);        // storage-level allow-list: always on
                     expect(closedCtx!.user.id).toBe(MASKED_UUID);   // per-call: gated off
 
                     // Gate OPEN: both allow-lists apply (union), each value readable at its own path.
                     const open = createLogger({ preserve_unmasked_context_paths: [{ path: 'trace.id', shape: 'ulid' }], allow_per_call_unmasking: true }).logger;
                     await open.add({ type: 'info', message: 'independent', context }, callDirective);
-                    const openCtx = (await open.get())[0]!.context;
+                    const openCtx = entriesOf(await open.get())[0]!.context;
                     expect(openCtx!.trace.id).toBe(ULID);
                     expect(openCtx!.user.id).toBe(UUID);
                 })
@@ -573,7 +574,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                     const logger = createLogger({ allow_per_call_unmasking: true }).logger;
                     await logger.add({ type: 'info', message: 'not persisted', context: { user: { id: UUID } } }, directive);
 
-                    const entry = (await logger.get())[0]!;
+                    const entry = entriesOf(await logger.get())[0]!;
                     // Half 1 — the directive was genuinely in effect (so this isn't trivially green): the id is readable.
                     expect(entry.context!.user.id).toBe(UUID);
                     // Half 2 — yet the control metadata survives nowhere in the stored entry (out-of-band, never serialised).
@@ -589,7 +590,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                     const logger = createLogger({ allow_per_call_unmasking: true }).logger;
                     await logger.add({ type: 'info', message: 'multi', context: { user: { id: UUID }, trace: { id: ULID }, auth: { token: SECRET } } }, directive);
 
-                    const entry = (await logger.get())[0]!;
+                    const entry = entriesOf(await logger.get())[0]!;
                     expect(entry.context!.user.id).toBe(UUID);          // first listed path honored
                     expect(entry.context!.trace.id).toBe(ULID);         // second listed path honored too
                     expect(entry.context!.auth.token).toBe(MASKED_SECRET); // unlisted secret still masked
@@ -602,7 +603,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                     // The path is allow-listed for UUIDs, but the value is a token-shaped secret.
                     await logger.add({ type: 'info', message: 'drift', context: { user: { id: SECRET } } }, directive);
 
-                    const entry = (await logger.get())[0]!;
+                    const entry = entriesOf(await logger.get())[0]!;
                     // Fail-closed on the per-call surface too: a non-UUID at the listed path is masked like any secret.
                     expect(entry.context!.user.id).toBe(MASKED_SECRET);
                 })
@@ -615,8 +616,8 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                     const without = createLogger({ allow_per_call_unmasking: true }).logger;
                     await without.add({ type: 'info', message: 'empty', context: { user: { id: UUID } } });
 
-                    const a = (await withEmpty.get())[0]!.context;
-                    const b = (await without.get())[0]!.context;
+                    const a = entriesOf(await withEmpty.get())[0]!.context;
+                    const b = entriesOf(await without.get())[0]!.context;
                     expect(a).toEqual(b);
                     expect(a!.user.id).toBe(MASKED_UUID); // anchored: genuinely masked, gate-open empty directive added nothing
                 })
@@ -639,7 +640,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                     }
                 });
 
-                const all = await logger.get();
+                const all = entriesOf(await logger.get());
 
                 const entry = all[0]!;
 
@@ -669,7 +670,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                 });
 
                 // Storing a circular submission neither throws nor loses the entry.
-                const all = await logger.get();
+                const all = entriesOf(await logger.get());
                 const entry = all[0]!;
 
                 // A plain value survives, a non-serialisable value is redacted to a string, and the back-edge
@@ -683,7 +684,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                 expect(JSON.parse(JSON.stringify(entry))).toEqual(entry);
 
                 // Full-text search serialises every entry to match; a surviving cycle would throw here.
-                const found = await logger.get(undefined, message);
+                const found = entriesOf(await logger.get(undefined, message));
                 expect(found.length).toBe(1);
                 expect(found[0]!.message).toBe(message);
 
@@ -712,7 +713,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                     }
                 });
 
-                const all = await logger.get();
+                const all = entriesOf(await logger.get());
 
                 const entry = all[0]!;
 
@@ -737,7 +738,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                 const instance = createLogger();
                 const entries = sampleEntries(3);
                 await instance.logger.reset(entries);
-                const result = await instance.logger.get();
+                const result = entriesOf(await instance.logger.get());
 
                 expect(result.length).toBe(3);
                 expect(result.map(e => e.message)).toEqual([
@@ -752,7 +753,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                 await instance.logger.reset(sampleEntries(2));
                 await instance.logger.reset(sampleEntries(1)); // only 1 new entry
 
-                const result = await instance.logger.get();
+                const result = entriesOf(await instance.logger.get());
                 expect(result.length).toBe(1);
                 expect(result[0]!.message).toBe('Test log 1');
             });
@@ -763,7 +764,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                 await instance.logger.reset(sampleEntries(2));
 
                 const newLogger = instance.recreateWithSameData();
-                const result = await newLogger.get();
+                const result = entriesOf(await newLogger.get());
 
                 expect(result.length).toBe(2);
                 expect(result.map(e => e.message)).toContain('Test log 1');

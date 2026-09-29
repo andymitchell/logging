@@ -1,5 +1,5 @@
 import { isLogEntrySimple } from "../log-storage/types.ts";
-import type { LogWriteResult, LoggingError, LoggingFailed, LoggingFailure, LoggingOk, LoggingOperation, LoggingResult } from "./types.ts";
+import type { LogReadResult, LogWriteResult, LoggingError, LoggingFailed, LoggingFailure, LoggingOk, LoggingOperation, LoggingResult } from "./types.ts";
 
 
 /**
@@ -74,6 +74,15 @@ export function isLogWriteResult(x: unknown): x is LogWriteResult {
     if (!isLoggingResult(x)) return false;
     const entry = 'entry' in x ? x.entry : undefined;
     return x.ok ? isLogEntrySimple(entry) : entry === undefined || isLogEntrySimple(entry);
+}
+
+
+/**
+ * Whether `x` is a well-formed {@link LogReadResult}: a {@link LoggingResult} whose `entries` is an array of log
+ * entries, on success and on failure alike.
+ */
+export function isLogReadResult(x: unknown): x is LogReadResult {
+    return isLoggingResult(x) && 'entries' in x && Array.isArray(x.entries) && x.entries.every(isLogEntrySimple);
 }
 
 

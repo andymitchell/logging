@@ -1,8 +1,14 @@
-import type { AcceptLogEntry, ILogStorage, LogCallMaskingOptions } from "../log-storage/types.ts";
+import type { AcceptLogEntry, ILogStorage, LogCallMaskingOptions, LogEntry } from "../log-storage/types.ts";
 import type { MinimumContext } from "../types.ts";
 import { ignoreRejection, isInsideFailureListener } from "./FailureListeners.ts";
-import { failed, isLogWriteResult } from "./results.ts";
-import type { LogWriteResult, LoggingFailed, LoggingFailure } from "./types.ts";
+import { failed, isLogReadResult, isLogWriteResult } from "./results.ts";
+import type { LogReadResult, LogWriteResult, LoggingFailed, LoggingFailure } from "./types.ts";
+
+
+/**
+ * Who called the store through a guard, named as the `source` of any failure the guard describes.
+ */
+type GuardedCaller = 'Logger' | 'Span' | 'TraceViewer';
 
 
 /**
@@ -51,7 +57,37 @@ export async function guardedWrite<M extends MinimumContext = any>(
 }
 
 
-function unexpected(storage: ILogStorage, source: 'Logger' | 'Span', message: string, reportFailure: boolean): LoggingFailed {
+/**
+ * Read entries through `storage`, guaranteeing a result whatever the store does.
+ *
+ * The read counterpart of {@link guardedWrite}: a store that throws, rejects, or answers with something that
+ * is not a read result becomes an `unexpected` failure from `source`, told to the store through
+ * `reportInternalFailure` and returned with no entries.
+ *
+ * @param storage The store being read; told about any failure the guard describes.
+ * @param source Who is reading, named in any failure.
+ * @param read Calls the store. Runs inside the guard, so it may throw.
+ * @returns The store's result unchanged when it is a well-formed read result, else a failed result with no
+ * entries. Never rejects.
+ */
+export async function guardedRead<T extends LogEntry>(
+    storage: ILogStorage,
+    source: GuardedCaller,
+    read: () => Promise<LogReadResult<T>>
+): Promise<LogReadResult<T>> {
+    const reportFailure = !isInsideFailureListener();
+
+    try {
+        const result = await read();
+        if (isLogReadResult(result)) return result;
+        return { ...unexpected(storage, source, 'The log storage answered the read with something that is not a read result.', reportFailure), entries: [] };
+    } catch {
+        return { ...unexpected(storage, source, 'The log storage threw or rejected instead of answering the read with a result.', reportFailure), entries: [] };
+    }
+}
+
+
+function unexpected(storage: ILogStorage, source: GuardedCaller, message: string, reportFailure: boolean): LoggingFailed {
     const failure: LoggingFailure = { source, operation: 'unexpected', message };
     const result = failed(failure);
     if (!reportFailure) return result;

@@ -563,7 +563,9 @@ others fail. The result says so, and never presents a partial answer as complete
   every source that failed. A UI renders what it has and flags what broke:
   `setRows(r.entries); setBroken(r.error?.failures.map(f => f.source) ?? [])`.
 - One failure event per call: `onFailure` receives the combined error once, never once per child plus once
-  for the total.
+  for the total. A trace search is two calls on the store (find the matching traces, then fill them), so a
+  failing store's listeners hear two; the search's own result lists a failure both reads hit once, and skips
+  the second read when nothing matched.
 - Tests are strict by default: the test helper `entriesOf` fails on any `error`, so a dead child cannot hide
   behind a healthy one.
 - Accepted cost: `if (!r.ok) return` drops the partial rows. That fails loudly and the developer fixes the UI;
@@ -587,11 +589,15 @@ failures as they are, adding only its own.
   minifier shortens class names in exactly the production builds whose failures get forwarded.
 - A store that throws or rejects from a hook instead of answering is described by its `toFailure`: by
   default the store and operation with a generic sentence, never the thrown value.
-- `Span` and `Logger` create a failure only in their final safety net — a store that throws, rejects or
-  resolves something that is not a result, or a bug in their own code: `operation: 'unexpected'`,
-  `source: 'Span' | 'Logger'`. They hand it to the store with `reportInternalFailure` and return it; both
-  are the same object. If `reportInternalFailure` itself throws, the throw is swallowed and a second
-  `unexpected` failure is appended to the returned error, so the value still says what happened.
+- `Span`, `Logger` and the trace viewer create a failure only in their final safety net — a store that
+  throws, rejects or resolves something that is not a result, or a bug in their own code:
+  `operation: 'unexpected'`, `source: 'Span' | 'Logger' | 'TraceViewer'`. A store's misbehaviour is handed
+  to the store with `reportInternalFailure` and returned; both are the same object. If
+  `reportInternalFailure` itself throws, the throw is swallowed and a second `unexpected` failure is
+  appended to the returned error, so the value still says what happened.
+- The trace viewer's own failures (a `results_filter` it cannot apply, which leaves the unmatchable traces
+  out) are returned only, not told to the store's listeners: the store did not fail, so "my logging is
+  failing" would be false.
 
 **Example:** a Channels write where the IndexedDB child hits a quota error resolves
 `{ ok: false, entry, error: { failures: [{ source: 'IDBLogStorage:my-app', operation: 'write', message: '…',
@@ -692,7 +698,9 @@ code that awaits an IndexedDB write and gets `ok: true` knows a later quota abor
 - Per-call options that cannot be cloned are dropped: the entry is recorded fully masked (fail closed).
 - Reads ask every child, merge their entries and list their failures; `ok` only if every child succeeded
   (dec-partial-results-are-explicit). Console and Webhook children answer empty
-  (dec-stores-that-retain-nothing-answer-empty).
+  (dec-stores-that-retain-nothing-answer-empty). `reset` and `forceClearOldEntries` likewise reach every
+  child and list every failure; `reset(entries)` gives each child only the entries its `accept` filter
+  matches.
 
 **Example — averted lost log:** `span.log('fetched', { response, parse })` where `response` is a `Response`
 and `parse` a function. A single `structuredClone` of the raw context throws `DataCloneError`, so every channel

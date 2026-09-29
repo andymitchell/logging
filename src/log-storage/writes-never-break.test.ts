@@ -2,7 +2,7 @@ import { describe, it, expect, onTestFinished, vi } from 'vitest';
 import { MemoryLogStorage } from './memory/MemoryLogStorage.ts';
 import { MemoryBreakpoints } from '../breakpoints/MemoryBreakpoints.ts';
 import { FailingLogStorage, type HookFailure } from './testing-helpers/FailingLogStorage.ts';
-import { recordFailures } from './testing-helpers/results.ts';
+import { entriesOf, recordFailures } from './testing-helpers/results.ts';
 import { recordUnhandledRejections } from './testing-helpers/recordUnhandledRejections.ts';
 import { failed } from '../failures/results.ts';
 import type { LogWriteResult } from '../failures/types.ts';
@@ -17,7 +17,7 @@ describe('an app writing to a store', () => {
         expect(result.ok).toBe(true);
         expect(result.error).toBeUndefined();
         expect(result.entry).toMatchObject({ type: 'info', message: 'fetched', context: { count: 2 } });
-        expect(await storage.get()).toEqual([result.entry]);
+        expect(entriesOf(await storage.get())).toEqual([result.entry]);
     });
 
     describe('when the store cannot commit the entry', () => {
@@ -104,7 +104,7 @@ describe('an app writing to a store', () => {
         expect(result.entry).toBeUndefined();
         expect(result.error?.failures).toEqual([{ source: 'MemoryLogStorage:my-app', operation: 'write', message: 'Could not record the entry.' }]);
         expect(failures.heard).toEqual([result.error]);
-        expect(await storage.get()).toEqual([]);
+        expect(entriesOf(await storage.get())).toEqual([]);
         expect(await unhandled.settled()).toEqual([]);
     });
 
@@ -113,7 +113,7 @@ describe('an app writing to a store', () => {
 
         void storage.add({ type: 'info', message: 'unawaited' });
 
-        expect((await storage.get()).map(entry => entry.message)).toEqual(['unawaited']);
+        expect(entriesOf(await storage.get()).map(entry => entry.message)).toEqual(['unawaited']);
     });
 });
 
@@ -145,7 +145,7 @@ describe('a developer debugging with breakpoints or a console echo', () => {
 
         expect(result.ok).toBe(false);
         expect(result.error?.failures).toEqual([{ source: 'MemoryLogStorage:my-app', operation: 'breakpoint', message: 'Could not check the entry against breakpoints.' }]);
-        expect(await storage.get()).toEqual([result.entry]);
+        expect(entriesOf(await storage.get())).toEqual([result.entry]);
         expect(failures.heard).toEqual([result.error]);
         expect(await unhandled.settled()).toEqual([]);
     });
@@ -159,7 +159,7 @@ describe('a developer debugging with breakpoints or a console echo', () => {
 
         expect(result.ok).toBe(false);
         expect(result.error?.failures).toEqual([{ source: 'MemoryLogStorage:my-app', operation: 'write', message: 'Could not echo the entry to the console.' }]);
-        expect(await storage.get()).toEqual([result.entry]);
+        expect(entriesOf(await storage.get())).toEqual([result.entry]);
     });
 
     it('lists every failed step, in order, when the commit, the breakpoint check and the echo all fail', async () => {

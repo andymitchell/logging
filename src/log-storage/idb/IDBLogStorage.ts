@@ -3,7 +3,7 @@ import type { LogStorageOptions } from "../types.ts";
 import { BaseLogStorage } from "../BaseLogStorage.ts";
 import type { ILogStorage, LogEntry } from "../types.ts";
 import createMaxAgeTest from "../createMaxAgeTest.ts";
-import type { LoggingResult } from "../../failures/types.ts";
+import type { LogReadResult, LoggingResult } from "../../failures/types.ts";
 import { ok } from "../../failures/results.ts";
 
 
@@ -66,12 +66,12 @@ export class IDBLogStorage extends BaseLogStorage implements ILogStorage {
         };
     }
 
-    protected override async clearOldEntries(): Promise<void> {
-        
+    protected override async clearOldEntries(): Promise<LoggingResult> {
+
 
         const db = await this.#dbPromise;
         this.#clearOldEntriesUsingDb(db);
-        
+        return ok();
     }
 
 
@@ -90,12 +90,12 @@ export class IDBLogStorage extends BaseLogStorage implements ILogStorage {
         return ok();
     }
 
-    public override async reset(entries: LogEntry[] = []):Promise<void> {
+    protected override async resetEntries(entries: LogEntry[] = []):Promise<LoggingResult> {
         const db = await this.#dbPromise;
         const transaction = db.transaction('logs', 'readwrite');
         const store = transaction.objectStore('logs');
-    
-        return new Promise((resolve, reject) => {
+
+        await new Promise<void>((resolve, reject) => {
             // Clear existing logs first
             const clearRequest = store.clear();
             clearRequest.onerror = (event) => reject(event);
@@ -120,12 +120,14 @@ export class IDBLogStorage extends BaseLogStorage implements ILogStorage {
                 }
             };
         });
+        return ok();
     }
 
 
-    public override async get<T extends LogEntry = LogEntry>(filter?: WhereFilterDefinition<T>, fullTextFilter?: string): Promise<T[]> {
-        return new Promise(async (resolve, reject) => {
-            const db = await this.#dbPromise;
+    protected override async queryEntries<T extends LogEntry = LogEntry>(filter?: WhereFilterDefinition<T>, fullTextFilter?: string): Promise<LogReadResult<T>> {
+        // Awaited outside the executor, so a failed open rejects this read rather than leaving it pending.
+        const db = await this.#dbPromise;
+        const entries = await new Promise<T[]>((resolve, reject) => {
             const transaction = db.transaction('logs', 'readonly');
             const store = transaction.objectStore('logs');
             const request = store.getAll();
@@ -147,5 +149,6 @@ export class IDBLogStorage extends BaseLogStorage implements ILogStorage {
                 reject(event);
             };
         });
+        return { ok: true, entries };
     }
 }

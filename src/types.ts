@@ -1,6 +1,6 @@
 import type { WhereFilterDefinition } from "@andymitchell/objects/where-filter";
 import type { LogCallMaskingOptions, LogEntry } from "./log-storage/types.ts";
-import type { LogWriteResult } from "./failures/types.ts";
+import type { LogReadResult, LogWriteResult } from "./failures/types.ts";
 
 
 export type MinimumContext = Record<string, any>;
@@ -53,7 +53,14 @@ export interface ILogger {
     criticalWithOptions<C extends MinimumContext>(options: LogCallMaskingOptions<C>, message: any, context: C): Promise<LogWriteResult<C>>;
 
 
-    get(filter?:WhereFilterDefinition<LogEntry>): Promise<LogEntry[]>;
+    /**
+     * Read entries from the store this writes to.
+     *
+     * @param filter Match entries against this where-filter; all entries if omitted.
+     * @returns `{ ok: true, entries }`, or `{ ok: false, entries, error }` where `entries` holds whatever
+     * could still be read. Never rejects.
+     */
+    get(filter?:WhereFilterDefinition<LogEntry>): Promise<LogReadResult>;
 
 }
 

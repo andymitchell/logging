@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
+import { entriesOf } from '../log-storage/testing-helpers/results.ts';
 import { Span } from './Span.ts';
 import type { ILogStorage, LogEntry } from '../log-storage/types.ts';
-import type { LogWriteResult, LoggingError } from '../failures/types.ts';
+import type { LogReadResult, LogWriteResult, LoggingError, LoggingResult } from '../failures/types.ts';
 import type { ILogger, MinimumContext } from '../types.ts';
 import { matchJavascriptObject, type WhereFilterDefinition } from '@andymitchell/objects/where-filter';
 import type { SpanMeta } from './types.ts';
@@ -43,21 +44,22 @@ class FakeLogStorage<T extends MinimumContext = any> implements ILogStorage {
         this.reported.push(error);
     }
 
-    async get(filter?:WhereFilterDefinition): Promise<any[]> {
+    async get(filter?:WhereFilterDefinition): Promise<LogReadResult<any>> {
         if (this.shouldFailGetAll) {
             throw new Error("get failure");
         }
         if( filter ) {
-            return this.logs.filter(x => matchJavascriptObject(x, filter));
+            return { ok: true, entries: this.logs.filter(x => matchJavascriptObject(x, filter)) };
         }
-        return this.logs;
+        return { ok: true, entries: this.logs };
     }
 
-    async forceClearOldEntries(): Promise<void> {
+    async forceClearOldEntries(): Promise<LoggingResult> {
         this.logs = [];
+        return { ok: true };
     }
 
-    reset(entries?: LogEntry<T, MinimumContext>[] | undefined): Promise<void> {
+    reset(entries?: LogEntry<T, MinimumContext>[] | undefined): Promise<LoggingResult> {
         throw new Error('Method not implemented.');
     }
 }
@@ -115,7 +117,7 @@ describe('Span Integration Tests', () => {
         const fakeLogger = new FakeLogStorage();
         const span = new Span(fakeLogger);
         await span.log("test log", { data: 123 });
-        const allLogs = await span.get();
+        const allLogs = entriesOf(await span.get());
         // Expect two log entries: one from the span_start event and one from the info log.
         expect(allLogs.length).toBe(2);
         expect(allLogs[0]!.type).toBe('event');
@@ -250,7 +252,7 @@ describe('Span Integration Tests', () => {
         span.log("abc1");
         span.end();
 
-        const result = await span.get();
+        const result = entriesOf(await span.get());
         
         expect(result.length).toBe(3);
         
@@ -262,7 +264,7 @@ describe('Span Integration Tests', () => {
         span.log("abc1");
         span.end();
 
-        const result = await span.get({'type': 'info', message: 'abc1'});
+        const result = entriesOf(await span.get({'type': 'info', message: 'abc1'}));
         
         
         expect(result.length).toBe(1);
@@ -312,11 +314,17 @@ describe('Span Integration Tests', () => {
             expect(fakeLogger.reported).toEqual(results.map(result => result.error));
         });
 
-        it('should propagate errors when storage.get fails', async () => {
+        it('should resolve a failed result with no entries, never reject, when storage.get throws, and hand the failure to the storage', async () => {
             const fakeLogger = new FakeLogStorage();
             const span = new Span(fakeLogger);
             fakeLogger.shouldFailGetAll = true;
-            await expect(span.get()).rejects.toThrow("get failure");
+
+            const result = await span.get();
+
+            expect(result.ok).toBe(false);
+            expect(result.entries).toEqual([]);
+            expect(result.error?.failures).toEqual([expect.objectContaining({ source: 'Span', operation: 'unexpected' })]);
+            expect(fakeLogger.reported).toEqual([result.error]);
         });
 
     });

@@ -1,9 +1,10 @@
 import { describe, it, expectTypeOf } from 'vitest';
 import type { JsonValue } from "@andymitchell/clone-to-json-safe";
-import type { LogEntry } from "../log-storage/types.ts";
-import type { SpanMeta } from "../trace/types.ts";
-import type { GetTracesResult, TraceSearchResults } from "../trace/viewing/types.ts";
-import type { MinimumContext } from "../types.ts";
+import type { ILogStorage, LogEntry } from "../log-storage/types.ts";
+import type { SpanMeta, TraceEntry } from "../trace/types.ts";
+import type { Span } from "../trace/Span.ts";
+import type { GetTracesResult, ITraceViewer, TraceSearchResults } from "../trace/viewing/types.ts";
+import type { ILogger, MinimumContext } from "../types.ts";
 import type { LogReadResult, LogWriteResult, LoggingError, LoggingFailure, LoggingFailureListener, LoggingOperation, LoggingResult } from "./types.ts";
 
 // These are compile-time contracts, checked by `tsc`. The functions below are never called: they exist so the
@@ -187,6 +188,38 @@ describe('failure and result types', () => {
         it('receives the whole error, not a single failure', () => {
             expectTypeOf<Parameters<LoggingFailureListener>>().toEqualTypeOf<[error: LoggingError]>();
             expectTypeOf((_failure: LoggingFailure) => {}).not.toExtend<LoggingFailureListener>();
+        });
+    });
+
+    describe('an app calling the public read and admin methods', () => {
+
+        it('gets a read result typed by the entries it asked for from a store', () => {
+            const read = (storage: ILogStorage) => {
+                expectTypeOf(storage.get()).toEqualTypeOf<Promise<LogReadResult<LogEntry>>>();
+                expectTypeOf(storage.get<TraceEntry>()).toEqualTypeOf<Promise<LogReadResult<TraceEntry>>>();
+            };
+            void read;
+        });
+
+        it('gets a result with no payload from reset and forceClearOldEntries', () => {
+            const admin = (storage: ILogStorage) => {
+                expectTypeOf(storage.reset()).toEqualTypeOf<Promise<LoggingResult>>();
+                expectTypeOf(storage.forceClearOldEntries()).toEqualTypeOf<Promise<LoggingResult>>();
+            };
+            void admin;
+        });
+
+        it('gets a read result from a logger or a span, and a span\'s stands in for a logger\'s', () => {
+            expectTypeOf<ReturnType<ILogger['get']>>().toEqualTypeOf<Promise<LogReadResult>>();
+            expectTypeOf<Awaited<ReturnType<Span['get']>>>().toEqualTypeOf<LogReadResult<LogEntry<any, SpanMeta>>>();
+            expectTypeOf<Span['get']>().toExtend<ILogger['get']>();
+        });
+
+        it('gets a trace search result typed by the context it asked for from a trace viewer', () => {
+            const view = (viewer: ITraceViewer) => {
+                expectTypeOf(viewer.getTraces<Ctx>()).toEqualTypeOf<Promise<GetTracesResult<Ctx>>>();
+            };
+            void view;
         });
     });
 });

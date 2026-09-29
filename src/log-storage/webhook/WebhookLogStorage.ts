@@ -3,7 +3,7 @@ import type { LogStorageOptions } from "../types.ts";
 import { BaseLogStorage } from "../BaseLogStorage.ts";
 import type { LogEntry, ILogStorage } from "../types.ts";
 import { uid } from "@andymitchell/utils/uid";
-import type { LoggingResult } from "../../failures/types.ts";
+import type { LogReadResult, LoggingResult } from "../../failures/types.ts";
 import { ok } from "../../failures/results.ts";
 
 
@@ -19,6 +19,9 @@ export type PostBody = {
  * It buffers entries and sends them in batches, with exponential backoff on failure.
  * 
  * The endpoint should expect a POST of {entries: LogEntry[], instanceId: string}
+ *
+ * Entries are sent on, not kept: `get` resolves `{ ok: true, entries: [] }`, and `reset` and
+ * `forceClearOldEntries` resolve `{ ok: true }`.
  */
 export class WebhookLogStorage extends BaseLogStorage implements ILogStorage {
 
@@ -67,6 +70,20 @@ export class WebhookLogStorage extends BaseLogStorage implements ILogStorage {
         await this.#bufferStorage.add(logEntry);
         await this.#flushBuffer();
         return ok();
+    }
+
+    // Entries are sent on, not kept, so there is nothing to clear, reset or read.
+
+    protected override async clearOldEntries(): Promise<LoggingResult> {
+        return ok();
+    }
+
+    protected override async resetEntries(): Promise<LoggingResult> {
+        return ok();
+    }
+
+    protected override async queryEntries<T extends LogEntry = LogEntry>(): Promise<LogReadResult<T>> {
+        return { ok: true, entries: [] };
     }
 
 

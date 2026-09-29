@@ -1,8 +1,7 @@
-import { type WhereFilterDefinition } from "@andymitchell/objects/where-filter";
 import type { LogStorageOptions } from "../types.ts";
 import { BaseLogStorage } from "../BaseLogStorage.ts";
 import type { LogEntry, ILogStorage } from "../types.ts";
-import type { LoggingResult } from "../../failures/types.ts";
+import type { LogReadResult, LoggingResult } from "../../failures/types.ts";
 import { ok } from "../../failures/results.ts";
 
 
@@ -15,7 +14,11 @@ interface ConsoleLogStorageOptions extends LogStorageOptions {
 }
 
 /**
- * Send all logs to the native global `console`
+ * Send all logs to the native global `console`.
+ *
+ * The console keeps nothing: `get` resolves `{ ok: true, entries: [] }`, and `reset` and
+ * `forceClearOldEntries` resolve `{ ok: true }`. Behind a `ChannelsLogStorage`, reads come from the other
+ * channels.
  */
 export class ConsoleLogStorage extends BaseLogStorage implements ILogStorage {
 
@@ -67,14 +70,18 @@ export class ConsoleLogStorage extends BaseLogStorage implements ILogStorage {
         return ok();
     }
 
-    protected override async clearOldEntries(): Promise<void> {
+    // The console keeps nothing, so there is nothing to clear, reset or read.
+
+    protected override async clearOldEntries(): Promise<LoggingResult> {
+        return ok();
     }
 
 
-    public override async reset(entries?: LogEntry[]):Promise<void> {
+    protected override async resetEntries(): Promise<LoggingResult> {
+        return ok();
     }
 
-    public override async get<T extends LogEntry = LogEntry>(filter?: WhereFilterDefinition<T>, fullTextFilter?: string): Promise<T[]> {
-        throw new Error("Not available in ConsoleLogStorage");
+    protected override async queryEntries<T extends LogEntry = LogEntry>(): Promise<LogReadResult<T>> {
+        return { ok: true, entries: [] };
     }
 }

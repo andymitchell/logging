@@ -1,4 +1,5 @@
 import { MemoryLogStorage } from "../../log-storage/memory/MemoryLogStorage.ts";
+import { tracesOf } from "../../log-storage/testing-helpers/results.ts";
 import { getTraces } from "./getTraces.ts";
 import { Trace } from "../Trace.ts";
 import { convertArrayToRecord, sleep } from "@andymitchell/utils";
@@ -12,7 +13,7 @@ describe('get-all', () => {
         const trace1 = new Trace(rawLogger);
         trace1.log('abc1');
         
-        const tracesArray = await getTraces(rawLogger);
+        const tracesArray = tracesOf(await getTraces(rawLogger));
         const traces = convertArrayToRecord(tracesArray, 'id');
         
         expect(traces[trace1.getId()]?.logs.some(x => x.type==='info' && x.message==='abc1')).toBe(true)
@@ -37,7 +38,7 @@ describe('get-all', () => {
         trace2.log('def');
 
         
-        const tracesArray = await getTraces(rawLogger);
+        const tracesArray = tracesOf(await getTraces(rawLogger));
         const traces = convertArrayToRecord(tracesArray, 'id');
         
         expect(Object.keys(traces)).toEqual([trace1.getId(), trace2.getId()]);
@@ -54,7 +55,7 @@ describe('get-all', () => {
         trace1.log('abc1');
         trace1.log('def2');
         
-        const tracesArray = await getTraces(rawLogger);
+        const tracesArray = tracesOf(await getTraces(rawLogger));
         const traces = convertArrayToRecord(tracesArray, 'id');
         
         expect(traces[trace1.getId()]?.id).toBe(traces[trace1.getId()]?.logs[0]?.meta?.span.id);
@@ -73,7 +74,7 @@ describe('filtering', () => {
         const trace1 = new Trace(rawLogger);
         trace1.log('abc1');
         
-        const tracesArray = await getTraces(rawLogger, {entries_filter: {type: 'info'}});
+        const tracesArray = tracesOf(await getTraces(rawLogger, {entries_filter: {type: 'info'}}));
         const traces = convertArrayToRecord(tracesArray, 'id');
         
         expect(traces[trace1.getId()]?.logs.some(x => x.type==='info' && x.message==='abc1')).toBe(true)
@@ -98,7 +99,7 @@ describe('filtering', () => {
         trace2.log('def');
     
         
-        const tracesArray = await getTraces(rawLogger, {entries_filter: {type: 'info'}});
+        const tracesArray = tracesOf(await getTraces(rawLogger, {entries_filter: {type: 'info'}}));
         const traces = convertArrayToRecord(tracesArray, 'id');
         
         expect(Object.keys(traces)).toEqual([trace1.getId(), trace2.getId()]);
@@ -118,7 +119,7 @@ describe('filtering', () => {
         trace2.log('def');
     
         
-        const tracesArray = await getTraces(rawLogger, {entries_filter: {type: 'info', message: 'abc1'}});
+        const tracesArray = tracesOf(await getTraces(rawLogger, {entries_filter: {type: 'info', message: 'abc1'}}));
         const traces = convertArrayToRecord(tracesArray, 'id');
         expect(Object.keys(traces)).toEqual([trace1.getId()]);
         
@@ -134,12 +135,12 @@ describe('filtering', () => {
             const trace1 = new Trace(rawLogger);
             trace1.log('abc1', {name: 'Bob'});
             
-            const tracesArray = await getTraces(rawLogger, {entries_filter: {context: {name: 'Bob'}}});
+            const tracesArray = tracesOf(await getTraces(rawLogger, {entries_filter: {context: {name: 'Bob'}}}));
             const traces = convertArrayToRecord(tracesArray, 'id');
             
             expect(traces[trace1.getId()]?.matches.length).toBe(1);
         
-            const tracesArray1 = await getTraces(rawLogger, {entries_filter: {context: {name: 'Sue'}}});
+            const tracesArray1 = tracesOf(await getTraces(rawLogger, {entries_filter: {context: {name: 'Sue'}}}));
             const traces1 = convertArrayToRecord(tracesArray1, 'id');
             
             expect(traces1[trace1.getId()]?.matches.length).toBe(undefined);
@@ -153,12 +154,12 @@ describe('filtering', () => {
             const trace1 = new Trace(rawLogger);
             trace1.log('abc1', 'Bob');
             
-            const tracesArray = await getTraces(rawLogger, {entries_filter: {context: 'Bob'}});
+            const tracesArray = tracesOf(await getTraces(rawLogger, {entries_filter: {context: 'Bob'}}));
             const traces = convertArrayToRecord(tracesArray, 'id');
             
             expect(traces[trace1.getId()]?.matches.length).toBe(1);
         
-            const tracesArray1 = await getTraces(rawLogger, {entries_filter: {context: 'Sue'}});
+            const tracesArray1 = tracesOf(await getTraces(rawLogger, {entries_filter: {context: 'Sue'}}));
             const traces1 = convertArrayToRecord(tracesArray1, 'id');
             
             expect(traces1[trace1.getId()]?.matches.length).toBe(undefined);
@@ -173,12 +174,12 @@ describe('filtering', () => {
             const trace1 = new Trace(rawLogger);
             trace1.log('abc1', ['Bob']);
             
-            const tracesArray = await getTraces(rawLogger, {entries_filter: {context: {$all: ['Bob']}}});
+            const tracesArray = tracesOf(await getTraces(rawLogger, {entries_filter: {context: {$all: ['Bob']}}}));
             const traces = convertArrayToRecord(tracesArray, 'id');
             
             expect(traces[trace1.getId()]?.matches.length).toBe(1);
         
-            const tracesArray1 = await getTraces(rawLogger, {entries_filter: {context: {$all: ['Sue']}}});
+            const tracesArray1 = tracesOf(await getTraces(rawLogger, {entries_filter: {context: {$all: ['Sue']}}}));
             const traces1 = convertArrayToRecord(tracesArray1, 'id');
             
             expect(traces1[trace1.getId()]?.matches.length).toBe(undefined);
@@ -200,7 +201,7 @@ describe('filtering full text', () => {
         const trace2 = new Trace(rawLogger);
         trace2.log('xyz');
         
-        const tracesArray = await getTraces(rawLogger, {entries_full_text_search: 'abc1'});
+        const tracesArray = tracesOf(await getTraces(rawLogger, {entries_full_text_search: 'abc1'}));
         const traces = convertArrayToRecord(tracesArray, 'id');
         
         expect(Object.keys(traces).length).toBe(1);
@@ -220,7 +221,7 @@ describe('filtering full text', () => {
         trace1.log('def');
 
         
-        const tracesArray = await getTraces(rawLogger, {entries_full_text_search: 'xyz'});
+        const tracesArray = tracesOf(await getTraces(rawLogger, {entries_full_text_search: 'xyz'}));
         const traces = convertArrayToRecord(tracesArray, 'id');
         
         expect(Object.keys(traces).length).toBe(0);
@@ -250,7 +251,7 @@ describe('filtering final traces', () => {
         trace2.log('def');
 
         
-        const tracesArray = await getTraces(rawLogger, {results_filter: {timestamp: {'$gt': afterTs}}});
+        const tracesArray = tracesOf(await getTraces(rawLogger, {results_filter: {timestamp: {'$gt': afterTs}}}));
         const traces = convertArrayToRecord(tracesArray, 'id');
         expect(Object.keys(traces)).toEqual([trace2.getId()]);
     })
@@ -265,7 +266,7 @@ describe('toggle include all', () => {
         trace1.log('abc1');
         trace1.log('abc2');
         
-        const tracesArray = await getTraces(rawLogger, {entries_filter: {message: 'abc1'}}, false);
+        const tracesArray = tracesOf(await getTraces(rawLogger, {entries_filter: {message: 'abc1'}}, false));
         expect(tracesArray[0]?.matches[0]?.message).toBe('abc1');
         expect(tracesArray[0]?.logs).toEqual([]);
         
@@ -291,7 +292,7 @@ describe('handles child traces', () => {
         trace2.log('def');
     
         
-        const tracesArray = await getTraces(rawLogger);
+        const tracesArray = tracesOf(await getTraces(rawLogger));
         const traces = convertArrayToRecord(tracesArray, 'id');
         
         expect(Object.keys(traces)).toEqual([trace1.getId(), trace2.getId()]);

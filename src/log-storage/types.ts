@@ -2,7 +2,7 @@ import type { WhereFilterDefinition } from "@andymitchell/objects/where-filter";
 import type { PreserveUnmaskedPath } from "@andymitchell/clone-to-json-safe";
 import type { IBreakpoints } from "../breakpoints/types.ts";
 import type { MaxAge, MinimumContext } from "../types.ts";
-import type { LogWriteResult, LoggingError, LoggingFailureListener } from "../failures/types.ts";
+import type { LogReadResult, LogWriteResult, LoggingError, LoggingFailureListener, LoggingResult } from "../failures/types.ts";
 
 
 /**
@@ -185,23 +185,39 @@ export interface ILogStorage {
     add<T extends any>(entry:AcceptLogEntry<T>, options?: LogCallMaskingOptions):Promise<LogWriteResult<T>>;
 
     /**
-     * Retrieve entries from the data store
+     * Retrieve entries from the data store, oldest first.
+     *
      * @param filter Match any entries with a precise spec
-     * @param fullTextFilter Match entries that, when serialised, contain this text 
+     * @param fullTextFilter Match entries that, when serialised, contain this text
+     * @returns `{ ok: true, entries }`, or `{ ok: false, entries, error }`. `entries` is always an array: on
+     * failure it holds whatever the store could still read (e.g. a `ChannelsLogStorage`'s healthy children),
+     * often none. Never rejects.
+     *
+     * @example
+     * const r = await storage.get({ type: 'error' });
+     * setRows(r.entries);
+     * setBroken(r.error?.failures.map(f => f.source) ?? []);
+     *
+     * @remarks
+     * A store that keeps no entries (console, webhook) answers `{ ok: true, entries: [] }`.
      */
-    get<T extends LogEntry = LogEntry>(filter?:WhereFilterDefinition<T>, fullTextFilter?: string): Promise<T[]>;
+    get<T extends LogEntry = LogEntry>(filter?:WhereFilterDefinition<T>, fullTextFilter?: string): Promise<LogReadResult<T>>;
 
     /**
-     * Remove items older than the max age stated in LogStorageOptions
+     * Remove items older than the max age stated in LogStorageOptions.
+     *
+     * @returns `{ ok: true }`, or `{ ok: false, error }`. Never rejects.
      */
-    forceClearOldEntries(): Promise<void>;
+    forceClearOldEntries(): Promise<LoggingResult>;
 
 
     /**
-     * Manually reset the database and populate it with the passed in entries 
-     * @param entries 
+     * Manually reset the database and populate it with the passed in entries.
+     *
+     * @param entries The entries the store holds afterwards; none if omitted.
+     * @returns `{ ok: true }`, or `{ ok: false, error }`. Never rejects.
      */
-    reset(entries?:LogEntry[]): Promise<void>;
+    reset(entries?:LogEntry[]): Promise<LoggingResult>;
 
     /**
      * Be told whenever a logging call on this store fails.

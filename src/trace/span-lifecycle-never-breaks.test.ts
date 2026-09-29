@@ -8,7 +8,7 @@ import { Logger } from '../log/Logger.ts';
 import { MemoryLogStorage } from '../log-storage/memory/MemoryLogStorage.ts';
 import type { ILogStorage } from '../log-storage/types.ts';
 import { FailingLogStorage } from '../log-storage/testing-helpers/FailingLogStorage.ts';
-import { recordFailures } from '../log-storage/testing-helpers/results.ts';
+import { entriesOf, recordFailures } from '../log-storage/testing-helpers/results.ts';
 import { recordUnhandledRejections } from '../log-storage/testing-helpers/recordUnhandledRejections.ts';
 
 const REMOTE_SPAN_ID = { id: 'remote-span', top_id: 'remote-trace' };
@@ -123,7 +123,7 @@ describe('an app starting a span with a context that cannot be read', () => {
         const span = start(storage);
         const result = await span.log('inside');
 
-        const spanStarts = (await storage.get()).filter(isEventLogEntrySpanStart).filter(entry => entry.meta?.span.id === span.getId());
+        const spanStarts = entriesOf(await storage.get()).filter(isEventLogEntrySpanStart).filter(entry => entry.meta?.span.id === span.getId());
         expect(spanStarts).toHaveLength(1);
         expect(result.ok).toBe(true);
         expect(await unhandled.settled()).toEqual([]);

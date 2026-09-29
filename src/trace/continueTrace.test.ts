@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { entriesOf } from '../log-storage/testing-helpers/results.ts';
 import { continueTrace as continueTraceDefault } from "../index.ts";
 import { continueTrace as continueTraceBrowser } from "../index-browser.ts";
 import { continueTrace as continueTraceNode } from "../index-node.ts";
@@ -28,7 +29,7 @@ describe('continueTrace', () => {
 
         const continued = continueTrace(storage, spanId);
 
-        expect(await storage.get()).toEqual([]);
+        expect(entriesOf(await storage.get())).toEqual([]);
         expect(continued.getFullId()).toEqual(spanId);
     });
 
@@ -63,7 +64,7 @@ describe('continueTrace', () => {
 
         await continued.log('continued work');
 
-        const entries = await storage.get<TraceEntry>();
+        const entries = entriesOf(await storage.get<TraceEntry>());
         expect(entries).toHaveLength(1);
         expect(entries[0]?.meta?.span).toEqual(spanId);
     });
@@ -79,7 +80,7 @@ describe('continueTrace', () => {
         const child = continued.startSpan('child');
         const grandchild = child.startSpan('grandchild');
 
-        const entries = await storage.get<TraceEntry>();
+        const entries = entriesOf(await storage.get<TraceEntry>());
         expect(entries).toHaveLength(2);
         expect(entries[0]?.meta?.span).toEqual({
             id: child.getId(),

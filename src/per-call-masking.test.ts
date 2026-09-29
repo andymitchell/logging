@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { entriesOf } from './log-storage/testing-helpers/results.ts';
 import { MemoryLogStorage } from "./log-storage/memory/MemoryLogStorage.ts";
 import { Logger } from "./log/Logger.ts";
 import { startTrace, startTraceWithOptions } from "./trace/startTrace.ts";
@@ -34,7 +35,7 @@ describe('per-call masking: the value-agnostic _dangerous hatch can never be ope
         const hostile = { preserve_unmasked_context_paths: [{ path: 'user.id', shape: 'uuid' }], permit_dangerous_context_properties: true } as LogCallMaskingOptions;
         await logger.logWithOptions(hostile, 'm', { user: { id: UUID }, _dangerousToken: SECRET });
 
-        const e = (await storage.get())[0]!;
+        const e = entriesOf(await storage.get())[0]!;
         // The legitimate path+shape exemption is honored…
         expect(e.context!.user.id).toBe(UUID);
         // …but the runtime never reads `permit_dangerous` from per-call options, so the `_dangerous` secret stays masked.
@@ -51,7 +52,7 @@ describe('per-call masking: span & trace options scope to the span_start context
         const span = startTraceWithOptions({ preserve_unmasked_context_paths: [{ path: 'user.id', shape: 'uuid' }] }, 'op', { user: { id: UUID } }, storage)!;
         await span.log('later step', { user: { id: UUID } });
 
-        const entries = await storage.get();
+        const entries = entriesOf(await storage.get());
         const spanStart = entries.find(e => e.type === 'event')!;
         const laterLog = entries.find(e => e.message === 'later step')!;
         // The span's OWN context (span_start) honored the option…
@@ -67,7 +68,7 @@ describe('per-call masking: span & trace options scope to the span_start context
         const child = startTraceWithOptions({ preserve_unmasked_context_paths: [{ path: 'user.id', shape: 'uuid' }] }, 'child', { user: { id: UUID } }, undefined, parent)!;
         await child.log('later', { user: { id: UUID } });
 
-        const entries = await storage.get();
+        const entries = entriesOf(await storage.get());
         // The child span_start is the event entry carrying user context.
         const childStart = entries.find(e => e.type === 'event' && !!e.context?.user)!;
         const later = entries.find(e => e.message === 'later')!;
@@ -90,7 +91,7 @@ describe('per-call masking: the options slot cannot be spoofed by a logged value
         const hostilePayload = { preserve_unmasked_context_paths: [{ path: 'ref', shape: 'uuid' }], ref: UUID };
         await logger.log('incoming', hostilePayload);
 
-        const e = (await storage.get())[0]!;
+        const e = entriesOf(await storage.get())[0]!;
         // It was treated as ordinary data and masked — the look-alike "options" had no power, because options
         // only ever arrive in the dedicated leading slot of a `*WithOptions` method, never sniffed from data.
         expect(e.context!.ref).toBe(MASKED_UUID);
@@ -108,14 +109,14 @@ describe('per-call masking: the gate is honored at every log level (each *WithOp
         const storage = new MemoryLogStorage('', { allow_per_call_unmasking: true });
         const logger = new Logger(storage);
         await logger[`${level}WithOptions`](directive, 'm', { user: { id: UUID } });
-        expect((await storage.get())[0]!.context!.user.id).toBe(UUID);
+        expect(entriesOf(await storage.get())[0]!.context!.user.id).toBe(UUID);
     });
 
     it.each(['debug', 'log', 'warn', 'error', 'critical'] as const)('Span.%sWithOptions keeps the allow-listed path readable', async (level) => {
         const storage = new MemoryLogStorage('', { allow_per_call_unmasking: true });
         const span = startTrace('t', undefined, storage)!;
         await span[`${level}WithOptions`](directive, 'step', { user: { id: UUID } });
-        const logged = (await storage.get()).find(e => e.message === 'step')!;
+        const logged = entriesOf(await storage.get()).find(e => e.message === 'step')!;
         expect(logged.context!.user.id).toBe(UUID);
     });
 

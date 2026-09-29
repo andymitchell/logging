@@ -3,7 +3,7 @@ import { Logger } from './log/Logger.ts';
 import { Trace } from './trace/Trace.ts';
 import type { ILogger } from './types.ts';
 import { MemoryLogStorage } from './log-storage/memory/MemoryLogStorage.ts';
-import { entryOf } from './log-storage/testing-helpers/results.ts';
+import { entriesOf, entryOf } from './log-storage/testing-helpers/results.ts';
 import { recordUnhandledRejections } from './log-storage/testing-helpers/recordUnhandledRejections.ts';
 
 class ErrorWithUnreadableMessage extends Error {
@@ -47,7 +47,7 @@ describe.each(loggers)('%s on a healthy store, given a value it cannot read', (_
         const entry = entryOf(await logger.warn(value()));
 
         expect(typeof entry.message).toBe('string');
-        expect(await storage.get()).toContainEqual(entry);
+        expect(entriesOf(await storage.get())).toContainEqual(entry);
         expect(await unhandled.settled()).toEqual([]);
     });
 
@@ -60,7 +60,7 @@ describe.each(loggers)('%s on a healthy store, given a value it cannot read', (_
         const entry = entryOf(await logger.warn('hostile context', value()));
 
         expect(entry.message).toBe('hostile context');
-        expect(await storage.get()).toContainEqual(entry);
+        expect(entriesOf(await storage.get())).toContainEqual(entry);
         expect(await unhandled.settled()).toEqual([]);
     });
 });

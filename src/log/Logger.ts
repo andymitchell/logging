@@ -2,9 +2,9 @@
 import type { WhereFilterDefinition } from "@andymitchell/objects/where-filter";
 import type { ILogStorage, LogCallMaskingOptions, LogEntry, LogEntryType } from "../log-storage/types.ts";
 import type { ILogger, InferContextTypeFromLogArgsWithoutMessage, MinimumContext } from "../types.ts";
-import type { LogWriteResult } from "../failures/types.ts";
+import type { LogReadResult, LogWriteResult } from "../failures/types.ts";
 import { normalizeArgs } from "../utils/normalizeArgs.ts";
-import { guardedWrite } from "../failures/guardedWrite.ts";
+import { guardedRead, guardedWrite } from "../failures/guardedCalls.ts";
 import { assertLogStorage } from "../log-storage/assertLogStorage.ts";
 
 
@@ -88,8 +88,8 @@ export class Logger implements ILogger {
     }
 
 
-    async get(filter?:WhereFilterDefinition): Promise<LogEntry[]> {
-        return await this.storage.get(filter);
+    async get(filter?:WhereFilterDefinition<LogEntry>): Promise<LogReadResult> {
+        return guardedRead(this.storage, 'Logger', () => this.storage.get(filter));
     }
 
 }

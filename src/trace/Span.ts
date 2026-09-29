@@ -7,9 +7,9 @@ import type { AcceptLogEntry, ILogStorage, LogCallMaskingOptions, LogEntry, LogE
 import type { WhereFilterDefinition } from "@andymitchell/objects/where-filter";
 import type { ISpan, SpanMeta,  SpanId } from "./types.ts";
 import type { InferContextTypeFromLogArgsWithoutMessage, MinimumContext } from "../types.ts";
-import type { LogWriteResult } from "../failures/types.ts";
+import type { LogReadResult, LogWriteResult } from "../failures/types.ts";
 import { normalizeArgs } from "../utils/normalizeArgs.ts";
-import { guardedWrite } from "../failures/guardedWrite.ts";
+import { guardedRead, guardedWrite } from "../failures/guardedCalls.ts";
 import { assertLogStorage } from "../log-storage/assertLogStorage.ts";
 
 
@@ -130,8 +130,8 @@ class SpanHandle implements ISpan {
         return this.#writeMessage('critical', [message, context], options);
     }
 
-    async get(filter?:WhereFilterDefinition<LogEntry<any, SpanMeta>>): Promise<LogEntry<any, SpanMeta>[]> {
-        return await this.storage.get(filter);
+    async get(filter?:WhereFilterDefinition<LogEntry<any, SpanMeta>>): Promise<LogReadResult<LogEntry<any, SpanMeta>>> {
+        return guardedRead(this.storage, 'Span', () => this.storage.get(filter));
     }
 
     

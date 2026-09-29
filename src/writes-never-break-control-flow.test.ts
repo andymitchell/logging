@@ -6,8 +6,8 @@ import type { ISpan } from './trace/types.ts';
 import type { ILogStorage, LogEntryType } from './log-storage/types.ts';
 import type { LogWriteResult } from './failures/types.ts';
 import { FailingLogStorage, type HookFailure } from './log-storage/testing-helpers/FailingLogStorage.ts';
-import { ForeignLogStorage, type ForeignAddBehaviour } from './log-storage/testing-helpers/ForeignLogStorage.ts';
-import { recordFailures } from './log-storage/testing-helpers/results.ts';
+import { ForeignLogStorage, type ForeignBehaviour } from './log-storage/testing-helpers/ForeignLogStorage.ts';
+import { entriesOf, recordFailures } from './log-storage/testing-helpers/results.ts';
 import { recordUnhandledRejections } from './log-storage/testing-helpers/recordUnhandledRejections.ts';
 
 type Write<T extends ILogger> = [method: string, level: LogEntryType, write: (logger: T) => Promise<LogWriteResult>];
@@ -45,7 +45,7 @@ const brokenCommits: [string, HookFailure][] = [
     ['throws a null-prototype object', { throws: Object.create(null) }],
 ];
 
-const foreignAdds: ForeignAddBehaviour[] = ['throws', 'rejects', 'answers-bare-entry', 'answers-nothing'];
+const foreignAdds: ForeignBehaviour[] = ['throws', 'rejects', 'answers-old-shape', 'answers-nothing'];
 
 
 describe.each(writers)('$name writing to a broken store', ({ source, writes, build }) => {
@@ -71,12 +71,12 @@ describe.each(writers)('$name writing to a broken store', ({ source, writes, bui
         });
     });
 
-    describe.each(foreignAdds)('written without BaseLogStorage, whose add %s', (addBehaviour) => {
+    describe.each(foreignAdds)('written without BaseLogStorage, whose add %s', (behaviour) => {
 
         it.each(writes)(`%s resolves an unexpected failure from ${source}, handed to the store as the same object`, async (_method, _level, write) => {
             const unhandled = recordUnhandledRejections();
             onTestFinished(unhandled.stop);
-            const storage = new ForeignLogStorage(addBehaviour);
+            const storage = new ForeignLogStorage(behaviour);
             const logger = build(storage);
 
             const result = await write(logger);
@@ -132,7 +132,7 @@ describe.each(writers)('$name writing to a healthy store', ({ writes, build }) =
 
         expect(result.ok).toBe(true);
         expect(result.entry?.type).toBe(level);
-        expect(await storage.get()).toContainEqual(result.entry);
+        expect(entriesOf(await storage.get())).toContainEqual(result.entry);
         expect(failures.heard).toEqual([]);
     });
 
@@ -142,6 +142,6 @@ describe.each(writers)('$name writing to a healthy store', ({ writes, build }) =
 
         void logger.log('unawaited');
 
-        expect((await storage.get()).map(entry => entry.message)).toContain('unawaited');
+        expect(entriesOf(await storage.get()).map(entry => entry.message)).toContain('unawaited');
     });
 });
