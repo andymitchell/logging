@@ -695,6 +695,30 @@ is time-boxed so an awaited write cannot hang.
 **Example:** a test reads a Memory store immediately after an un-awaited `span.log(...)` and sees the entry;
 code that awaits an IndexedDB write and gets `ok: true` knows a later quota abort cannot undo it.
 
+#### dec-webhook-write-answers-for-its-own-entry
+A Webhook write's result says what became of **its own entry**, not how the flush it waited on went. Writes
+made together share a batch, so one write's flush can send or refuse another write's entry. The store
+therefore records the outcome of each entry a write is waiting on, and each write answers with its own.
+- `ok: true` only once the webhook accepted the entry (2xx). Unreachable, no answer within `TIMEOUT_MS`
+  (10 s), a temporary error (429/5xx, `details: { status }`) or a refusal (any other status, `{ status }`)
+  each fail the write. A refused entry is discarded; the others stay buffered and are retried after the
+  back-off.
+- An entry its flush did not try (the store is waiting to retry, or an earlier batch failed first) answers
+  "waiting to be sent". It is never answered `ok`.
+- A retry the store makes on its own timer has no caller, so it is not reported (dec-failures-as-values).
+  The next write's result says how delivery is going.
+- An entry that `JSON.stringify` cannot handle (a bigint in `meta`) is refused at write time and never joins
+  the buffer.
+- The console lines the store prints on each failed delivery are unchanged.
+
+**Example — averted false success:** two writes land in one batch that the webhook refuses with 400. If each
+write answered from its own flush, the second would answer `ok: true`, because its flush found the buffer
+already empty. Instead both answer the refusal with `{ status: 400 }`.
+
+**Example — averted poison batch:** an entry with a bigint in `meta` made `JSON.stringify` throw for every
+batch it was in, and was retried forever, holding back every entry behind it. Now that write fails with
+"Could not turn the entry into JSON", and later entries are sent.
+
 ### dec-channels-isolate-channels
 **One channel's filter, transform or store failure never stops the others.**
 - A write succeeds only if every matching channel recorded it; otherwise it resolves `{ ok: false, entry,

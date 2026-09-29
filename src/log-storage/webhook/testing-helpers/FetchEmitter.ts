@@ -60,6 +60,9 @@ export class FetchEmitter {
     // Flag to simulate a total network failure
     private networkError: Error | null = null;
 
+    // Flag to simulate a server that never answers
+    private noAnswer = false;
+
     constructor() {
         // This is the core of the interceptor. We create a mock function
         // that will be the new implementation of global.fetch.
@@ -97,6 +100,14 @@ export class FetchEmitter {
             return Promise.reject(this.networkError);
         }
 
+        if (this.noAnswer) {
+            // Like a real fetch, it settles only if the caller aborts it.
+            return new Promise<Response>((_resolve, reject) => {
+                const signal = options.signal;
+                signal?.addEventListener('abort', () => reject(signal.reason), { once: true });
+            });
+        }
+
         // Otherwise, simulate a server response based on the current configuration.
         const response = new Response(JSON.stringify(this.responseConfig.body), {
             status: this.responseConfig.status,
@@ -122,8 +133,9 @@ export class FetchEmitter {
      * @param {object} [config.body={}] - The JSON body to return.
      */
     public setResponse({ status, body = {} }: { status: number; body?: object }): void {
-        // When setting a valid response, ensure we're not also simulating a network error.
+        // When setting a valid response, ensure we're not also simulating a network error or silence.
         this.networkError = null;
+        this.noAnswer = false;
         this.responseConfig = { status, body };
     }
 
@@ -132,7 +144,17 @@ export class FetchEmitter {
      * @param {string} [message='Network request failed'] - The error message.
      */
     public simulateNetworkError(message = 'Network request failed'): void {
+        this.noAnswer = false;
         this.networkError = new Error(message);
+    }
+
+    /**
+     * Configures the mock to simulate a server that never answers: each fetch stays pending until the caller
+     * aborts it through its `signal`, then rejects with the signal's reason.
+     */
+    public simulateNoAnswer(): void {
+        this.networkError = null;
+        this.noAnswer = true;
     }
 
     /**
