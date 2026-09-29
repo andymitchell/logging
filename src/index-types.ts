@@ -6,6 +6,8 @@ import type { ISpan, SpanId, SpanMeta, TraceEntry } from "./trace/types.ts";
 
 import type { ILogger, MinimumContext } from "./types.ts";
 
+import type { LogReadResult, LogWriteResult, LoggingError, LoggingFailed, LoggingFailure, LoggingFailureListener, LoggingOk, LoggingOperation, LoggingResult } from "./failures/types.ts";
+
 // Re-exported so consumers can type `preserve_unmasked_context_paths` entries without importing
 // @andymitchell/clone-to-json-safe directly. That package remains the single source of truth for the shape.
 import type { PreservableValueShape, PreserveUnmaskedPath } from "@andymitchell/clone-to-json-safe";
@@ -24,5 +26,14 @@ export type {
     SpanMeta,
     TraceEntry,
     PreservableValueShape,
-    PreserveUnmaskedPath
+    PreserveUnmaskedPath,
+    LoggingResult,
+    LoggingOk,
+    LoggingFailed,
+    LogWriteResult,
+    LogReadResult,
+    LoggingError,
+    LoggingFailure,
+    LoggingOperation,
+    LoggingFailureListener
 }

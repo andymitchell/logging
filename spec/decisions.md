@@ -506,3 +506,186 @@ nesting that second copy). In return, the symbols the UI imports are a contract:
 `isEventLogEntry`, `isEventLogEntrySpanStart` (root entry, via `index-guards.ts`) and `isTraceResult`,
 `TraceResult` (`/get-traces`), alongside the long-public `TraceViewer`, `TraceFilter`, `TraceSearchResults`,
 `LogEntry`, `SpanMeta`, `TraceEntry`, `MinimumContext`. Renaming or removing one is a breaking change for the UI.
+
+---
+
+## Logging never breaks control flow
+
+Logging is a side effect of the app's real work. A failing store (IndexedDB full, a webhook down, a value
+that cannot be cloned) must never change what the app does. Failures come back as **values**; one in-memory
+hook on the store lets the app forward them to a channel that is not this logger. Changing every public
+write and read from a bare payload to a result is a breaking change.
+
+### dec-logging-never-breaks-control-flow
+**Every public operation on stores, loggers, spans and the trace viewer resolves. None throws or rejects,
+and nothing is left unhandled, whatever the store does and whatever value is logged.** This covers
+construction too: starting a span or trace on a failing store returns a usable span.
+
+Deliberate exceptions are programmer errors at wiring time, deterministic and caught on the first run:
+- constructors validating their configuration (`ChannelsLogStorage` with no channels, `ConsoleLogStorage`
+  without a console, `Logger`/`Trace`/`Span` given a store lacking `onFailure` or `reportInternalFailure` —
+  a store written against an older `ILogStorage`);
+- `continueTrace` given a non-object (callers validate untrusted input with `SpanIdSchema` first);
+- breakpoint management (`addBreakpoint`/`removeBreakpoint`/`listBreakpoints`), a human dev-tool API that
+  keeps its shape.
+
+**Example — averted outage:** IndexedDB is full. Inside Authension's `authorize`, `span.warn(...)` runs after
+the tokens were saved. If the write rejected, sign-in would report failure for a sign-in that succeeded.
+Instead `span.warn` resolves `{ ok: false, error }` and sign-in is unaffected.
+
+### dec-failures-as-values
+**Writes resolve `LogWriteResult`, reads `LogReadResult`, admin calls (`reset`, `forceClearOldEntries`)
+`LoggingResult`, and the trace viewer `GetTracesResult`.**
+- `ok` is `true` only if every source the call consulted succeeded. `error` is present exactly when `ok` is
+  `false`.
+- The payload always carries whatever was obtained: `entries` and `traces` are always arrays (empty on a
+  total failure); a failed write carries `entry` whenever the entry was built.
+- `result.error?.message` and `result.entry?.ulid` work without narrowing; narrowing on `ok` or on
+  `result.error` both work.
+- The result is the **only** path a failure takes to the caller. Nothing is reported outside a public call:
+  no delivery from constructors, timers or background cleanup.
+- `LoggingError` is JSON, enforced by the type system (`details?: JsonValueCapped`), so it can be handed to
+  any reporter as-is.
+
+**Example:** `const r = await span.warn('x'); if (r.error) reportLoggingBroken(r.error);` — no `try`, and a
+caller that ignores the result loses nothing but the log.
+
+#### dec-partial-results-are-explicit
+When a call consults several sources (a Channels facade, or a trace viewer over one), some can succeed while
+others fail. The result says so, and never presents a partial answer as complete.
+- `ok` means **complete**, not "answered". A top-level success flag that means "answered", with failures
+  tucked into a side field, makes incomplete data look complete; every consumer that cares ends up wanting
+  strict. So any failed source gives `ok: false`.
+- Data and errors sit side by side: the payload holds what was obtained and `error.failures[].source` names
+  every source that failed. A UI renders what it has and flags what broke:
+  `setRows(r.entries); setBroken(r.error?.failures.map(f => f.source) ?? [])`.
+- One failure event per call: `onFailure` receives the combined error once, never once per child plus once
+  for the total.
+- Tests are strict by default: the test helper `entriesOf` fails on any `error`, so a dead child cannot hide
+  behind a healthy one.
+- Accepted cost: `if (!r.ok) return` drops the partial rows. That fails loudly and the developer fixes the UI;
+  the alternative fails silently.
+
+**Example — averted blind spot:** a facade over IndexedDB (dead) and Memory (healthy). A viewer that went
+blank would hide Memory's logs exactly when they are needed to debug IndexedDB; an "ok means answered" result
+would hide the outage and let a "survives reload" test pass. Instead the viewer shows Memory's rows, flags
+`IDBLogStorage:my-app`, the test fails, and `onFailure` fires once.
+
+### dec-classify-failure-once-at-origin
+**A `LoggingFailure` is written by the store where the failure happens and passed up unchanged.** It holds a
+`source` (store name and namespace, e.g. `IDBLogStorage:my-app`), an `operation`, a plain-English `message`
+and optional JSON `details`. The store converts its own problem into something clean before passing it out
+(IndexedDB: the `DOMException` name; Webhook: the HTTP status). A Channels facade lists its children's
+failures as they are, adding only its own.
+- Failure records are **developer content**: the store's masking options are not applied to them. The only
+  user-provided value in a record is the namespace inside `source`, which is cloned with
+  `strip_sensitive_info` first.
+- `Span` and `Logger` create a failure only in their final safety net — a store that throws, rejects or
+  resolves something that is not a result, or a bug in their own code: `operation: 'unexpected'`,
+  `source: 'Span' | 'Logger'`. They hand it to the store with `reportInternalFailure` and return it; both
+  are the same object. If `reportInternalFailure` itself throws, the throw is swallowed and a second
+  `unexpected` failure is appended to the returned error, so the value still says what happened.
+
+**Example:** a Channels write where the IndexedDB child hits a quota error resolves
+`{ ok: false, entry, error: { failures: [{ source: 'IDBLogStorage:my-app', operation: 'write', message: '…',
+details: { name: 'QuotaExceededError' } }] } }`. Nothing is re-wrapped or re-described on the way up.
+
+#### dec-failure-records-carry-no-pii
+A store author never copies a caught error's message, logged data or other user-provided values into a
+record: a `DOMException` message or a response body can quote the data that failed. Records carry names,
+statuses and developer-written sentences only. This is enforced by review, not by the library.
+
+**Example — averted leak:** a webhook answering 400 with `invalid payload: {"email":"a@b.com"}` produces
+`details: { status: 400 }`, not the body.
+
+### dec-failure-signal-in-memory
+**`storage.onFailure(listener)` returns an unsubscribe function, and exists on stores only** — on the store
+the app built and handed to its logger. It is one global "my logging is failing" hook for forwarding to a
+different channel. It lives in memory because reporting a store failure through a persistent or remote
+channel risks failing the same way.
+- The listener receives the `LoggingError` that a failed public call on that store is about to return —
+  the same object, once per failed call. It fires exactly when the result has `error`, so a partial read
+  fires it once with the combined error.
+- A Channels facade's failed call carries its children's failures, so the facade's listeners hear them with
+  no extra machinery. Children deliver to their own (usually empty) listener sets. Listening on two objects a
+  failure passes through hears it twice.
+- `storage.reportInternalFailure(error)` is how `Span` and `Logger` hand their own `unexpected` failures to
+  the same listeners.
+- Subscriptions are identity-based: subscribing the same function twice is a no-op.
+- A listener is consumer code, so it is another way to break control flow. Each runs inside its own
+  `try`/`catch` and a returned promise gets a `.catch`. A listener that throws or rejects is skipped, later
+  listeners still run, nothing is reported (that would be the same double failure), and the call that
+  triggered delivery still returns its result.
+- `ILogger` and `ISpan` have no listener API: a caller who wants to see an error reads the return value.
+- Nothing is buffered: a listener subscribed after a failure does not hear it. Nothing is delivered before the
+  first public call, so subscribing right after construction misses nothing.
+
+**Example:** `storage.onFailure(error => sentry.captureMessage(error.message, { extra: error }))` at startup;
+every failed write, read or reset anywhere in the app reaches Sentry once.
+
+#### dec-listener-writes-never-deliver
+A listener that logs into the failing store would recurse forever: its write fails, the failure is delivered,
+the listener runs and writes again, and because each write settles in a microtask the loop never yields to
+the event loop. So a module-level counter is non-zero while listeners run, and a public call **started** while
+it is non-zero returns its result as normal but does not deliver its failure. The mark is taken when the call
+starts, so failures that arrive later (IndexedDB, a rejecting hook) are covered.
+
+Known limit: an async listener that logs after an `await` is outside the window. The README says to report
+through a different channel, never into the same store.
+
+**Example — averted hang:** `storage.onFailure(e => span.error('logging broke', e))` on a dead IndexedDB. The
+`span.error` call resolves `{ ok: false }` and nothing is delivered for it, so the listener runs once per
+original failure instead of forever.
+
+### dec-unavailable-store-fails-every-call
+A store that cannot work (IndexedDB after a failed open) answers every public call with the same failure until
+it can. Reads resolve with no entries rather than waiting forever.
+
+**Example — averted hang:** a browser profile where IndexedDB is blocked. Each `get` resolves
+`{ ok: false, entries: [], error }` immediately, so a trace viewer shows the error instead of a spinner that
+never stops.
+
+### dec-stores-that-retain-nothing-answer-empty
+Console and Webhook hold no entries. Their `get` resolves `{ ok: true, entries: [] }` and their `reset` and
+`forceClearOldEntries` resolve `{ ok: true }`. There is no "unsupported" failure, so a Channels facade needs no
+special case and a viewer over a mixed facade shows the entries of the children that keep them.
+
+**Example:** a facade over IndexedDB and Console reads as IndexedDB's entries with `ok: true`, not as a
+permanent partial failure that would fire `onFailure` on every poll.
+
+### dec-logger-never-logs-itself
+No library code writes its own failures into a store. A failed log is reported through the result and
+`onFailure` only; logging it through the same logger would likely fail the same way. `bestEffortSpanLog`
+therefore does not write to a span whose call just failed.
+
+**Example — averted double failure:** a span over a full IndexedDB whose write fails. Writing
+"logging failed" to the same span would hit the same full store.
+
+### dec-awaited-write-means-recorded
+`await span.log(...)` still means "committed or failed". Stores are called synchronously within the call
+(nothing is awaited before `commitEntry`; Channels calls its children in a synchronous loop); `span_start` is
+recorded synchronously in the span's constructor; IndexedDB resolves when the transaction completes, not when
+the request succeeds; a Webhook write awaits its flush and its result carries any delivery failure. `fetch`
+is time-boxed so an awaited write cannot hang.
+
+**Example:** a test reads a Memory store immediately after an un-awaited `span.log(...)` and sees the entry;
+code that awaits an IndexedDB write and gets `ok: true` knows a later quota abort cannot undo it.
+
+### dec-channels-isolate-channels
+**One channel's filter, clone, transform or store failure never stops the others.**
+- A write succeeds only if every matching channel recorded it; otherwise it resolves `{ ok: false, entry,
+  error }` listing each failed channel's failures.
+- An entry `structuredClone` cannot copy (a function, `Response` or `AbortSignal` in the context) falls back
+  to `cloneToJsonSafeUnknown(entry, { non_serialisable_handling: 'redact', skip_circular: true })` — no
+  masking, no getters — guarded by its own `try` with a marker as the last resort. Children still mask what
+  they receive (keys survive, so key-based redaction still applies), so
+  dec-channels-passthrough-children-are-boundary holds. In that fallback, transforms see flattened values.
+- Per-call options that cannot be cloned are dropped: the entry is recorded fully masked (fail closed).
+- Reads ask every child, merge their entries and list their failures; `ok` only if every child succeeded
+  (dec-partial-results-are-explicit). Console and Webhook children answer empty
+  (dec-stores-that-retain-nothing-answer-empty).
+
+**Example — averted lost log:** `span.log('fetched', { response, parse })` where `response` is a `Response`
+and `parse` a function. A single `structuredClone` of the raw context throws `DataCloneError`, so every channel
+would lose the entry. Instead each channel records it, with `response` flattened to its own enumerable
+properties (`{}`) and `parse` as `'redact:Function'`.

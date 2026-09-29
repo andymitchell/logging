@@ -2,6 +2,7 @@ import type { WhereFilterDefinition } from "@andymitchell/objects/where-filter";
 import { isLogEntrySimple, type LogEntry } from "../../log-storage/types.ts";
 import type { SpanMeta, TraceEntry } from "../types.ts";
 import type { MinimumContext } from "../../types.ts";
+import type { LoggingResult } from "../../failures/types.ts";
 
 /**
  * Definition for matching a log entry in a trace
@@ -76,6 +77,21 @@ export type TraceSearchResult<T extends MinimumContext = any> = TraceResult<T> &
  * A record of log entries, keyed on the trace id
  */
 export type TraceSearchResults<T extends MinimumContext = any> = TraceSearchResult<T>[]; //Record<string, TraceResult<T>>;
+
+
+/**
+ * The outcome of a trace search.
+ *
+ * `traces` is always an array. When the underlying store consulted several sources and some failed, `traces`
+ * holds what the healthy sources returned and `error` names the sources that failed, so `ok: false` can
+ * arrive with traces. Render what arrived, then flag what broke.
+ *
+ * @example
+ * const r = await viewer.getTraces();
+ * setTraces(r.traces);
+ * setBroken(r.error?.failures.map(f => f.source) ?? []);
+ */
+export type GetTracesResult<T extends MinimumContext = any> = { traces: TraceSearchResults<T> } & LoggingResult;
 
 
 

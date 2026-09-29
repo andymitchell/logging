@@ -3,7 +3,7 @@
 
 import { TraceViewer } from "./trace/viewing/TraceViewer.ts";
 import { isTraceResult } from "./trace/viewing/types.ts";
-import type { ITraceViewer, TraceEntryFilter, TraceFilter, TraceResult, TraceResultFilter, TraceSearchResult, TraceSearchResults } from "./trace/viewing/types.ts";
+import type { GetTracesResult, ITraceViewer, TraceEntryFilter, TraceFilter, TraceResult, TraceResultFilter, TraceSearchResult, TraceSearchResults } from "./trace/viewing/types.ts";
 
 export {
     TraceViewer,
@@ -17,6 +17,7 @@ export type {
     TraceResultFilter,
     TraceResult,
     TraceSearchResult,
-    TraceSearchResults
+    TraceSearchResults,
+    GetTracesResult
 }
 
