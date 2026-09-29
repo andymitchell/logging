@@ -683,7 +683,8 @@ No library code writes its own failures into a store. A failed log is reported t
 therefore does not write to a span whose call just failed.
 - `bestEffortSpanLog` keeps its time cap and its guard: a built-in write never rejects but can be slow (a
   Webhook write waits on the network), and a span from another `ISpan` implementation may still throw. Its
-  `caller` label named the self-report and is now ignored; it stays optional so existing calls compile.
+  `caller` option, which only labelled the self-report, is removed rather than left as an option that does
+  nothing; a call that still passes it fails to compile, and deleting `{ caller: … }` fixes it.
 
 **Example — averted double failure:** a span over a full IndexedDB whose write fails. Writing
 "logging failed" to the same span would hit the same full store.

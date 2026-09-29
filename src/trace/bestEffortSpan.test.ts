@@ -36,6 +36,11 @@ describe('code logging through bestEffortSpanLog', () => {
         expect(entries.filter(entry => entry.type === 'info').map(entry => [entry.message, entry.context])).toEqual([['response', { status: 200 }]]);
     });
 
+    it('takes no label for reporting failures, because it reports none', async () => {
+        // @ts-expect-error `caller` is not an option
+        await bestEffortSpanLog(undefined, async () => {}, { caller: 'Checkout.charge' });
+    });
+
     it('resolves straight away without logging when there is no span', async () => {
         let called = false;
 

@@ -42,11 +42,7 @@ export const DEFAULT_LOG_TIMEOUT_MS = 1000;
 export function bestEffortSpanLog(
   span: ISpan | undefined,
   op: (s: ISpan) => Promise<unknown>,
-  opts: {
-    /** @deprecated Not used; the call's failure is not reported again. */
-    caller?: string;
-    timeoutMs?: number;
-  } = {},
+  opts: { timeoutMs?: number } = {},
 ): Promise<void> {
   if (!span) return Promise.resolve();
   return bestEffort(() => op(span), {
