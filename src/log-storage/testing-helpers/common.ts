@@ -9,6 +9,16 @@ const DETAIL_ITEM_MESSAGE = 'Message 1';
 const DETAIL_ITEM_LITERAL = { object_literal: true };
 const DETAIL_ITEM_ERROR = new Error('error1');
 
+/** Two entries an hour old and one just written, for a store that keeps entries for a minute. */
+function entriesAgedForCleanUp(): LogEntry[] {
+    const anHourAgo = Date.now() - 3_600_000;
+    return [
+        { type: 'info', message: 'expired first', timestamp: anHourAgo, ulid: 'expired-first' },
+        { type: 'info', message: 'expired second', timestamp: anHourAgo + 1, ulid: 'expired-second' },
+        { type: 'info', message: 'kept', timestamp: Date.now(), ulid: 'kept' },
+    ];
+}
+
 type CreateTestLogger = (options?: LogStorageOptions) => {
     logger: ILogStorage,
     cannot_recreate_with_same_data?: boolean,
@@ -171,6 +181,27 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                 expect(entry.type).toBe('info'); if (entry.type !== 'info') throw new Error("noop");
                 expect(entry.message).toBe('Message 2');
 
+            })
+
+
+            it('removes every entry past its max age, not only the oldest', async () => {
+                const logger = createLogger({ max_age: [{ max_ms: 60_000 }] }).logger;
+                await logger.reset(entriesAgedForCleanUp());
+
+                await logger.forceClearOldEntries();
+
+                expect(entriesOf(await logger.get()).map(entry => entry.message)).toEqual(['kept']);
+            })
+
+
+            it('removes every entry past its max age on constructor, not only the oldest', async (cx) => {
+                const loggerTest = createLogger({ max_age: [{ max_ms: 60_000 }] });
+                if (loggerTest.cannot_recreate_with_same_data) cx.skip();
+                await loggerTest.logger.reset(entriesAgedForCleanUp());
+
+                const logger2 = loggerTest.recreateWithSameData();
+
+                expect(entriesOf(await logger2.get()).map(entry => entry.message)).toEqual(['kept']);
             })
 
 

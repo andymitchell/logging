@@ -589,6 +589,10 @@ failures as they are, adding only its own.
   minifier shortens class names in exactly the production builds whose failures get forwarded.
 - A store that throws or rejects from a hook instead of answering is described by its `toFailure`: by
   default the store and operation with a generic sentence, never the thrown value.
+- IndexedDB's hooks reject with whatever IndexedDB raised, and its `toFailure` adds `details: { name }` only
+  for a `DOMException`, whose name the browser picks from a fixed list (`ConstraintError`,
+  `QuotaExceededError`, …). Any other thrown value (an app's error thrown from a getter in `meta`, a filter's
+  own error) gets no `details`: its name is whatever its author chose.
 - `Span`, `Logger` and the trace viewer create a failure only in their final safety net — a store that
   throws, rejects or resolves something that is not a result, or a bug in their own code:
   `operation: 'unexpected'`, `source: 'Span' | 'Logger' | 'TraceViewer'`. A store's misbehaviour is handed
@@ -653,6 +657,13 @@ original failure instead of forever.
 ### dec-unavailable-store-fails-every-call
 A store that cannot work (IndexedDB after a failed open) answers every public call with the same failure until
 it can. Reads resolve with no entries rather than waiting forever.
+- IndexedDB does not retry a failed open, so the failure lasts as long as the store. Each call's failure names
+  that call's `operation` and carries the open's reason: `message: 'Could not open the IndexedDB database.'`,
+  `details: { name: 'VersionError' }`. A runtime with no IndexedDB (server rendering, a test without a
+  polyfill) fails the same way, without `details`.
+- The failed open is never reported by itself (it has no caller); the first call answers it.
+- The clean-up IndexedDB runs when its database opens has no caller either, so its failure is ignored and
+  the store keeps recording. `forceClearOldEntries` waits for its clean-up and answers its failure.
 
 **Example — averted hang:** a browser profile where IndexedDB is blocked. Each `get` resolves
 `{ ok: false, entries: [], error }` immediately, so a trace viewer shows the error instead of a spinner that
