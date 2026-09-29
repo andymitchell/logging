@@ -6,6 +6,8 @@ import type { AcceptLogEntry, ILogStorage, LogCallMaskingOptions, LogEntry, LogS
 import type { WhereFilterDefinition } from "@andymitchell/objects/where-filter";
 import { monotonicFactory } from "ulid";
 import type { IBreakpoints } from "../breakpoints/types.ts";
+import type { LoggingError, LoggingFailureListener } from "../failures/types.ts";
+import { FailureListeners, isInsideFailureListener } from "../failures/FailureListeners.ts";
 
 
 
@@ -31,6 +33,8 @@ export class BaseLogStorage implements ILogStorage {
     protected ulid:Function;
     
     breakpoints?:IBreakpoints | null;
+
+    #failureListeners = new FailureListeners();
 
     constructor(dbNamespace:string, options?: LogStorageOptions) {
         // Strip explicit-`undefined` keys so each falls back to its default. Callers build options
@@ -161,7 +165,48 @@ export class BaseLogStorage implements ILogStorage {
         throw new Error("Method not implemented");
     }
 
-    
+
+    /**
+     * Be told whenever a logging call on this store fails.
+     *
+     * This is the store's one "my logging is failing" hook: subscribe once at startup, on the store you gave
+     * your logger, and forward the error to a channel that is not this store (e.g. your error reporter).
+     * The listener receives the same {@link LoggingError} the failed call returns, once per failed call.
+     *
+     * @param listener - Told the error of every failed call from now on. It may be asynchronous; a listener
+     * that throws or rejects is ignored, and the other listeners still run.
+     * @returns A function that removes the listener.
+     *
+     * @example
+     * const stop = storage.onFailure(error => reportToSentry(error)); // error is plain JSON
+     *
+     * @remarks
+     * - Subscribing the same function twice has no effect.
+     * - Nothing is buffered: a listener subscribed after a failure does not hear it.
+     * - A logging call made from inside a listener does not deliver its own failure, so a listener that logs
+     *   into the failing store cannot loop forever. An async listener that logs after an `await` is outside
+     *   that protection; report through a different channel instead.
+     */
+    public onFailure(listener: LoggingFailureListener): () => void {
+        return this.#failureListeners.subscribe(listener);
+    }
+
+    /**
+     * Tell this store's failure listeners about a failure that happened outside the store.
+     *
+     * Loggers and spans call this when the store itself could not answer (e.g. it threw), so the app hears
+     * about it through {@link onFailure} like any other failure. Applications do not normally call it.
+     *
+     * @param error - The error being returned to the caller of the failed logging call.
+     *
+     * @remarks
+     * Never throws. Called from inside a failure listener, it delivers nothing.
+     */
+    public reportInternalFailure(error: LoggingError): void {
+        if( !isInsideFailureListener() ) this.#failureListeners.deliver(error);
+    }
+
+
 }
 
 /**
