@@ -685,17 +685,25 @@ is time-boxed so an awaited write cannot hang.
 code that awaits an IndexedDB write and gets `ok: true` knows a later quota abort cannot undo it.
 
 ### dec-channels-isolate-channels
-**One channel's filter, clone, transform or store failure never stops the others.**
+**One channel's filter, transform or store failure never stops the others.**
 - A write succeeds only if every matching channel recorded it; otherwise it resolves `{ ok: false, entry,
   error }` listing each failed channel's failures in channel order. A child store's own failures are listed
-  unchanged; a channel whose filter, clone, transform or `add` throws, rejects or answers with something
-  that is not a write result is described by the facade itself (`channels[1] rejected instead of …`).
-- An entry `structuredClone` cannot copy (a function, `Response` or `AbortSignal` in the context) falls back
-  to `cloneToJsonSafeUnknown(entry, { non_serialisable_handling: 'redact', skip_circular: true })` — no
-  masking, no getters — guarded by its own `try` with a marker as the last resort. Children still mask what
-  they receive (keys survive, so key-based redaction still applies), so
-  dec-channels-passthrough-children-are-boundary holds. In that fallback, transforms see flattened values.
-- Per-call options that cannot be cloned are dropped: the entry is recorded fully masked (fail closed).
+  unchanged; a channel whose filter, transform or `add` throws, rejects or answers with something that is
+  not a write result is described by the facade itself (`channels[1] rejected instead of …`).
+- Each channel gets its own copy of the entry. `structuredClone` copies it exactly; an entry it cannot copy
+  (a function, a `Response`, a throwing getter or Proxy in the context) is copied with
+  `cloneToJsonSafe(entry, { non_serialisable_handling: 'redact', skip_circular: true })` instead — no
+  masking, no getters run. If even that cannot copy it (a context nested too deeply to walk), `context` and
+  `meta` are copied separately and whichever cannot be becomes `'redact:uncopyable'`; the rest of the entry
+  is kept, so it still shows in its trace. Copying therefore never fails.
+- Children still mask what they receive (keys survive, and the markers are already safe), so
+  dec-channels-passthrough-children-are-boundary holds: a channel records exactly what its store records
+  when written to directly. In the JSON copy, transforms see flattened values (`'redact:Function'`,
+  `'redact:Date:<iso>'`).
+- Per-call options that cannot be copied are dropped, so every channel masks the entry as if none were
+  given (fail closed). The write then fails with the facade's own failure ("Could not copy the per-call
+  options…"), listed after the channels': the caller asked for values to stay readable and must learn why
+  they are masked.
 - Reads ask every child, merge their entries and list their failures; `ok` only if every child succeeded
   (dec-partial-results-are-explicit). Console and Webhook children answer empty
   (dec-stores-that-retain-nothing-answer-empty). `reset` and `forceClearOldEntries` likewise reach every

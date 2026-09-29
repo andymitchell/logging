@@ -188,7 +188,7 @@ describe('an app whose channel transform throws', () => {
         expect(result.error?.failures).toEqual([{
             source: 'ChannelsLogStorage:app',
             operation: 'write',
-            message: 'channels[1] threw while filtering, cloning, transforming or handing over the entry.',
+            message: 'channels[1] threw while filtering, transforming or handing over the entry.',
         }]);
         expect(JSON.stringify(result.error)).not.toContain('secret-value');
     });
@@ -198,7 +198,7 @@ describe('an app whose channel transform throws', () => {
 describe('an app whose channel is a store written without BaseLogStorage', () => {
 
     const foreignChannels: [ForeignBehaviour, string][] = [
-        ['throws', 'channels[0] threw while filtering, cloning, transforming or handing over the entry.'],
+        ['throws', 'channels[0] threw while filtering, transforming or handing over the entry.'],
         ['rejects', 'channels[0] rejected instead of answering with a result.'],
         ['answers-old-shape', 'channels[0] answered with something that is not a write result.'],
         ['answers-nothing', 'channels[0] answered with something that is not a write result.'],

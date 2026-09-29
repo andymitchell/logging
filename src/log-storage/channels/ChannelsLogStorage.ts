@@ -1,5 +1,6 @@
 import type { WhereFilterDefinition } from "@andymitchell/objects/where-filter";
-import { matchJavascriptObject } from "@andymitchell/objects/where-filter"; 
+import { matchJavascriptObject } from "@andymitchell/objects/where-filter";
+import { cloneToJsonSafe, cloneToJsonSafeUnknown, type CloneToJsonSafeOptions } from "@andymitchell/clone-to-json-safe";
 import type { LogStorageOptions } from "../types.ts";
 import { BaseLogStorage } from "../BaseLogStorage.ts";
 import type { ILogStorage, LogCallMaskingOptions, LogEntry } from "../types.ts";
@@ -24,6 +25,11 @@ export interface Channel {
     /**
      * An optional function to modify a log entry before it's sent to this channel's
      * storage. Useful for redacting data, adding channel-specific metadata, etc.
+     *
+     * It receives this channel's own copy of the entry, so changing it never affects another channel. The
+     * copy is exact unless the entry holds a value `structuredClone` cannot copy (a function, a `Response`, a
+     * throwing getter or Proxy, …); then it is a JSON copy in which each such value is a `redact:<Type>`
+     * marker, and a `Date` beside it arrives as `'redact:Date:<iso>'`.
      */
     transform?: (entry: LogEntry) => LogEntry;
 }
@@ -46,6 +52,11 @@ type LogStorageOptionsWithoutSensitive = Omit<LogStorageOptions, 'permit_dangero
  * Every call reaches every channel, even when one fails, and succeeds only if they all do. A failed result
  * lists each failing channel's failures, in channel order, alongside whatever the healthy channels produced:
  * a read returns their merged entries.
+ *
+ * Each channel records its own copy of an entry, masked by its own storage's options. An entry holding a
+ * value `structuredClone` cannot copy (a function or `Response` in the context) is still recorded: each such
+ * value becomes a `redact:<Type>` marker, as it would in a single store. A context nested too deeply to copy
+ * at all is recorded as `'redact:uncopyable'`.
  *
  * @example
  * const r = await storage.get();
@@ -86,21 +97,37 @@ export class ChannelsLogStorage extends BaseLogStorage implements ILogStorage {
      * Distributes the finalized log entry to all matching channels.
      * This method is called internally by the `add` method in `BaseLogStorage`.
      *
-     * Each channel is isolated: one channel's filter, clone, transform or storage failing never stops the
-     * others. Every channel is handed the entry synchronously, then their results are awaited together.
+     * Each channel is isolated: one channel's filter, transform or storage failing never stops the others. Every channel is handed the entry synchronously, then their results are awaited together.
      *
      * @param logEntry The complete log entry to be committed.
-     * @returns `ok()` only if every matching channel recorded the entry; otherwise every failure, in channel
-     * order: a child store's own failures unchanged, or the facade's description of a channel that threw.
+     * @returns `ok()` only if every matching channel recorded the entry and the per-call options could be
+     * passed on; otherwise every failure: each channel's in channel order (a child store's own failures
+     * unchanged, or the facade's description of a channel that threw), then the facade's own.
      */
     protected override async commitEntry(logEntry: LogEntry, options?: LogCallMaskingOptions): Promise<LoggingResult> {
-        // One options object is forwarded BY REFERENCE to every child. Clone-then-deep-freeze it so (a) the
-        // caller's own object is never mutated, and (b) no child can poison the shared directive — e.g. push an
-        // extra `preserve_unmasked_context_paths` entry that a concurrent sibling would then honor.
-        const frozenOptions = options ? deepFreeze(structuredClone(options)) : undefined;
+        const shared = this.#shareOptions(options);
 
-        const perChannel = this.channels.map((channel, index) => this.#askChannel(index, WRITE, () => this.#handOver(channel, logEntry, frozenOptions), isLogWriteResult));
-        return resultFrom((await Promise.all(perChannel)).flatMap(asked => asked.failures));
+        const perChannel = this.channels.map((channel, index) => this.#askChannel(index, WRITE, () => this.#handOver(channel, logEntry, shared.options), isLogWriteResult));
+        return resultFrom([...(await Promise.all(perChannel)).flatMap(asked => asked.failures), ...shared.failures]);
+    }
+
+    /**
+     * Copy the per-call options once, for every channel to share.
+     *
+     * One options object is forwarded BY REFERENCE to every child. Clone-then-deep-freeze it so (a) the
+     * caller's own object is never mutated, and (b) no child can poison the shared directive — e.g. push an
+     * extra `preserve_unmasked_context_paths` entry that a concurrent sibling would then honor.
+     *
+     * @returns The frozen copy; or, when the options cannot be copied, no options and the failure saying so:
+     * every channel then masks the entry as if none were given (fail closed).
+     */
+    #shareOptions(options?: LogCallMaskingOptions): { options?: LogCallMaskingOptions, failures: LoggingFailure[] } {
+        if( !options ) return { failures: [] };
+        try {
+            return { options: deepFreeze(structuredClone(options)), failures: [] };
+        } catch(cause) {
+            return { failures: [{ ...this.toFailure('write', cause), message: 'Could not copy the per-call options, so every channel was given the entry without them.' }] };
+        }
     }
 
     /**
@@ -112,9 +139,8 @@ export class ChannelsLogStorage extends BaseLogStorage implements ILogStorage {
         // 1. Check if the channel should accept this entry
         if (channel.accept && !matchJavascriptObject<LogEntry>(logEntry, channel.accept)) return NOT_ACCEPTED;
 
-        // 2. Clone the entry to prevent transforms in one channel affecting another.
-        // The `structuredClone` is important for isolation.
-        const entryForChannel = structuredClone(logEntry);
+        // 2. Give the channel its own copy, so a transform or store in one channel can't change another's.
+        const entryForChannel = copyEntry(logEntry);
 
         // 3. Transform the entry if a transformer is provided. Per-call options are deliberately NOT
         // passed to `transform`: they are a masking directive, not entry data, and must never be
@@ -224,7 +250,7 @@ type ChannelQuestion = {
     answer: string,
 };
 
-const WRITE: ChannelQuestion = { operation: 'write', threw: 'threw while filtering, cloning, transforming or handing over the entry.', answer: 'a write result' };
+const WRITE: ChannelQuestion = { operation: 'write', threw: 'threw while filtering, transforming or handing over the entry.', answer: 'a write result' };
 const READ: ChannelQuestion = { operation: 'read', threw: 'threw instead of answering the read with a result.', answer: 'a read result' };
 const RESET: ChannelQuestion = { operation: 'reset', threw: 'threw while filtering or handing over the entries.', answer: 'a result' };
 const CLEAR_OLD_ENTRIES: ChannelQuestion = { operation: 'clear_old_entries', threw: 'threw instead of answering with a result.', answer: 'a result' };
@@ -233,6 +259,43 @@ const CLEAR_OLD_ENTRIES: ChannelQuestion = { operation: 'clear_old_entries', thr
  * A channel whose `accept` filter rejects the entry is not asked to record it.
  */
 const NOT_ACCEPTED = Symbol('not accepted');
+
+/**
+ * Copy an entry for one channel, so nothing one channel's transform or store does can reach another's copy.
+ *
+ * `structuredClone` copies the entry exactly. When it cannot (the context holds a function, a `Response`, a
+ * throwing getter or Proxy, …), the entry is copied as JSON instead: each such value becomes a
+ * `redact:<Type>` marker, and getters are not run. The channel's store still masks the copy as it would the
+ * original, because keys survive and the markers are already safe. A `context` or `meta` that cannot be
+ * copied even as JSON (e.g. nested too deeply to walk) becomes {@link UNCOPYABLE}, and the rest of the entry
+ * is kept.
+ */
+function copyEntry(entry: LogEntry): LogEntry {
+    try {
+        return structuredClone(entry);
+    } catch {
+        // Fall through to a JSON copy.
+    }
+    try {
+        return cloneToJsonSafe(entry, AS_JSON);
+    } catch {
+        return { ...entry, context: copyAsJsonOrMark(entry.context), meta: copyAsJsonOrMark(entry.meta) };
+    }
+}
+
+function copyAsJsonOrMark(value: unknown) {
+    try {
+        return cloneToJsonSafeUnknown(value, AS_JSON);
+    } catch {
+        return UNCOPYABLE;
+    }
+}
+
+/** Keep a trace of each value JSON cannot hold, and drop a reference back to an ancestor. Nothing is masked. */
+const AS_JSON: CloneToJsonSafeOptions = { non_serialisable_handling: 'redact', skip_circular: true };
+
+/** What a channel records in place of a `context` or `meta` that cannot be copied at all. */
+const UNCOPYABLE = 'redact:uncopyable';
 
 /**
  * Recursively freeze a value so a forwarded options object — shared by reference across all children — cannot
