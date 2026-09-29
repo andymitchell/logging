@@ -195,6 +195,17 @@ describe('normalizeArgs', () => {
             expect(result.context[3]).toBeInstanceOf(Error);
         });
         
+        it('should never throw, describing a message that cannot be read at all as unstringifiable', () => {
+            const { proxy: revoked, revoke } = Proxy.revocable({}, {});
+            revoke();
+            class ErrorWithUnreadableMessage extends Error {
+                override get message(): string { throw new Error('hostile getter'); }
+            }
+
+            expect(logger.log(revoked).message).toBe('[Unstringifiable value]');
+            expect(logger.log(new ErrorWithUnreadableMessage()).message).toBe('[Unstringifiable value]');
+        });
+
         it('should handle an empty array as a message', () => {
             const result = logger.log([]);
             expect(result.message).toBe('[]'); // JSON.stringify([]) is '[]'

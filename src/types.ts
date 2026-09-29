@@ -1,17 +1,39 @@
 import type { WhereFilterDefinition } from "@andymitchell/objects/where-filter";
 import type { LogCallMaskingOptions, LogEntry } from "./log-storage/types.ts";
+import type { LogWriteResult } from "./failures/types.ts";
 
 
 export type MinimumContext = Record<string, any>;
 
+/**
+ * Something that records log entries, e.g. a `Logger` or a span.
+ *
+ * Logging never breaks the caller's control flow: every write resolves a {@link LogWriteResult} and never
+ * throws or rejects, whatever the store does or whatever value is logged. Awaiting a write means the store
+ * committed the entry or failed to; not awaiting it is safe.
+ *
+ * @example
+ * const r = await logger.warn('slow response', { ms });
+ * if (r.error) reportLoggingBroken(r.error); // plain JSON
+ */
 export interface ILogger {
 
-    
-    debug<T extends any[]>(message: any, ...context: T): Promise<LogEntry<InferContextTypeFromLogArgsWithoutMessage<T>>>;
-    log<T extends any[]>(message: any, ...context: T): Promise<LogEntry<InferContextTypeFromLogArgsWithoutMessage<T>>>;
-    warn<T extends any[]>(message: any, ...context: T): Promise<LogEntry<InferContextTypeFromLogArgsWithoutMessage<T>>>;
-    error<T extends any[]>(message: any, ...context: T): Promise<LogEntry<InferContextTypeFromLogArgsWithoutMessage<T>>>;
-    critical<T extends any[]>(message: any, ...context: T): Promise<LogEntry<InferContextTypeFromLogArgsWithoutMessage<T>>>;
+    /**
+     * Record a `debug` entry.
+     *
+     * @param message Stringified to become the entry's message (an Error keeps its message and stack).
+     * @param context One value becomes the entry's context; several become an array.
+     * @returns `{ ok: true, entry }`, or `{ ok: false, entry?, error }`. Never rejects.
+     */
+    debug<T extends any[]>(message: any, ...context: T): Promise<LogWriteResult<InferContextTypeFromLogArgsWithoutMessage<T>>>;
+    /** Record an `info` entry. Like {@link ILogger.debug} otherwise. */
+    log<T extends any[]>(message: any, ...context: T): Promise<LogWriteResult<InferContextTypeFromLogArgsWithoutMessage<T>>>;
+    /** Record a `warn` entry. Like {@link ILogger.debug} otherwise. */
+    warn<T extends any[]>(message: any, ...context: T): Promise<LogWriteResult<InferContextTypeFromLogArgsWithoutMessage<T>>>;
+    /** Record an `error` entry. Like {@link ILogger.debug} otherwise. */
+    error<T extends any[]>(message: any, ...context: T): Promise<LogWriteResult<InferContextTypeFromLogArgsWithoutMessage<T>>>;
+    /** Record a `critical` entry. Like {@link ILogger.debug} otherwise. */
+    critical<T extends any[]>(message: any, ...context: T): Promise<LogWriteResult<InferContextTypeFromLogArgsWithoutMessage<T>>>;
 
 
     /**
@@ -20,15 +42,15 @@ export interface ILogger {
      * `allow_per_call_unmasking`. A separate method with options in the LEADING positional slot, never a
      * sniffed argument, so a logged value can never be mistaken for options. @see LogCallMaskingOptions
      */
-    debugWithOptions<C extends MinimumContext>(options: LogCallMaskingOptions<C>, message: any, context: C): Promise<LogEntry<C>>;
+    debugWithOptions<C extends MinimumContext>(options: LogCallMaskingOptions<C>, message: any, context: C): Promise<LogWriteResult<C>>;
     /** Like {@link ILogger.log}, with per-call masking options in the leading slot. @see LogCallMaskingOptions */
-    logWithOptions<C extends MinimumContext>(options: LogCallMaskingOptions<C>, message: any, context: C): Promise<LogEntry<C>>;
+    logWithOptions<C extends MinimumContext>(options: LogCallMaskingOptions<C>, message: any, context: C): Promise<LogWriteResult<C>>;
     /** Like {@link ILogger.warn}, with per-call masking options in the leading slot. @see LogCallMaskingOptions */
-    warnWithOptions<C extends MinimumContext>(options: LogCallMaskingOptions<C>, message: any, context: C): Promise<LogEntry<C>>;
+    warnWithOptions<C extends MinimumContext>(options: LogCallMaskingOptions<C>, message: any, context: C): Promise<LogWriteResult<C>>;
     /** Like {@link ILogger.error}, with per-call masking options in the leading slot. @see LogCallMaskingOptions */
-    errorWithOptions<C extends MinimumContext>(options: LogCallMaskingOptions<C>, message: any, context: C): Promise<LogEntry<C>>;
+    errorWithOptions<C extends MinimumContext>(options: LogCallMaskingOptions<C>, message: any, context: C): Promise<LogWriteResult<C>>;
     /** Like {@link ILogger.critical}, with per-call masking options in the leading slot. @see LogCallMaskingOptions */
-    criticalWithOptions<C extends MinimumContext>(options: LogCallMaskingOptions<C>, message: any, context: C): Promise<LogEntry<C>>;
+    criticalWithOptions<C extends MinimumContext>(options: LogCallMaskingOptions<C>, message: any, context: C): Promise<LogWriteResult<C>>;
 
 
     get(filter?:WhereFilterDefinition<LogEntry>): Promise<LogEntry[]>;

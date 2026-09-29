@@ -42,7 +42,7 @@ export function initiateBreakpointCommandsInDevTools(accessName: string, breakpo
             }
             if( !id ) return;
 
-            breakpoints.removeBreakpoint(id);
+            await breakpoints.removeBreakpoint(id);
         },
         async listBreakpoints() {
             const items = await breakpoints.listBreakpoints();

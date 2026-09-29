@@ -6,13 +6,21 @@ import type { AcceptLogEntry, ILogStorage, LogCallMaskingOptions, LogEntry, LogS
 import type { WhereFilterDefinition } from "@andymitchell/objects/where-filter";
 import { monotonicFactory } from "ulid";
 import type { IBreakpoints } from "../breakpoints/types.ts";
-import type { LoggingError, LoggingFailureListener } from "../failures/types.ts";
+import type { LogWriteResult, LoggingError, LoggingFailure, LoggingFailureListener, LoggingOperation, LoggingResult } from "../failures/types.ts";
 import { FailureListeners, isInsideFailureListener } from "../failures/FailureListeners.ts";
+import { failed, isLoggingResult, resultFrom } from "../failures/results.ts";
 
 
 
 /**
- * Use this to build specific LogStorage
+ * Use this to build specific LogStorage.
+ *
+ * The base does the shared work of every store (building and masking entries, stack traces, breakpoints,
+ * failure listeners) and upholds the {@link ILogStorage} guarantee that no public method throws or rejects.
+ * A subclass provides the hooks, which answer with a result rather than throwing:
+ * - `commitEntry(entry)` → `ok()`, or `failed(...)` describing what went wrong.
+ *
+ * A hook that throws or rejects anyway is caught and described by {@link BaseLogStorage.toFailure}.
  */
 export class BaseLogStorage implements ILogStorage {
     protected includeStackTrace: Required<LogStorageOptions>['include_stack_trace'];
@@ -33,6 +41,12 @@ export class BaseLogStorage implements ILogStorage {
     protected ulid:Function;
     
     breakpoints?:IBreakpoints | null;
+
+    /**
+     * The store's name as it appears in the `source` of its failures, e.g. `IDBLogStorage`. Each store sets
+     * its own, written out because a minifier may shorten the class's name.
+     */
+    protected readonly storeName: string = 'BaseLogStorage';
 
     #failureListeners = new FailureListeners();
 
@@ -58,10 +72,48 @@ export class BaseLogStorage implements ILogStorage {
 
     /**
      * This is the main thing a sub class is expected to provide. Commit to storage / transport it somewhere.
-     * @param _entry 
+     *
+     * Call no `await` before the entry is committed where the store allows it: a caller that does not await
+     * its write still expects the entry to be recorded straight away.
+     *
+     * @param _entry The finished entry, already masked by {@link prepareContext}.
+     * @param _options The per-call masking directives the entry was built with.
+     * @returns `ok()` once the entry is committed, or `failed(...)` saying why it was not. Written by the
+     * store, never quoting the entry or a caught error's message.
      */
-    protected commitEntry(_entry:LogEntry, _options?: LogCallMaskingOptions):Promise<void> {
+    protected commitEntry(_entry:LogEntry, _options?: LogCallMaskingOptions):Promise<LoggingResult> {
         throw new Error("Method not implemented");
+    }
+
+    /**
+     * Describe a failure this store did not describe itself: a hook that threw or rejected, or a breakpoint
+     * check that failed.
+     *
+     * The default names the store and what it was doing, and deliberately ignores `cause`, which can quote
+     * the value that failed. Override it to add structured, non-sensitive `details` (e.g. an exception's
+     * `name`), starting from `super.toFailure(operation, cause)`.
+     *
+     * @param operation What the store was doing.
+     * @param _cause What was thrown or rejected with. Never copy its message into the failure.
+     * @returns A failure whose `source` is the store's name and namespace, e.g. `MemoryLogStorage:my-app`.
+     *
+     * @example
+     * protected override toFailure(operation: LoggingOperation, cause: unknown): LoggingFailure {
+     *     const failure = super.toFailure(operation, cause);
+     *     return cause instanceof DOMException ? { ...failure, details: { name: cause.name } } : failure;
+     * }
+     */
+    protected toFailure(operation: LoggingOperation, _cause: unknown): LoggingFailure {
+        return { source: this.#failureSource(), operation, message: GENERIC_FAILURE_MESSAGES[operation] };
+    }
+
+    /**
+     * The store's name and namespace. The namespace is the one caller-provided value a failure carries, so it
+     * is masked the same way logged context is first.
+     */
+    #failureSource(): string {
+        const namespace = cloneToJsonSafeUnknown(this.dbNamespace, { strip_sensitive_info: true });
+        return typeof namespace === 'string' && namespace !== '' ? `${this.storeName}:${namespace}` : this.storeName;
     }
 
     /**
@@ -119,25 +171,78 @@ export class BaseLogStorage implements ILogStorage {
         }
     }
 
-    async add<C extends any>(acceptEntry: AcceptLogEntry<C>, options?: LogCallMaskingOptions): Promise<LogEntry<C>> {
-        let stackTrace:string | undefined = this.includeStackTrace[acceptEntry.type]? this.generateStackTrace() : undefined;
+    /**
+     * Build the entry, commit it with {@link commitEntry}, check it against breakpoints, and echo it to the
+     * console if `log_to_console` is set.
+     *
+     * @returns `{ ok: true, entry }`, or `{ ok: false, entry, error }` listing every step that failed. A
+     * failed breakpoint check or console echo fails the result even though the entry was recorded. Never
+     * rejects; a failure is also told to {@link onFailure} listeners.
+     */
+    async add<C extends any>(acceptEntry: AcceptLogEntry<C>, options?: LogCallMaskingOptions): Promise<LogWriteResult<C>> {
+        const deliverFailure = !isInsideFailureListener();
 
-        const logEntry:LogEntry = {
-            ...acceptEntry,
-            timestamp: Date.now(),
-            context: this.prepareContext(acceptEntry.context, options),
-            stack_trace: acceptEntry.stack_trace ?? stackTrace,
-            ulid: acceptEntry.ulid ?? this.ulid()
+        let logEntry: LogEntry;
+        try {
+            // Called directly from `add`, so the trace starts at the caller of `add` (see generateStackTrace).
+            const stackTrace:string | undefined = this.includeStackTrace[acceptEntry.type]? this.generateStackTrace() : undefined;
+
+            logEntry = {
+                ...acceptEntry,
+                timestamp: Date.now(),
+                context: this.prepareContext(acceptEntry.context, options),
+                stack_trace: acceptEntry.stack_trace ?? stackTrace,
+                ulid: acceptEntry.ulid ?? this.ulid()
+            }
+        } catch(cause) {
+            return this.#settle(failed(this.toFailure('write', cause)), deliverFailure);
         }
 
-        await this.commitEntry(logEntry, options);
-        this.breakpoints?.test(logEntry);
+        const committed = await this.#answer('write', () => this.commitEntry(logEntry, options));
+        const afterwards = [...await this.#testBreakpoints(logEntry), ...this.#echoToConsole(logEntry)];
+        const outcome = afterwards.length===0? committed : resultFrom([...(committed.error?.failures ?? []), ...afterwards]);
 
-        if( this.logToConsole && logEntry.type!=='event') {
+        return this.#settle(outcome.ok? { ok: true, entry: logEntry } : { ok: false, error: outcome.error, entry: logEntry }, deliverFailure);
+    }
+
+    /**
+     * Run a hook, turning a throw, a rejection or an answer that is not a result into a failure.
+     */
+    async #answer(operation: LoggingOperation, hook: () => Promise<LoggingResult>): Promise<LoggingResult> {
+        try {
+            const answer: unknown = await hook();
+            return isLoggingResult(answer)? answer : failed(this.toFailure(operation, answer));
+        } catch(cause) {
+            return failed(this.toFailure(operation, cause));
+        }
+    }
+
+    async #testBreakpoints(logEntry: LogEntry): Promise<LoggingFailure[]> {
+        try {
+            await this.breakpoints?.test(logEntry);
+            return [];
+        } catch(cause) {
+            return [this.toFailure('breakpoint', cause)];
+        }
+    }
+
+    #echoToConsole(logEntry: LogEntry): LoggingFailure[] {
+        if( !this.logToConsole || logEntry.type==='event' ) return [];
+        try {
             console.log(`[Log ${this.dbNamespace}] ${logEntry.message}`, logEntry.context);
+            return [];
+        } catch(cause) {
+            return [{ ...this.toFailure('write', cause), message: 'Could not echo the entry to the console.' }];
         }
+    }
 
-        return logEntry;
+    /**
+     * Tell the failure listeners about a failed result (unless the call started inside a listener), and
+     * return it unchanged.
+     */
+    #settle<R extends LoggingResult>(result: R, deliverFailure: boolean): R {
+        if( result.error && deliverFailure ) this.#failureListeners.deliver(result.error);
+        return result;
     }
 
     
@@ -166,42 +271,10 @@ export class BaseLogStorage implements ILogStorage {
     }
 
 
-    /**
-     * Be told whenever a logging call on this store fails.
-     *
-     * This is the store's one "my logging is failing" hook: subscribe once at startup, on the store you gave
-     * your logger, and forward the error to a channel that is not this store (e.g. your error reporter).
-     * The listener receives the same {@link LoggingError} the failed call returns, once per failed call.
-     *
-     * @param listener - Told the error of every failed call from now on. It may be asynchronous; a listener
-     * that throws or rejects is ignored, and the other listeners still run.
-     * @returns A function that removes the listener.
-     *
-     * @example
-     * const stop = storage.onFailure(error => reportToSentry(error)); // error is plain JSON
-     *
-     * @remarks
-     * - Subscribing the same function twice has no effect.
-     * - Nothing is buffered: a listener subscribed after a failure does not hear it.
-     * - A logging call made from inside a listener does not deliver its own failure, so a listener that logs
-     *   into the failing store cannot loop forever. An async listener that logs after an `await` is outside
-     *   that protection; report through a different channel instead.
-     */
     public onFailure(listener: LoggingFailureListener): () => void {
         return this.#failureListeners.subscribe(listener);
     }
 
-    /**
-     * Tell this store's failure listeners about a failure that happened outside the store.
-     *
-     * Loggers and spans call this when the store itself could not answer (e.g. it threw), so the app hears
-     * about it through {@link onFailure} like any other failure. Applications do not normally call it.
-     *
-     * @param error - The error being returned to the caller of the failed logging call.
-     *
-     * @remarks
-     * Never throws. Called from inside a failure listener, it delivers nothing.
-     */
     public reportInternalFailure(error: LoggingError): void {
         if( !isInsideFailureListener() ) this.#failureListeners.deliver(error);
     }
@@ -225,6 +298,18 @@ function stripUndefinedValues<T extends object>(obj: T | undefined): Partial<T> 
         }
     }
     return out;
+}
+
+/**
+ * What a store's failure says when the store did not describe it itself.
+ */
+const GENERIC_FAILURE_MESSAGES: Record<LoggingOperation, string> = {
+    write: 'Could not record the entry.',
+    read: 'Could not read the entries.',
+    reset: 'Could not reset the entries.',
+    clear_old_entries: 'Could not clear old entries.',
+    breakpoint: 'Could not check the entry against breakpoints.',
+    unexpected: 'Failed unexpectedly.',
 }
 
 const DEFAULT_LOGGER_OPTIONS:Required<LogStorageOptions> = {

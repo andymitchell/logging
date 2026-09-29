@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Span } from './Span.ts';
 import type { ILogStorage, LogEntry } from '../log-storage/types.ts';
+import type { LogWriteResult, LoggingError } from '../failures/types.ts';
 import type { ILogger, MinimumContext } from '../types.ts';
 import { matchJavascriptObject, type WhereFilterDefinition } from '@andymitchell/objects/where-filter';
 import type { SpanMeta } from './types.ts';
@@ -19,16 +20,27 @@ class FakeLogStorage<T extends MinimumContext = any> implements ILogStorage {
 
     breakpoints = new MemoryBreakpoints();
 
-    async add(entry: any): Promise<LogEntry> {
+    /** The failures handed to this storage via reportInternalFailure. */
+    reported: LoggingError[] = [];
+
+    async add(entry: any): Promise<LogWriteResult> {
         if (this.shouldFailAdd) {
             throw new Error("add failure");
         }
-        // Simulate adding a timestamp (as required by LogEntry) if not provided.
-        const logEntry = { ...entry, timestamp: Date.now() };
+        // Simulate adding a timestamp and ulid (as required by LogEntry) if not provided.
+        const logEntry = { ...entry, timestamp: Date.now(), ulid: entry.ulid ?? String(this.logs.length) };
         this.logs.push(logEntry);
 
-        return logEntry;
-        
+        return { ok: true, entry: logEntry };
+
+    }
+
+    onFailure(): () => void {
+        return () => undefined;
+    }
+
+    reportInternalFailure(error: LoggingError): void {
+        this.reported.push(error);
     }
 
     async get(filter?:WhereFilterDefinition): Promise<any[]> {
@@ -280,18 +292,24 @@ describe('Span Integration Tests', () => {
 
     describe('Failure Scenarios', () => {
 
-        it('should propagate errors when storage.add fails', async () => {
+        it('should resolve a failed result, never reject, when storage.add throws, and hand each failure to the storage', async () => {
             const fakeLogger = new FakeLogStorage();
             const span = new Span(fakeLogger);
             // Set the fake logger to simulate failure on subsequent add() calls.
             fakeLogger.shouldFailAdd = true;
 
-            
-            await expect(span.log("fail message", {})).rejects.toThrowError('add failure')
-            await expect(span.warn("fail message", {})).rejects.toThrowError('add failure')
-            await expect(span.error("fail message", {})).rejects.toThrowError('add failure')
-            await expect(span.end()).rejects.toThrowError('add failure')
+            const results = [
+                await span.log("fail message", {}),
+                await span.warn("fail message", {}),
+                await span.error("fail message", {}),
+                await span.end(),
+            ];
 
+            for (const result of results) {
+                expect(result.ok).toBe(false);
+                expect(result.error?.failures).toEqual([expect.objectContaining({ source: 'Span', operation: 'unexpected' })]);
+            }
+            expect(fakeLogger.reported).toEqual(results.map(result => result.error));
         });
 
         it('should propagate errors when storage.get fails', async () => {

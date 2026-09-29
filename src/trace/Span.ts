@@ -2,12 +2,15 @@
 import { uuidV4 } from "@andymitchell/utils/uid";
 import { deepFreeze } from "@andymitchell/utils/deep-freeze";
 import { cloneToJsonSafe } from "@andymitchell/clone-to-json-safe";
-import type { AcceptLogEntry, ILogStorage, LogCallMaskingOptions, LogEntry } from "../log-storage/types.ts";
+import type { AcceptLogEntry, ILogStorage, LogCallMaskingOptions, LogEntry, LogEntryType } from "../log-storage/types.ts";
 
 import type { WhereFilterDefinition } from "@andymitchell/objects/where-filter";
 import type { ISpan, SpanMeta,  SpanId } from "./types.ts";
 import type { InferContextTypeFromLogArgsWithoutMessage, MinimumContext } from "../types.ts";
+import type { LogWriteResult } from "../failures/types.ts";
 import { normalizeArgs } from "../utils/normalizeArgs.ts";
+import { guardedWrite } from "../failures/guardedWrite.ts";
+import { assertLogStorage } from "../log-storage/assertLogStorage.ts";
 
 
 
@@ -32,14 +35,16 @@ class SpanHandle implements ISpan {
     protected storage:ILogStorage;
 
     constructor(storage: ILogStorage, spanId: Readonly<SpanId>) {
+        assertLogStorage(storage, 'Span');
         this.storage = storage;
         this.spanId = deepFreeze(cloneToJsonSafe(spanId));
     }
 
     protected recordStart(name?: string, context?: any, options?: LogCallMaskingOptions): void {
         // `options` (if any) scopes ONLY to this span_start entry's own context — it is deliberately NOT
-        // retained for logs emitted later within the span.
-        this.storage.add({
+        // retained for logs emitted later within the span. Nobody awaits this write: a failure reaches the
+        // store's failure listeners, and the write never rejects.
+        void this.#write(() => ({
             type: 'event',
 
             meta: {
@@ -50,7 +55,7 @@ class SpanHandle implements ISpan {
             event: {
                 name: 'span_start'
             }
-        }, options);
+        }), options);
     }
 
     /**
@@ -65,98 +70,64 @@ class SpanHandle implements ISpan {
         }
     }
 
-    async #addToStorage<C extends MinimumContext = MinimumContext>(entry: AcceptLogEntry, options?: LogCallMaskingOptions<C>):Promise<LogEntry<any, SpanMeta>> {
+    /**
+     * Write through the safety net: resolves a result whatever the store does, and never rejects. The store
+     * is called synchronously, so the span's start is recorded before its constructor returns.
+     */
+    #write<C extends MinimumContext = MinimumContext>(buildEntry: () => AcceptLogEntry, options?: LogCallMaskingOptions<C>):Promise<LogWriteResult<any, SpanMeta>> {
         // `add` is non-generic at the storage boundary (dec-add-boundary-non-generic); widening a `C`-narrowed
         // directive to string paths is sound but unprovable for an abstract `C`, so it is asserted at this hand-off.
-        const logEntry = await this.storage.add(entry, options as LogCallMaskingOptions | undefined) as LogEntry<any, SpanMeta>;
-        return logEntry;
-    }
-    
-    
-    async debug<T extends any[]>(message: any, ...context: T): Promise<LogEntry<InferContextTypeFromLogArgsWithoutMessage<T>, SpanMeta>> {
-        
-        return await this.#addToStorage({
-            type: 'debug',
-            ...normalizeArgs([message, ...context]), // message + context
-            meta: this.#getMeta()
-        })
+        return guardedWrite<SpanMeta>(this.storage, 'Span', buildEntry, options as LogCallMaskingOptions | undefined);
     }
 
-    async log<T extends any[]>(message: any, ...context: T): Promise<LogEntry<InferContextTypeFromLogArgsWithoutMessage<T>, SpanMeta>> {
-        
-        return await this.#addToStorage({
-            type: 'info',
-            ...normalizeArgs([message, ...context]), // message + context
+    #writeMessage<C extends MinimumContext = MinimumContext>(type: Exclude<LogEntryType, 'event'>, args: unknown[], options?: LogCallMaskingOptions<C>):Promise<LogWriteResult<any, SpanMeta>> {
+        return this.#write(() => ({
+            type,
+            ...normalizeArgs(args), // message + context
             meta: this.#getMeta()
-        })
-    }
-
-    async warn<T extends any[]>(message: any, ...context: T): Promise<LogEntry<InferContextTypeFromLogArgsWithoutMessage<T>, SpanMeta>> {
-        
-        return await this.#addToStorage({
-            type: 'warn',
-            ...normalizeArgs([message, ...context]), // message + context
-            meta: this.#getMeta()
-        })
-    }
-
-    async error<T extends any[]>(message: any, ...context: T): Promise<LogEntry<InferContextTypeFromLogArgsWithoutMessage<T>, SpanMeta>> {
-        
-        return await this.#addToStorage({
-            type: 'error',
-            ...normalizeArgs([message, ...context]), // message + context
-            meta: this.#getMeta()
-        })
-    }
-
-    async critical<T extends any[]>(message: any, ...context: T): Promise<LogEntry<InferContextTypeFromLogArgsWithoutMessage<T>, SpanMeta>> {
-
-        return await this.#addToStorage({
-            type: 'critical',
-            ...normalizeArgs([message, ...context]), // message + context
-            meta: this.#getMeta()
-        })
+        }), options);
     }
 
 
-    async debugWithOptions<C extends MinimumContext>(options: LogCallMaskingOptions<C>, message: any, context: C): Promise<LogEntry<C, SpanMeta>> {
-        return await this.#addToStorage({
-            type: 'debug',
-            ...normalizeArgs([message, context]), // single context, masked per `options`
-            meta: this.#getMeta()
-        }, options)
+    async debug<T extends any[]>(message: any, ...context: T): Promise<LogWriteResult<InferContextTypeFromLogArgsWithoutMessage<T>, SpanMeta>> {
+        return this.#writeMessage('debug', [message, ...context]);
     }
 
-    async logWithOptions<C extends MinimumContext>(options: LogCallMaskingOptions<C>, message: any, context: C): Promise<LogEntry<C, SpanMeta>> {
-        return await this.#addToStorage({
-            type: 'info',
-            ...normalizeArgs([message, context]),
-            meta: this.#getMeta()
-        }, options)
+    async log<T extends any[]>(message: any, ...context: T): Promise<LogWriteResult<InferContextTypeFromLogArgsWithoutMessage<T>, SpanMeta>> {
+        return this.#writeMessage('info', [message, ...context]);
     }
 
-    async warnWithOptions<C extends MinimumContext>(options: LogCallMaskingOptions<C>, message: any, context: C): Promise<LogEntry<C, SpanMeta>> {
-        return await this.#addToStorage({
-            type: 'warn',
-            ...normalizeArgs([message, context]),
-            meta: this.#getMeta()
-        }, options)
+    async warn<T extends any[]>(message: any, ...context: T): Promise<LogWriteResult<InferContextTypeFromLogArgsWithoutMessage<T>, SpanMeta>> {
+        return this.#writeMessage('warn', [message, ...context]);
     }
 
-    async errorWithOptions<C extends MinimumContext>(options: LogCallMaskingOptions<C>, message: any, context: C): Promise<LogEntry<C, SpanMeta>> {
-        return await this.#addToStorage({
-            type: 'error',
-            ...normalizeArgs([message, context]),
-            meta: this.#getMeta()
-        }, options)
+    async error<T extends any[]>(message: any, ...context: T): Promise<LogWriteResult<InferContextTypeFromLogArgsWithoutMessage<T>, SpanMeta>> {
+        return this.#writeMessage('error', [message, ...context]);
     }
 
-    async criticalWithOptions<C extends MinimumContext>(options: LogCallMaskingOptions<C>, message: any, context: C): Promise<LogEntry<C, SpanMeta>> {
-        return await this.#addToStorage({
-            type: 'critical',
-            ...normalizeArgs([message, context]),
-            meta: this.#getMeta()
-        }, options)
+    async critical<T extends any[]>(message: any, ...context: T): Promise<LogWriteResult<InferContextTypeFromLogArgsWithoutMessage<T>, SpanMeta>> {
+        return this.#writeMessage('critical', [message, ...context]);
+    }
+
+
+    async debugWithOptions<C extends MinimumContext>(options: LogCallMaskingOptions<C>, message: any, context: C): Promise<LogWriteResult<C, SpanMeta>> {
+        return this.#writeMessage('debug', [message, context], options); // single context, masked per `options`
+    }
+
+    async logWithOptions<C extends MinimumContext>(options: LogCallMaskingOptions<C>, message: any, context: C): Promise<LogWriteResult<C, SpanMeta>> {
+        return this.#writeMessage('info', [message, context], options);
+    }
+
+    async warnWithOptions<C extends MinimumContext>(options: LogCallMaskingOptions<C>, message: any, context: C): Promise<LogWriteResult<C, SpanMeta>> {
+        return this.#writeMessage('warn', [message, context], options);
+    }
+
+    async errorWithOptions<C extends MinimumContext>(options: LogCallMaskingOptions<C>, message: any, context: C): Promise<LogWriteResult<C, SpanMeta>> {
+        return this.#writeMessage('error', [message, context], options);
+    }
+
+    async criticalWithOptions<C extends MinimumContext>(options: LogCallMaskingOptions<C>, message: any, context: C): Promise<LogWriteResult<C, SpanMeta>> {
+        return this.#writeMessage('critical', [message, context], options);
     }
 
     async get(filter?:WhereFilterDefinition<LogEntry<any, SpanMeta>>): Promise<LogEntry<any, SpanMeta>[]> {
@@ -194,15 +165,14 @@ class SpanHandle implements ISpan {
 
     }
 
-    async end(): Promise<void> {
-
-        await this.#addToStorage({
+    async end(): Promise<LogWriteResult<undefined, SpanMeta>> {
+        return this.#write(() => ({
             type: 'event',
             meta: this.#getMeta(),
             event: {
                 name: 'span_end'
             }
-        })
+        }));
     }
 
     getId() {
@@ -248,6 +218,9 @@ export class Span extends SpanHandle implements ISpan {
      * @param name An optional operation name written on the `span_start` event.
      * @param context Optional structured context written on the `span_start` event.
      * @param options Optional masking directives that apply only to the start event's context.
+     * @throws TypeError if `storage` lacks `onFailure` or `reportInternalFailure` (a store that does not
+     * implement {@link ILogStorage}). A store that fails to record the start does not make this throw: the
+     * failure is told to the store's failure listeners.
      */
     constructor(storage:ILogStorage, parent?: {parent_id?: string, top_id?: string}, name?: string, context?: any, options?: LogCallMaskingOptions) {
         const id = uuidV4();

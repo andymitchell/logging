@@ -31,7 +31,7 @@ export class KvStorageBreakpoints extends BaseBreakpoints implements IBreakpoint
 
     override async addBreakpoint(filter:WhereFilterDefinition<AcceptLogEntry>):Promise<{id:string}> {
         const id = uuidV4();
-        this.breakpoints.set(id, {id, filter});
+        await this.breakpoints.set(id, {id, filter});
         return {id};
     }
 

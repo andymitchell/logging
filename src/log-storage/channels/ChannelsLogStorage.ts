@@ -3,6 +3,8 @@ import { matchJavascriptObject } from "@andymitchell/objects/where-filter";
 import type { LogStorageOptions } from "../types.ts";
 import { BaseLogStorage } from "../BaseLogStorage.ts";
 import type { ILogStorage, LogCallMaskingOptions, LogEntry } from "../types.ts";
+import type { LoggingFailure, LoggingResult } from "../../failures/types.ts";
+import { isLogWriteResult, resultFrom } from "../../failures/results.ts";
 
 /**
  * Defines the configuration for a single channel within the ChannelsLogStorage.
@@ -45,6 +47,8 @@ export class ChannelsLogStorage extends BaseLogStorage implements ILogStorage {
 
     private channels: Channel[];
 
+    protected override readonly storeName: string = 'ChannelsLogStorage';
+
     /**
      * @param dbNamespace A namespace for this logger instance.
      * @param channels An array of channel configurations.
@@ -72,39 +76,63 @@ export class ChannelsLogStorage extends BaseLogStorage implements ILogStorage {
     /**
      * Distributes the finalized log entry to all matching channels.
      * This method is called internally by the `add` method in `BaseLogStorage`.
+     *
+     * Each channel is isolated: one channel's filter, clone, transform or storage failing never stops the
+     * others. Every channel is handed the entry synchronously, then their results are awaited together.
+     *
      * @param logEntry The complete log entry to be committed.
+     * @returns `ok()` only if every matching channel recorded the entry; otherwise every failure, in channel
+     * order: a child store's own failures unchanged, or the facade's description of a channel that threw.
      */
-    protected override async commitEntry(logEntry: LogEntry, options?: LogCallMaskingOptions): Promise<void> {
-        const commitPromises: Promise<unknown>[] = [];
-
+    protected override async commitEntry(logEntry: LogEntry, options?: LogCallMaskingOptions): Promise<LoggingResult> {
         // One options object is forwarded BY REFERENCE to every child. Clone-then-deep-freeze it so (a) the
         // caller's own object is never mutated, and (b) no child can poison the shared directive — e.g. push an
         // extra `preserve_unmasked_context_paths` entry that a concurrent sibling would then honor.
         const frozenOptions = options ? deepFreeze(structuredClone(options)) : undefined;
 
-        for (const channel of this.channels) {
+        const perChannel = this.channels.map((channel, index) => this.#sendToChannel(channel, index, logEntry, frozenOptions));
+        return resultFrom((await Promise.all(perChannel)).flat());
+    }
+
+    /**
+     * Send the entry to one channel, if it accepts it.
+     *
+     * @returns The channel's failures: none if it recorded the entry (or does not accept it). Never rejects.
+     */
+    async #sendToChannel(channel: Channel, index: number, logEntry: LogEntry, frozenOptions?: LogCallMaskingOptions): Promise<LoggingFailure[]> {
+        let answer: Promise<unknown>;
+        try {
             // 1. Check if the channel should accept this entry
-            const isMatch = !channel.accept || matchJavascriptObject<LogEntry>(logEntry, channel.accept);
+            if (channel.accept && !matchJavascriptObject<LogEntry>(logEntry, channel.accept)) return [];
 
-            if (isMatch) {
-                // 2. Clone the entry to prevent transforms in one channel affecting another.
-                // The `structuredClone` is important for isolation.
-                const entryForChannel = structuredClone(logEntry);
+            // 2. Clone the entry to prevent transforms in one channel affecting another.
+            // The `structuredClone` is important for isolation.
+            const entryForChannel = structuredClone(logEntry);
 
-                // 3. Transform the entry if a transformer is provided. Per-call options are deliberately NOT
-                // passed to `transform`: they are a masking directive, not entry data, and must never be
-                // attached to the entry (which would persist them).
-                const entryToSend:LogEntry = channel.transform ? channel.transform(entryForChannel) : entryForChannel;
+            // 3. Transform the entry if a transformer is provided. Per-call options are deliberately NOT
+            // passed to `transform`: they are a masking directive, not entry data, and must never be
+            // attached to the entry (which would persist them).
+            const entryToSend:LogEntry = channel.transform ? channel.transform(entryForChannel) : entryForChannel;
 
-                // 4. Send to the channel's storage, forwarding the frozen per-call options so a flagged child
-                // (allow_per_call_unmasking) can honor them. We call .add() to adhere to the ILogStorage
-                // interface. The underlying BaseLogStorage.add() will use the existing ulid.
-                commitPromises.push(channel.storage.add(entryToSend, frozenOptions));
-            }
+            // 4. Send to the channel's storage, forwarding the frozen per-call options so a flagged child
+            // (allow_per_call_unmasking) can honor them. We call .add() to adhere to the ILogStorage
+            // interface. The underlying BaseLogStorage.add() will use the existing ulid.
+            answer = channel.storage.add(entryToSend, frozenOptions);
+        } catch(cause) {
+            return [this.#channelFailure(index, cause, 'threw while filtering, cloning, transforming or handing over the entry.')];
         }
 
-        // Wait for all channels to complete their write operations
-        await Promise.all(commitPromises);
+        try {
+            const result = await answer;
+            if (!isLogWriteResult(result)) return [this.#channelFailure(index, result, 'answered with something that is not a write result.')];
+            return result.error?.failures ?? [];
+        } catch(cause) {
+            return [this.#channelFailure(index, cause, 'rejected instead of answering with a result.')];
+        }
+    }
+
+    #channelFailure(index: number, cause: unknown, what: string): LoggingFailure {
+        return { ...this.toFailure('write', cause), message: `channels[${index}] ${what}` };
     }
 
     /**

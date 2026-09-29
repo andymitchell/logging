@@ -3,6 +3,8 @@ import type { LogStorageOptions } from "../types.ts";
 import { BaseLogStorage } from "../BaseLogStorage.ts";
 import type { LogEntry, ILogStorage } from "../types.ts";
 import { uid } from "@andymitchell/utils/uid";
+import type { LoggingResult } from "../../failures/types.ts";
+import { ok } from "../../failures/results.ts";
 
 
 
@@ -25,6 +27,8 @@ export class WebhookLogStorage extends BaseLogStorage implements ILogStorage {
      * The maximum number of log entries to send in a single batch.
      */
     static readonly MAX_BATCH_SIZE = 10;
+
+    protected override readonly storeName: string = 'WebhookLogStorage';
 
     
     /**
@@ -59,13 +63,10 @@ export class WebhookLogStorage extends BaseLogStorage implements ILogStorage {
     }
 
 
-    protected override async commitEntry(logEntry: LogEntry): Promise<void> {
-
-
-
+    protected override async commitEntry(logEntry: LogEntry): Promise<LoggingResult> {
         await this.#bufferStorage.add(logEntry);
         await this.#flushBuffer();
-
+        return ok();
     }
 
 

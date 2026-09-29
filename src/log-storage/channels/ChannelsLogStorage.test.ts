@@ -3,7 +3,9 @@ import { ChannelsLogStorage, type Channel } from "./ChannelsLogStorage.ts"
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-import type { AcceptLogEntry, LogCallMaskingOptions, LogEntry } from '../types.ts';
+import type { AcceptLogEntry, LogCallMaskingOptions } from '../types.ts';
+import type { LogWriteResult } from '../../failures/types.ts';
+import { entryOf } from '../testing-helpers/results.ts';
 
 
 /**
@@ -12,7 +14,7 @@ import type { AcceptLogEntry, LogCallMaskingOptions, LogEntry } from '../types.t
  * per child — both are valid per the design, so the test asserts the OUTCOME, not the mechanism).
  */
 class PoisoningStorage extends MemoryLogStorage {
-    override async add<C>(entry: AcceptLogEntry<C>, options?: LogCallMaskingOptions): Promise<LogEntry<C>> {
+    override async add<C>(entry: AcceptLogEntry<C>, options?: LogCallMaskingOptions): Promise<LogWriteResult<C>> {
         try {
             options?.preserve_unmasked_context_paths?.push({ path: 'auth.token', shape: 'uuid' });
         } catch { /* a frozen array throws here — exactly the defense we want */ }
@@ -45,7 +47,7 @@ it('basic', async () => {
     const items = await memoryLogger.get();
     console.log(items);
 
-    expect(added.ulid).toBe(items[0]?.ulid);
+    expect(entryOf(added).ulid).toBe(items[0]?.ulid);
 
 
 })

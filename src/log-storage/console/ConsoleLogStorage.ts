@@ -2,6 +2,8 @@ import { type WhereFilterDefinition } from "@andymitchell/objects/where-filter";
 import type { LogStorageOptions } from "../types.ts";
 import { BaseLogStorage } from "../BaseLogStorage.ts";
 import type { LogEntry, ILogStorage } from "../types.ts";
+import type { LoggingResult } from "../../failures/types.ts";
+import { ok } from "../../failures/results.ts";
 
 
 
@@ -18,6 +20,8 @@ interface ConsoleLogStorageOptions extends LogStorageOptions {
 export class ConsoleLogStorage extends BaseLogStorage implements ILogStorage {
 
     #options?: ConsoleLogStorageOptions;
+
+    protected override readonly storeName: string = 'ConsoleLogStorage';
     
     
     
@@ -32,7 +36,7 @@ export class ConsoleLogStorage extends BaseLogStorage implements ILogStorage {
 
     
 
-    protected override async commitEntry(logEntry: LogEntry): Promise<void> {
+    protected override async commitEntry(logEntry: LogEntry): Promise<LoggingResult> {
 
         const consoleFunctions = ['debug', 'log', 'warn', 'error'] as const;
         type ConsoleFunctions = typeof consoleFunctions[number];
@@ -59,7 +63,8 @@ export class ConsoleLogStorage extends BaseLogStorage implements ILogStorage {
             }
         } else {
             logFunction(logEntry);
-        }        
+        }
+        return ok();
     }
 
     protected override async clearOldEntries(): Promise<void> {

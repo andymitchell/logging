@@ -2,6 +2,7 @@ import type { WhereFilterDefinition } from "@andymitchell/objects/where-filter";
 import type { PreserveUnmaskedPath } from "@andymitchell/clone-to-json-safe";
 import type { IBreakpoints } from "../breakpoints/types.ts";
 import type { MaxAge, MinimumContext } from "../types.ts";
+import type { LogWriteResult, LoggingError, LoggingFailureListener } from "../failures/types.ts";
 
 
 /**
@@ -160,19 +161,28 @@ export type LogCallMaskingOptions<C extends MinimumContext = MinimumContext> = {
 
 /**
  * The storage area for loggers. An implementation of this will always be passed into a Logger/Trace class.
+ *
+ * Logging never breaks the control flow of the code that logs: no method throws or rejects. A call that
+ * fails resolves a result saying so (`{ ok: false, error }`), and the same error is told to the store's
+ * {@link ILogStorage.onFailure} listeners. Every failure is plain JSON, written by the store where it
+ * happened, and never quotes logged data. Extend `BaseLogStorage` to get these guarantees for free.
  */
 export interface ILogStorage {
 
     breakpoints?: IBreakpoints | null,
 
     /**
-     * Add an entry to the data store
+     * Add an entry to the data store.
+     *
      * @param entry
      * @param options Optional per-call masking directives (out-of-band; honored only when this storage has
      * `allow_per_call_unmasking: true`). Non-generic on purpose — typed paths live at the `*WithOptions`
      * call sites; `C` cannot be reliably inferred from the entry's union here.
+     * @returns `{ ok: true, entry }` with the recorded entry, or `{ ok: false, entry, error }`; `entry` is
+     * present on failure whenever it was built. Never rejects. Resolving means the store committed the
+     * entry or failed to.
      */
-    add<T extends any>(entry:AcceptLogEntry<T>, options?: LogCallMaskingOptions):Promise<LogEntry<T>>;
+    add<T extends any>(entry:AcceptLogEntry<T>, options?: LogCallMaskingOptions):Promise<LogWriteResult<T>>;
 
     /**
      * Retrieve entries from the data store
@@ -192,6 +202,45 @@ export interface ILogStorage {
      * @param entries 
      */
     reset(entries?:LogEntry[]): Promise<void>;
+
+    /**
+     * Be told whenever a logging call on this store fails.
+     *
+     * This is the store's one "my logging is failing" hook: subscribe once at startup, on the store you gave
+     * your logger, and forward the error to a channel that is not this store (e.g. your error reporter).
+     * The listener receives the same {@link LoggingError} the failed call returns, once per failed call.
+     *
+     * @param listener - Told the error of every failed call from now on. It may be asynchronous; a listener
+     * that throws or rejects is ignored, and the other listeners still run.
+     * @returns A function that removes the listener.
+     *
+     * @example
+     * const stop = storage.onFailure(error => reportToSentry(error)); // error is plain JSON
+     *
+     * @remarks
+     * - Subscribing the same function twice has no effect.
+     * - Nothing is buffered: a listener subscribed after a failure does not hear it.
+     * - A logging call made from inside a listener does not deliver its own failure, so a listener that logs
+     *   into the failing store cannot loop forever. An async listener that logs after an `await` is outside
+     *   that protection; report through a different channel instead.
+     * - A failure passes up through every store it touches: a `ChannelsLogStorage` reports its children's
+     *   failures as its own, so listening on both a child and its facade hears the failure twice.
+     */
+    onFailure(listener: LoggingFailureListener): () => void;
+
+    /**
+     * Tell this store's failure listeners about a failure that happened outside the store.
+     *
+     * Loggers and spans call this when the store itself could not answer (e.g. it threw), so the app hears
+     * about it through {@link ILogStorage.onFailure} like any other failure. Applications do not normally
+     * call it.
+     *
+     * @param error - The error being returned to the caller of the failed logging call.
+     *
+     * @remarks
+     * Must not throw. Called from inside a failure listener, it delivers nothing.
+     */
+    reportInternalFailure(error: LoggingError): void;
 
 }
 

@@ -6,6 +6,7 @@ import {
   type StartEventDetail,
 } from "../log-storage/types.ts";
 import type { ILogger, MinimumContext } from "../types.ts";
+import type { LogWriteResult } from "../failures/types.ts";
 
 export interface ISpan extends ILogger {
   /**
@@ -33,8 +34,10 @@ export interface ISpan extends ILogger {
    * Adds a final timestamp for duration logging.
    *
    * Optional.
+   *
+   * @returns The `span_end` write's result, like any other write. Never rejects.
    */
-  end(): Promise<void>;
+  end(): Promise<LogWriteResult<undefined, SpanMeta>>;
 
   /**
    * The the ID of this instance (`SpanId.id`)

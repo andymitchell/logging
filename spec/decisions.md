@@ -546,6 +546,9 @@ Instead `span.warn` resolves `{ ok: false, error }` and sign-in is unaffected.
   no delivery from constructors, timers or background cleanup.
 - `LoggingError` is JSON, enforced by the type system (`details?: JsonValueCapped`), so it can be handed to
   any reporter as-is.
+- A write's `ok` covers every step the store runs for it, not only the commit: a failed breakpoint check or
+  `log_to_console` echo fails the result although the entry was recorded. The breakpoint check is awaited
+  so its failure can reach the result.
 
 **Example:** `const r = await span.warn('x'); if (r.error) reportLoggingBroken(r.error);` — no `try`, and a
 caller that ignores the result loses nothing but the log.
@@ -580,6 +583,10 @@ failures as they are, adding only its own.
 - Failure records are **developer content**: the store's masking options are not applied to them. The only
   user-provided value in a record is the namespace inside `source`, which is cloned with
   `strip_sensitive_info` first.
+- The store name in `source` is written out by each store (`storeName`), not read from the class: a
+  minifier shortens class names in exactly the production builds whose failures get forwarded.
+- A store that throws or rejects from a hook instead of answering is described by its `toFailure`: by
+  default the store and operation with a generic sentence, never the thrown value.
 - `Span` and `Logger` create a failure only in their final safety net — a store that throws, rejects or
   resolves something that is not a result, or a bug in their own code: `operation: 'unexpected'`,
   `source: 'Span' | 'Logger'`. They hand it to the store with `reportInternalFailure` and return it; both
@@ -674,7 +681,9 @@ code that awaits an IndexedDB write and gets `ok: true` knows a later quota abor
 ### dec-channels-isolate-channels
 **One channel's filter, clone, transform or store failure never stops the others.**
 - A write succeeds only if every matching channel recorded it; otherwise it resolves `{ ok: false, entry,
-  error }` listing each failed channel's failures.
+  error }` listing each failed channel's failures in channel order. A child store's own failures are listed
+  unchanged; a channel whose filter, clone, transform or `add` throws, rejects or answers with something
+  that is not a write result is described by the facade itself (`channels[1] rejected instead of …`).
 - An entry `structuredClone` cannot copy (a function, `Response` or `AbortSignal` in the context) falls back
   to `cloneToJsonSafeUnknown(entry, { non_serialisable_handling: 'redact', skip_circular: true })` — no
   masking, no getters — guarded by its own `try` with a marker as the last resort. Children still mask what

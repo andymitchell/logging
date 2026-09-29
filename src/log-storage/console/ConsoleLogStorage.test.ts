@@ -2,6 +2,7 @@
 import { vi } from "vitest";
 import { ConsoleLogStorage } from "./ConsoleLogStorage.ts";
 import type { LogEntry } from "../types.ts";
+import { entryOf } from "../testing-helpers/results.ts";
 
 
 
@@ -34,7 +35,7 @@ describe('ConsoleLogStorage', () => {
         };
 
         // Use a private method call workaround for testing the protected method
-        const finalLogEntry = await storage.add(logEntry);
+        const finalLogEntry = entryOf(await storage.add(logEntry));
 
         // Assert that console.log was called once
         expect(consoleLogSpy).toHaveBeenCalled();
@@ -98,7 +99,7 @@ describe('ConsoleLogStorage', () => {
         };
 
         // Use a private method call workaround for testing the protected method
-        const finalLogEntry = await storage.add(logEntry);
+        const finalLogEntry = entryOf(await storage.add(logEntry));
 
         // Assert that console.error was called once
         expect(consoleLogSpy).not.toHaveBeenCalled();

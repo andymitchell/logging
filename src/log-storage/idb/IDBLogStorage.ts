@@ -3,12 +3,16 @@ import type { LogStorageOptions } from "../types.ts";
 import { BaseLogStorage } from "../BaseLogStorage.ts";
 import type { ILogStorage, LogEntry } from "../types.ts";
 import createMaxAgeTest from "../createMaxAgeTest.ts";
+import type { LoggingResult } from "../../failures/types.ts";
+import { ok } from "../../failures/results.ts";
 
 
 
 
 export class IDBLogStorage extends BaseLogStorage implements ILogStorage {
     #dbPromise: Promise<IDBDatabase>;
+
+    protected override readonly storeName: string = 'IDBLogStorage';
     
 
     constructor(dbNamespace:string, options?: LogStorageOptions) {
@@ -71,11 +75,11 @@ export class IDBLogStorage extends BaseLogStorage implements ILogStorage {
     }
 
 
-    protected override async commitEntry(logEntry: LogEntry): Promise<void> {
+    protected override async commitEntry(logEntry: LogEntry): Promise<LoggingResult> {
         const db = await this.#dbPromise;
         const transaction = db.transaction('logs', 'readwrite');
         const request = transaction.objectStore('logs').add(logEntry);
-        return new Promise<void>((resolve, reject) => {
+        await new Promise<void>((resolve, reject) => {
             request.onsuccess = (() => {
                 resolve()
             })
@@ -83,7 +87,7 @@ export class IDBLogStorage extends BaseLogStorage implements ILogStorage {
                 reject(event)
             })
         });
-        
+        return ok();
     }
 
     public override async reset(entries: LogEntry[] = []):Promise<void> {
