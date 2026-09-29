@@ -10,11 +10,18 @@ import type { LogWriteResult } from "../failures/types.ts";
 
 export interface ISpan extends ILogger {
   /**
-   * Create a child span with a link back to this as the parent
-   * @param name
-   * @returns
+   * Starts a child span whose entries link back to this span as their parent.
    *
-   * @see `tryStartSpan` as a way to call this and suppress errors
+   * The child records its `span_start` entry straight away, in the same store as this span.
+   *
+   * @param name - The child span's name, recorded on its `span_start` entry.
+   * @param context - Context recorded on the child's `span_start` entry.
+   * @returns The child span.
+   *
+   * @remarks
+   * Implementations must not throw. Built-in spans never do: a store that fails to record the `span_start`
+   * entry delivers the failure to its `onFailure` listeners instead. `tryStartSpan` guards a call to a span
+   * from an implementation that might throw.
    */
   startSpan(name?: string, context?: any): ISpan;
 

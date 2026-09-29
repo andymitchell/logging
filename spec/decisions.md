@@ -681,6 +681,9 @@ permanent partial failure that would fire `onFailure` on every poll.
 No library code writes its own failures into a store. A failed log is reported through the result and
 `onFailure` only; logging it through the same logger would likely fail the same way. `bestEffortSpanLog`
 therefore does not write to a span whose call just failed.
+- `bestEffortSpanLog` keeps its time cap and its guard: a built-in write never rejects but can be slow (a
+  Webhook write waits on the network), and a span from another `ISpan` implementation may still throw. Its
+  `caller` label named the self-report and is now ignored; it stays optional so existing calls compile.
 
 **Example — averted double failure:** a span over a full IndexedDB whose write fails. Writing
 "logging failed" to the same span would hit the same full store.
