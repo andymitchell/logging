@@ -511,7 +511,7 @@ nesting that second copy). In return, the symbols the UI imports are a contract:
   UI release that handles it, and the README says which UI version the logging release needs.
 
 **Example:** `TraceViewer.getTraces` resolving `{ ok, traces, error? }` instead of an array. A UI that calls
-`traces.map(...)` on the result fails at runtime, yet npm installs it without a warning. Logging 0.14.0 is
+`traces.map(...)` on the result fails at runtime, yet npm installs it without a warning. Logging 0.15.0 is
 therefore released together with a UI release that reads `.traces`.
 
 ---

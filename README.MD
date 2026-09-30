@@ -75,11 +75,11 @@ if (r.error) reportLoggingBroken(r.error);   // r.entry?.ulid and r.error?.messa
 **`bestEffortSpanLog(span, s => s.log(...))`** is for logging as a side note to other work. It waits at most a second (`{ timeoutMs }` to change it) and does nothing when `span` is `undefined`. Call the span directly when you need the result.
 
 
-# Upgrading to 0.14.0
+# Upgrading to 0.15.0
 
-Every logging call now resolves a result instead of a bare value, and never throws or rejects.
+Every logging call now resolves a result instead of a bare value, and never throws or rejects. (0.14.0 has the same API as 0.13.)
 
-| 0.13 | 0.14 |
+| 0.13 and 0.14 | 0.15 |
 |---|---|
 | `const entry = await logger.log(...)` | `const { entry } = await logger.log(...)` (`entry` may be `undefined` on failure) |
 | `const entries = await storage.get(...)` | `const { entries } = await storage.get(...)` |
@@ -113,7 +113,7 @@ const viewer = new TraceViewer(new IDBLogStorage('my-app'));
 export const Traces = () => <TraceInspector tracesSource={viewer} template="neutral" />;
 ```
 
-Logging 0.14.0 needs `@andymitchell/logging-ui-react` 0.3.0 or later; see [Upgrading to 0.14.0](#upgrading-to-0140).
+Logging 0.15.0 needs `@andymitchell/logging-ui-react` 0.3.0 or later; see [Upgrading to 0.15.0](#upgrading-to-0150).
 
 The `@andymitchell/logging/react` entry point was removed in 0.13.0. Replace `from "@andymitchell/logging/react"` with `from "@andymitchell/logging-ui-react"`; the exported components are unchanged.
 
