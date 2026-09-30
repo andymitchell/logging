@@ -161,6 +161,20 @@ describe('an app whose webhook answers with an error', () => {
 });
 
 
+describe('an app writing one entry twice at once (a replay, or two channels routing it to the same store)', () => {
+
+    it('answers both writes with what became of the entry', async () => {
+        interceptor.setResponse({ status: 200 });
+        const storage = new WebhookLogStorage('my-app', POST_URL);
+        const entry = { type: 'info' as const, message: 'replayed', ulid: '01J9ZZZZZZZZZZZZZZZZZZZZZZ' };
+
+        const results = await Promise.all([storage.add(entry), storage.add(entry)]);
+
+        expect(results.map(result => result.error)).toEqual([undefined, undefined]);
+    });
+});
+
+
 describe('an app writing an entry that cannot be sent as JSON', () => {
 
     it('answers the write with a failure without sending it, and keeps sending later entries', async () => {

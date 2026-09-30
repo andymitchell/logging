@@ -57,10 +57,10 @@ export class WebhookLogStorage extends BaseLogStorage implements ILogStorage {
     protected override readonly storeName: string = 'WebhookLogStorage';
 
     /**
-     * The entries whose writes are waiting on their delivery, by ulid, with what became of each once its batch
-     * was tried (nothing until then).
+     * One record per write still waiting on its entry's delivery, filled in with what became of the entry once
+     * its batch was tried. Kept per write, not per ulid, because one entry can be written twice at once.
      */
-    #awaitedDeliveries = new Map<string, LoggingResult | undefined>();
+    #awaitedDeliveries = new Set<AwaitedDelivery>();
 
     
     /**
@@ -105,13 +105,14 @@ export class WebhookLogStorage extends BaseLogStorage implements ILogStorage {
         // was in, holding back every entry behind it for good.
         if( !isSendableAsJson(logEntry) ) return failed(this.#writeFailure(NOT_JSON));
 
-        this.#awaitedDeliveries.set(logEntry.ulid, undefined);
+        const awaited: AwaitedDelivery = { ulid: logEntry.ulid };
+        this.#awaitedDeliveries.add(awaited);
         try {
             await this.#bufferStorage.add(logEntry);
             await this.#flushBuffer();
-            return this.#awaitedDeliveries.get(logEntry.ulid) ?? failed(this.#writeFailure(HELD_BACK));
+            return awaited.result ?? failed(this.#writeFailure(HELD_BACK));
         } finally {
-            this.#awaitedDeliveries.delete(logEntry.ulid);
+            this.#awaitedDeliveries.delete(awaited);
         }
     }
 
@@ -124,8 +125,9 @@ export class WebhookLogStorage extends BaseLogStorage implements ILogStorage {
      */
     #settle(batch: LogEntry[], delivery: Delivery): void {
         const result = this.#resultOf(delivery);
-        for( const entry of batch ) {
-            if( this.#awaitedDeliveries.has(entry.ulid) ) this.#awaitedDeliveries.set(entry.ulid, result);
+        const tried = new Set(batch.map(entry => entry.ulid));
+        for( const awaited of this.#awaitedDeliveries ) {
+            if( tried.has(awaited.ulid) ) awaited.result = result;
         }
     }
 
@@ -289,6 +291,11 @@ const RETRYABLE_STATUSES:Readonly<number[]> = [
     ];
 
 type BackOffUntil = { timestamp: number, attempt: number };
+
+/**
+ * A write waiting on its entry's delivery, and what became of the entry once its batch was tried.
+ */
+type AwaitedDelivery = { readonly ulid: string, result?: LoggingResult };
 
 /**
  * What became of one attempt to send a batch.
