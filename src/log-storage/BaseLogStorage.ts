@@ -37,12 +37,12 @@ export class BaseLogStorage implements ILogStorage {
     protected dbNamespace:string;
 
     /**
-     * Generate an ID. 
-     * 
+     * Generate an ID.
+     *
      * @default monotonicFactory // guarantees ascending order within this context
      */
     protected ulid:Function;
-    
+
     breakpoints?:IBreakpoints | null;
 
     /**
@@ -204,7 +204,12 @@ export class BaseLogStorage implements ILogStorage {
      */
     public async get<T extends LogEntry = LogEntry>(filter?: WhereFilterDefinition<T>, fullTextFilter?: string): Promise<LogReadResult<T>> {
         const deliverFailure = !isInsideFailureListener();
-        const read = await this.#answer('read', () => this.queryEntries(filter, fullTextFilter), isLogReadResult, result => ({ ...result, entries: [] }));
+      const read = await this.#answer(
+          'read',
+          () => this.queryEntries(filter, fullTextFilter),
+          isLogReadResult,
+          result => ({ ...result, entries: [] })
+        );
         return this.#settle(read, deliverFailure);
     }
 
@@ -322,11 +327,11 @@ export class BaseLogStorage implements ILogStorage {
         return result;
     }
 
-    
+
 
     /**
-     * Helper to create a stack trace back to before the log call. 
-     * @returns 
+     * Helper to create a stack trace back to before the log call.
+     * @returns
      */
     protected generateStackTrace() {
         try {
