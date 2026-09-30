@@ -600,9 +600,10 @@ failures as they are, adding only its own.
   catches an override that throws and answers with the default failure: a broken description costs only its
   `details`, never the call.
 - IndexedDB's hooks reject with whatever IndexedDB raised, and its `toFailure` adds `details: { name }` only
-  for a `DOMException`, whose name the browser picks from a fixed list (`ConstraintError`,
-  `QuotaExceededError`, …). Any other thrown value (an app's error thrown from a getter in `meta`, a filter's
-  own error) gets no `details`: its name is whatever its author chose.
+  for a `DOMException` whose name is one IndexedDB defines (`ConstraintError`, `QuotaExceededError`, …).
+  Being a `DOMException` is not enough: app code can construct one with any name, e.g. a getter in `meta`
+  throwing `new DOMException('x', 'alice@example.com')`. Any other thrown value (an app's error, a filter's own
+  error) gets no `details`: its name is whatever its author chose.
 - `Span`, `Logger` and the trace viewer create a failure only in their final safety net — a store that
   throws, rejects or resolves something that is not a result, or a bug in their own code:
   `operation: 'unexpected'`, `source: 'Span' | 'Logger' | 'TraceViewer'`. A store's misbehaviour is handed

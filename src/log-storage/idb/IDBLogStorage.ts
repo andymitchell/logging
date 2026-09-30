@@ -16,8 +16,9 @@ import { ok } from "../../failures/results.ts";
  * for it. Entries older than `max_age` are removed as soon as it opens, and again on `forceClearOldEntries`.
  * A write resolves once its entry is committed.
  *
- * Like every store it never throws or rejects. A failure carries the name of the exception the browser raised
- * as `details`, e.g. `{ name: 'QuotaExceededError' }`. A store whose database cannot be opened (it exists at a
+ * Like every store it never throws or rejects. A failure carries the name of the exception IndexedDB raised
+ * as `details`, e.g. `{ name: 'QuotaExceededError' }`, when it is one of the names IndexedDB defines; any other
+ * name is left out, since it might quote logged data. A store whose database cannot be opened (it exists at a
  * newer version, or the runtime has no IndexedDB) answers every call with that failure, for as long as the
  * store lives.
  *
@@ -53,9 +54,9 @@ export class IDBLogStorage extends BaseLogStorage implements ILogStorage {
 
     /**
      * Describe a failure in IndexedDB's terms. This store's hooks reject with whatever IndexedDB raised, and
-     * this turns it into the failure: a failed open says so, and an exception the browser raised adds its `name`
+     * this turns it into the failure: a failed open says so, and an exception IndexedDB raised adds its `name`
      * as `details` (e.g. `{ name: 'QuotaExceededError' }`), which says what went wrong without quoting anything
-     * that was logged.
+     * that was logged. Only the names IndexedDB defines are reported.
      */
     protected override toFailure(operation: LoggingOperation, cause: unknown): LoggingFailure {
         const failure = super.toFailure(operation, cause);
@@ -243,9 +244,21 @@ function abortQuietly(transaction: IDBTransaction | null): void {
 }
 
 /**
- * The name of an exception the browser raised (a `DOMException`, e.g. `VersionError`). Nothing for any other
- * value, whose name the browser did not choose and so might say anything.
+ * The exception names the IndexedDB standard gives the browser to raise, plus `SecurityError`, which a browser
+ * raises when a page may not use storage.
+ */
+const INDEXEDDB_EXCEPTION_NAMES: ReadonlySet<string> = new Set([
+    'AbortError', 'ConstraintError', 'DataCloneError', 'DataError', 'InvalidAccessError', 'InvalidStateError',
+    'NotFoundError', 'QuotaExceededError', 'ReadOnlyError', 'SecurityError', 'SyntaxError',
+    'TransactionInactiveError', 'UnknownError', 'VersionError',
+]);
+
+/**
+ * The name of an exception IndexedDB raised (e.g. `VersionError`), taken only from the names IndexedDB defines.
+ * Nothing for any other value: app code can construct a `DOMException` with any name (even an email address),
+ * so a name outside that list might quote anything.
  */
 function browserExceptionName(cause: unknown): string | undefined {
-    return typeof DOMException === 'function' && cause instanceof DOMException ? cause.name : undefined;
+    if( typeof DOMException !== 'function' || !(cause instanceof DOMException) ) return undefined;
+    return INDEXEDDB_EXCEPTION_NAMES.has(cause.name) ? cause.name : undefined;
 }

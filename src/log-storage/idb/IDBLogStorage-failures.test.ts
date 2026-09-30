@@ -170,6 +170,15 @@ describe('an app whose entries IndexedDB refuses to store', () => {
         expect(await unhandled.settled()).toEqual([]);
     });
 
+    it('never repeats an exception name the browser did not choose', async () => {
+        const storage = new IDBLogStorage('my-app');
+
+        const result = await storage.add({ type: 'info', message: 'first', meta: { get span() { throw new DOMException('failure', 'alice@example.com'); } } });
+
+        expect(result.error?.failures).toEqual([{ source: 'IDBLogStorage:my-app', operation: 'write', message: 'Could not record the entry.' }]);
+        expect(JSON.stringify(result.error)).not.toContain('alice@example.com');
+    });
+
     it('answers a reset the database refuses with a reset failure naming the browser\'s reason, leaving the entries as they were', async () => {
         const storage = new IDBLogStorage('my-app');
         await storage.add({ type: 'info', message: 'kept' });
