@@ -155,6 +155,21 @@ describe('an app whose entries IndexedDB refuses to store', () => {
         expect(entriesOf(await storage.get()).map(entry => entry.message)).toEqual(['later']);
     });
 
+    it('answers a write whose meta throws a value that cannot be inspected with a plain write failure, telling its listeners and throwing nothing', async () => {
+        const unhandled = recordUnhandledRejections();
+        onTestFinished(unhandled.stop);
+        const storage = new IDBLogStorage('my-app');
+        const failures = recordFailures(storage);
+        const { proxy: revoked, revoke } = Proxy.revocable({}, {});
+        revoke();
+
+        const result = await storage.add({ type: 'info', message: 'first', meta: { get span() { throw revoked; } } });
+
+        expect(result.error?.failures).toEqual([{ source: 'IDBLogStorage:my-app', operation: 'write', message: 'Could not record the entry.' }]);
+        expect(failures.heard).toEqual([result.error]);
+        expect(await unhandled.settled()).toEqual([]);
+    });
+
     it('answers a reset the database refuses with a reset failure naming the browser\'s reason, leaving the entries as they were', async () => {
         const storage = new IDBLogStorage('my-app');
         await storage.add({ type: 'info', message: 'kept' });

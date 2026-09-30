@@ -97,7 +97,8 @@ export class BaseLogStorage implements ILogStorage {
      * `name`), starting from `super.toFailure(operation, cause)`.
      *
      * @param operation What the store was doing.
-     * @param _cause What was thrown or rejected with. Never copy its message into the failure.
+     * @param _cause What was thrown or rejected with. It can be any value, including one that throws when
+     * inspected (e.g. a revoked Proxy). Never copy its message into the failure.
      * @returns A failure whose `source` is the store's name and namespace, e.g. `MemoryLogStorage:my-app`.
      *
      * @example
@@ -105,8 +106,28 @@ export class BaseLogStorage implements ILogStorage {
      *     const failure = super.toFailure(operation, cause);
      *     return cause instanceof DOMException ? { ...failure, details: { name: cause.name } } : failure;
      * }
+     *
+     * @remarks
+     * An override that throws (e.g. while inspecting `cause`) costs only its `details`: the store answers with
+     * the default failure instead.
      */
     protected toFailure(operation: LoggingOperation, _cause: unknown): LoggingFailure {
+        return this.#genericFailure(operation);
+    }
+
+    /**
+     * Describe a failure with {@link toFailure}, falling back to the generic failure if it throws, so that
+     * describing a failure can never itself break a call.
+     */
+    #describe(operation: LoggingOperation, cause: unknown): LoggingFailure {
+        try {
+            return this.toFailure(operation, cause);
+        } catch {
+            return this.#genericFailure(operation);
+        }
+    }
+
+    #genericFailure(operation: LoggingOperation): LoggingFailure {
         return { source: this.#failureSource(), operation, message: GENERIC_FAILURE_MESSAGES[operation] };
     }
 
@@ -250,7 +271,7 @@ export class BaseLogStorage implements ILogStorage {
                 ulid: acceptEntry.ulid ?? this.ulid()
             }
         } catch(cause) {
-            return this.#settle(failed(this.toFailure('write', cause)), deliverFailure);
+            return this.#settle(failed(this.#describe('write', cause)), deliverFailure);
         }
 
         const committed = await this.#answer('write', () => this.commitEntry(logEntry, options), isLoggingResult, result => result);
@@ -267,9 +288,9 @@ export class BaseLogStorage implements ILogStorage {
     async #answer<A extends LoggingResult>(operation: LoggingOperation, hook: () => Promise<A>, isWellFormed: (answer: unknown) => boolean, crashed: (failure: LoggingFailed) => A): Promise<A> {
         try {
             const answer = await hook();
-            return isWellFormed(answer)? answer : crashed(failed(this.toFailure(operation, answer)));
+            return isWellFormed(answer)? answer : crashed(failed(this.#describe(operation, answer)));
         } catch(cause) {
-            return crashed(failed(this.toFailure(operation, cause)));
+            return crashed(failed(this.#describe(operation, cause)));
         }
     }
 
@@ -278,7 +299,7 @@ export class BaseLogStorage implements ILogStorage {
             await this.breakpoints?.test(logEntry);
             return [];
         } catch(cause) {
-            return [this.toFailure('breakpoint', cause)];
+            return [this.#describe('breakpoint', cause)];
         }
     }
 
@@ -288,7 +309,7 @@ export class BaseLogStorage implements ILogStorage {
             console.log(`[Log ${this.dbNamespace}] ${logEntry.message}`, logEntry.context);
             return [];
         } catch(cause) {
-            return [{ ...this.toFailure('write', cause), message: 'Could not echo the entry to the console.' }];
+            return [{ ...this.#describe('write', cause), message: 'Could not echo the entry to the console.' }];
         }
     }
 

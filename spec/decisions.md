@@ -595,7 +595,10 @@ failures as they are, adding only its own.
 - The store name in `source` is written out by each store (`storeName`), not read from the class: a
   minifier shortens class names in exactly the production builds whose failures get forwarded.
 - A store that throws or rejects from a hook instead of answering is described by its `toFailure`: by
-  default the store and operation with a generic sentence, never the thrown value.
+  default the store and operation with a generic sentence, never the thrown value. The thrown value can be
+  anything, including one that throws when inspected (a revoked Proxy fails even `instanceof`), so the base
+  catches an override that throws and answers with the default failure: a broken description costs only its
+  `details`, never the call.
 - IndexedDB's hooks reject with whatever IndexedDB raised, and its `toFailure` adds `details: { name }` only
   for a `DOMException`, whose name the browser picks from a fixed list (`ConstraintError`,
   `QuotaExceededError`, …). Any other thrown value (an app's error thrown from a getter in `meta`, a filter's
