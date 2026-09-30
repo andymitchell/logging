@@ -1,6 +1,6 @@
 import type { WhereFilterDefinition } from "@andymitchell/objects/where-filter";
 import { matchJavascriptObject } from "@andymitchell/objects/where-filter";
-import { cloneToJsonSafe, cloneToJsonSafeUnknown, type CloneToJsonSafeOptions } from "@andymitchell/clone-to-json-safe";
+import { cloneToJsonSafeUnknown, type CloneToJsonSafeOptions } from "@andymitchell/clone-to-json-safe";
 import type { LogStorageOptions } from "../types.ts";
 import { BaseLogStorage } from "../BaseLogStorage.ts";
 import type { ILogStorage, LogCallMaskingOptions, LogEntry } from "../types.ts";
@@ -264,22 +264,17 @@ const NOT_ACCEPTED = Symbol('not accepted');
  * Copy an entry for one channel, so nothing one channel's transform or store does can reach another's copy.
  *
  * `structuredClone` copies the entry exactly. When it cannot (the context holds a function, a `Response`, a
- * throwing getter or Proxy, …), the entry is copied as JSON instead: each such value becomes a
+ * throwing getter or Proxy, …), each field of the entry is copied as JSON instead: each such value becomes a
  * `redact:<Type>` marker, and getters are not run. The channel's store still masks the copy as it would the
- * original, because keys survive and the markers are already safe. A `context` or `meta` that cannot be
- * copied even as JSON (e.g. nested too deeply to walk) becomes {@link UNCOPYABLE}, and the rest of the entry
- * is kept.
+ * original, because keys survive and the markers are already safe. A field that cannot be copied even as JSON
+ * (e.g. a context nested too deeply to walk) becomes {@link UNCOPYABLE}, and the other fields are kept.
  */
 function copyEntry(entry: LogEntry): LogEntry {
     try {
         return structuredClone(entry);
     } catch {
-        // Fall through to a JSON copy.
-    }
-    try {
-        return cloneToJsonSafe(entry, AS_JSON);
-    } catch {
-        return { ...entry, context: copyAsJsonOrMark(entry.context), meta: copyAsJsonOrMark(entry.meta) };
+        // Every field of `entry` is replaced by its own copy; spreading `entry` first only carries its type.
+        return { ...entry, ...Object.fromEntries(Object.entries(entry).map(([key, value]) => [key, copyAsJsonOrMark(value)])) };
     }
 }
 

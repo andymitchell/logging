@@ -745,11 +745,12 @@ batch it was in, and was retried forever, holding back every entry behind it. No
   unchanged; a channel whose filter, transform or `add` throws, rejects or answers with something that is
   not a write result is described by the facade itself (`channels[1] rejected instead of …`).
 - Each channel gets its own copy of the entry. `structuredClone` copies it exactly; an entry it cannot copy
-  (a function, a `Response`, a throwing getter or Proxy in the context) is copied with
-  `cloneToJsonSafe(entry, { non_serialisable_handling: 'redact', skip_circular: true })` instead — no
-  masking, no getters run. If even that cannot copy it (a context nested too deeply to walk), `context` and
-  `meta` are copied separately and whichever cannot be becomes `'redact:uncopyable'`; the rest of the entry
-  is kept, so it still shows in its trace. Copying therefore never fails.
+  (a function, a `Response`, a throwing getter or Proxy in the context) has each of its fields copied with
+  `cloneToJsonSafeUnknown(field, { non_serialisable_handling: 'redact', skip_circular: true })` instead — no
+  masking, no getters run. A field that cannot be copied even so (a context nested too deeply to walk)
+  becomes `'redact:uncopyable'`; the other fields are kept, so the entry still shows in its trace. Every
+  field is copied, including `event`: a field left shared would let one channel's transform change what the
+  others record. Copying therefore never fails.
 - Children still mask what they receive (keys survive, and the markers are already safe), so
   dec-channels-passthrough-children-are-boundary holds: a channel records exactly what its store records
   when written to directly. In the JSON copy, transforms see flattened values (`'redact:Function'`,

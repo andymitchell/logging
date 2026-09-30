@@ -130,6 +130,22 @@ describe('an app logging a context nested too deeply to copy through a Channels 
         }
         expect(await unhandled.settled()).toEqual([]);
     });
+
+    it('gives each channel its own copy of every other part of the entry, so one channel\'s transform reaches no other', async () => {
+        const recorder = new MemoryLogStorage('recorder');
+        const storage = new ChannelsLogStorage('app', [
+            { storage: new MemoryLogStorage('renamer'), transform: entry => {
+                if (entry.type === 'event') entry.event.name = 'span_end';
+                return entry;
+            } },
+            { storage: recorder },
+        ]);
+
+        const result = await storage.add({ type: 'event', event: { name: 'span_start' }, context: nestedTooDeeplyToCopy() });
+
+        expect(entriesOf(await recorder.get())).toMatchObject([{ type: 'event', event: { name: 'span_start' }, context: 'redact:uncopyable' }]);
+        expect(result.entry).toMatchObject({ event: { name: 'span_start' } });
+    });
 });
 
 
