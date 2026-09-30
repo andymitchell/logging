@@ -4,10 +4,35 @@ import { type ISpan, type SpanId, type SpanMeta } from "./types.ts"
 import type { ILogger } from "../types.ts"
 
 
+/**
+ * One id in a `SpanId`: 1 to 64 letters, digits, `-` or `_`.
+ *
+ * Every id the library makes is a UUID, which fits. The bound is what lets {@link SpanIdSchema} vet a span id that
+ * arrived from a less trusted side: an email, a long string, or anything with spaces or punctuation fails. That
+ * matters because span ids are written to every entry's `meta`, which is never masked.
+ */
+const SpanIdPartSchema = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
+
+/**
+ * A span's identity: its own `id`, the `top_id` of its trace's root span, and its `parent_id` when it has a parent.
+ *
+ * It is also what crosses a boundary when a trace continues on the other side (e.g. from a web page to a browser
+ * extension): the sender sends `span.getFullId()`, and the receiver checks it with this schema before passing it to
+ * `continueTrace`. Each id must be a short token (1 to 64 letters, digits, `-` or `_`), so a value a sender made up to
+ * smuggle an email or a huge string into the receiver's log is rejected.
+ *
+ * @example
+ * const received = SpanIdSchema.safeParse(message.log_span);
+ * const span = received.success
+ *     ? continueTrace(logStorage, received.data).startSpan('Received at boundary')
+ *     : startTrace('Received at boundary', undefined, logStorage);
+ *
+ * @see dec-span-ids-cross-boundaries-validated in spec/decisions.md, and "How to cross boundaries" in the README.
+ */
 export const SpanIdSchema = z.object({
-    id: z.string(),
-    top_id: z.string(),
-    parent_id: z.string().optional(),
+    id: SpanIdPartSchema,
+    top_id: SpanIdPartSchema,
+    parent_id: SpanIdPartSchema.optional(),
 })
 
 export const SpanMetaSchema = z.object({

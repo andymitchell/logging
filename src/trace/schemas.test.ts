@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
 import { SpanIdSchema, SpanMetaSchema, ILoggerSchema, ISpanSchema } from './schemas.ts';
+import { MemoryLogStorage } from '../log-storage/memory/MemoryLogStorage.ts';
+import { startTrace } from './startTrace.ts';
 
 /**
  * Anti-regression lockdown for the span/logger schemas.
@@ -35,6 +37,39 @@ describe('Span identity schema', () => {
             const issue = result.error.issues.find(i => i.path.join('.') === 'id');
             expect(issue?.code).toBe('invalid_type');
         }
+    });
+
+    it('accepts the ids of a real span, and of its child', () => {
+        const root = startTrace('root', undefined, new MemoryLogStorage(''));
+        const child = root.startSpan('child');
+        expect(SpanIdSchema.safeParse(root.getFullId()).success).toBe(true);
+        expect(SpanIdSchema.safeParse(child.getFullId()).success).toBe(true);
+    });
+
+    it('accepts short readable ids, as tests and hand-built spans use', () => {
+        expect(SpanIdSchema.safeParse({ id: 'received-span', top_id: 'trace_root', parent_id: 'P1' }).success).toBe(true);
+    });
+
+    // A span id received across a boundary (e.g. from a web page) lands unmasked in every entry the receiver writes
+    describe('rejects anything that is not a short id, in any of its three fields', () => {
+        const notIds: Array<[string, unknown]> = [
+            ['an email', 'alice@example.com'],
+            ['an empty string', ''],
+            ['text with a space', 'span 1'],
+            ['65 characters', 'a'.repeat(65)],
+            ['a number', 1],
+        ];
+        for (const field of ['id', 'top_id', 'parent_id'] as const) {
+            it.each(notIds)(`${field}: %s`, (_label, value) => {
+                const result = SpanIdSchema.safeParse({ ...validSpanId, parent_id: 'p1', [field]: value });
+                expect(result.success).toBe(false);
+                if (!result.success) expect(result.error.issues.every(i => i.path.join('.') === field)).toBe(true);
+            });
+        }
+    });
+
+    it('accepts an id of exactly 64 characters', () => {
+        expect(SpanIdSchema.safeParse({ id: 'a'.repeat(64), top_id: 't1' }).success).toBe(true);
     });
 
 });

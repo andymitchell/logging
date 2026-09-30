@@ -769,3 +769,27 @@ batch it was in, and was retried forever, holding back every entry behind it. No
 and `parse` a function. A single `structuredClone` of the raw context throws `DataCloneError`, so every channel
 would lose the entry. Instead each channel records it, with `response` flattened to its own enumerable
 properties (`{}`) and `parse` as `'redact:Function'`.
+
+### dec-span-ids-cross-boundaries-validated
+**A trace continues across a boundary by sending the span's `SpanId` (`span.getFullId()`); the receiver checks it
+with `SpanIdSchema`, attaches with `continueTrace`, and logs only in a child span of its own. `SpanIdSchema` accepts
+only short ids: 1 to 64 letters, digits, `-` or `_`.**
+
+**Why:** the receiver (e.g. a browser extension's background) often trusts the sender (a web page) less than
+itself, and a span id is written to the `meta` of every entry the receiver logs, which is never masked.
+- **Only the ids cross.** No name or context goes with them; the receiver's child span carries its own.
+- **Bounded ids, not UUID-only.** Every id the library makes is a UUID, but consumers' tests and hand-built spans use
+  readable ids (`'trace-root'`). The bound still rejects what matters: an email, a huge string, spaces or
+  punctuation. `SpanMetaSchema` shares the rule, which every stored entry already meets.
+- **A child span, never the attached handle.** Attaching writes no `span_start`, so the child is the first span the
+  receiver's store sees start. Logging only in it also stops a sender from aiming the receiver's logs at a span id of
+  its choosing.
+- **A bad id is the receiver's call.** One whose logging must never change an outcome drops it and starts a trace of
+  its own (Authension); one that treats a malformed envelope as a protocol error refuses the request (store2). The
+  schema serves both.
+- **Each side keeps its own store.** They are joined by id: the receiver's store holds a trace whose root lives in the
+  sender's. The React trace viewer shows each missing ancestor as a "Recorded elsewhere" span rather than failing.
+
+**Example — averted leak:** a compromised page sends `log_span: { id: 'alice@example.com', top_id: 'x'.repeat(1e6) }`.
+Unchecked, every background entry for that request carries the email in unmasked `meta`, plus a megabyte of id.
+With the bounded schema both ids fail, and the background drops them and starts its own trace.

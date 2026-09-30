@@ -42,6 +42,45 @@ const span = startTrace('validate', undefined, undefined, parentSpan);
 ```
 
 
+# How to cross boundaries
+
+A trace can carry on across a process or message boundary: a web page messaging a browser extension, a worker, a
+server. Send the span's id; on the other side, check it, attach to it, and do the work in a child span. Both sides
+then share one trace id, while each keeps its entries in its own store.
+
+```ts
+import { continueTrace, startTrace } from '@andymitchell/logging';
+import { SpanIdSchema } from '@andymitchell/logging/schemas';
+
+// Sender: put the span's id on the message. It is only ids: { id, top_id, parent_id? }.
+const span = startTrace('sign-in', undefined, pageStorage);
+await sendToBackground({ name: 'authorize', body, log_span: span.getFullId() });
+
+// Receiver: check what arrived, attach to it, and work in a child span of your own.
+function spanForMessage(message: { name: string, log_span?: unknown }) {
+  const received = SpanIdSchema.safeParse(message.log_span);
+  return received.success
+    ? continueTrace(backgroundStorage, received.data).startSpan('Received at boundary', { message: message.name })
+    : startTrace('Received at boundary', { message: message.name }, backgroundStorage);   // absent or malformed
+}
+const hop = spanForMessage(message);
+await authorize(request, hop);
+```
+
+- **Check before attaching.** `continueTrace` trusts what it is given, and span ids are written to every entry's
+  `meta`, which is never masked. `SpanIdSchema` accepts only short ids (1 to 64 letters, digits, `-` or `_`), so an
+  email or a huge string from a less trusted sender fails.
+- **Drop a bad id rather than fail the request**, if logging must never change what your app does: start a trace of
+  your own instead, as above.
+- **Log only in your child span**, never on the handle `continueTrace` returns. Attaching writes nothing, so the child
+  is the first span your store sees start, and a sender can't aim your logs at a span id of its choosing.
+- **Each store holds its own side.** The receiver's store has a trace whose root lives in the sender's. The React
+  trace viewer shows each missing ancestor as a "Recorded elsewhere" span. To see both sides together, read both
+  stores and join their entries by `meta.span.top_id`.
+
+See `dec-span-ids-cross-boundaries-validated` in [spec/decisions.md](./spec/decisions.md).
+
+
 # When logging itself fails
 
 Logging is a side effect of your app's real work, so a broken store (IndexedDB full, a webhook down, a value that can't be copied) never changes what your app does. No logging call throws or rejects. Each one resolves a result that says whether it worked:
