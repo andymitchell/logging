@@ -1,8 +1,8 @@
 import type { AcceptLogEntry, ILogStorage, LogCallMaskingOptions, LogEntry } from "../log-storage/types.ts";
 import type { MinimumContext } from "../types.ts";
 import { ignoreRejection, isInsideFailureListener } from "./FailureListeners.ts";
-import { failed, isLogReadResult, isLogWriteResult } from "./results.ts";
-import type { LogReadResult, LogWriteResult, LoggingFailed, LoggingFailure } from "./types.ts";
+import { createLoggingFailedResult, isLogReadResult, isLogWriteResult } from "./results.ts";
+import type { LogReadResult, LogWriteResult, LoggingFailedResult, LoggingFailure } from "./types.ts";
 
 
 /**
@@ -87,15 +87,15 @@ export async function guardedRead<T extends LogEntry>(
 }
 
 
-function unexpected(storage: ILogStorage, source: GuardedCaller, message: string, reportFailure: boolean): LoggingFailed {
+function unexpected(storage: ILogStorage, source: GuardedCaller, message: string, reportFailure: boolean): LoggingFailedResult {
     const failure: LoggingFailure = { source, operation: 'unexpected', message };
-    const result = failed(failure);
+    const result = createLoggingFailedResult(failure);
     if (!reportFailure) return result;
 
     try {
         ignoreRejection(storage.reportInternalFailure(result.error));
         return result;
     } catch {
-        return failed(failure, { source, operation: 'unexpected', message: "The log storage's reportInternalFailure threw." });
+        return createLoggingFailedResult(failure, { source, operation: 'unexpected', message: "The log storage's reportInternalFailure threw." });
     }
 }

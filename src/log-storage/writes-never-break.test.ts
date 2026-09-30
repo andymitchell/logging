@@ -4,7 +4,7 @@ import { MemoryBreakpoints } from '../breakpoints/MemoryBreakpoints.ts';
 import { FailingLogStorage, type HookFailure } from './testing-helpers/FailingLogStorage.ts';
 import { entriesOf, recordFailures } from './testing-helpers/results.ts';
 import { recordUnhandledRejections } from './testing-helpers/recordUnhandledRejections.ts';
-import { failed } from '../failures/results.ts';
+import { createLoggingFailedResult } from '../failures/results.ts';
 import type { LogWriteResult } from '../failures/types.ts';
 
 describe('an app writing to a store', () => {
@@ -61,7 +61,7 @@ describe('an app writing to a store', () => {
         });
 
         it('passes on, as the same object, a failure the store described itself', async () => {
-            const described = failed({ source: 'IDBLogStorage:my-app', operation: 'write', message: 'The quota is exceeded.', details: { name: 'QuotaExceededError' } });
+            const described = createLoggingFailedResult({ source: 'IDBLogStorage:my-app', operation: 'write', message: 'The quota is exceeded.', details: { name: 'QuotaExceededError' } });
             const storage = new FailingLogStorage('my-app', { commitEntry: { answers: described } });
             const failures = recordFailures(storage);
 

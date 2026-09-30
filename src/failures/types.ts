@@ -83,7 +83,7 @@ export type LoggingError = {
  * The success half of every logging result. `error` is declared (as absent) so it can be read without first
  * checking `ok`.
  */
-export type LoggingOk = {
+export type LoggingOkResult = {
     ok: true,
     error?: never
 }
@@ -91,7 +91,7 @@ export type LoggingOk = {
 /**
  * The failure half of every logging result.
  */
-export type LoggingFailed = {
+export type LoggingFailedResult = {
     ok: false,
     error: LoggingError
 }
@@ -106,7 +106,7 @@ export type LoggingFailed = {
  * const r = await storage.reset();
  * if (r.error) console.warn(r.error.message);
  */
-export type LoggingResult = LoggingOk | LoggingFailed;
+export type LoggingResult = LoggingOkResult | LoggingFailedResult;
 
 
 /**
@@ -122,8 +122,8 @@ export type LoggingResult = LoggingOk | LoggingFailed;
  * else console.log(r.entry.ulid);
  */
 export type LogWriteResult<C = any, M extends MinimumContext = any> =
-    | ({ entry: LogEntry<C, M> } & LoggingOk)
-    | ({ entry?: LogEntry<C, M> } & LoggingFailed);
+    | ({ entry: LogEntry<C, M> } & LoggingOkResult)
+    | ({ entry?: LogEntry<C, M> } & LoggingFailedResult);
 
 
 /**

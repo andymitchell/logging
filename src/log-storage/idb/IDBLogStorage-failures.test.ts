@@ -7,7 +7,7 @@ import { entriesOf, entryOf, recordFailures } from "../testing-helpers/results.t
 import { MemoryLogStorage } from "../memory/MemoryLogStorage.ts";
 import { ChannelsLogStorage } from "../channels/ChannelsLogStorage.ts";
 import { Trace } from "../../trace/Trace.ts";
-import { failed } from "../../failures/results.ts";
+import { createLoggingFailedResult } from "../../failures/results.ts";
 import type { LoggingFailure, LoggingOperation } from "../../failures/types.ts";
 import type { LogStorageOptions } from "../types.ts";
 
@@ -66,15 +66,15 @@ describe('an app whose IndexedDB database cannot be opened', () => {
 
         const result = await storage.get();
 
-        expect(result).toEqual({ ...failed(openFailure('read')), entries: [] });
+        expect(result).toEqual({ ...createLoggingFailedResult(openFailure('read')), entries: [] });
     });
 
     it('answers a reset and a clear of old entries with the open failure', async () => {
         await openStoreDatabaseAt('my-app', 2);
         const storage = new IDBLogStorage('my-app');
 
-        expect(await storage.reset()).toEqual(failed(openFailure('reset')));
-        expect(await storage.forceClearOldEntries()).toEqual(failed(openFailure('clear_old_entries')));
+        expect(await storage.reset()).toEqual(createLoggingFailedResult(openFailure('reset')));
+        expect(await storage.forceClearOldEntries()).toEqual(createLoggingFailedResult(openFailure('clear_old_entries')));
     });
 
     it('tells the store\'s failure listeners about each failed call, once', async () => {
@@ -186,7 +186,7 @@ describe('an app whose entries IndexedDB refuses to store', () => {
 
         const result = await storage.reset([replacement, replacement]);
 
-        expect(result).toEqual(failed(refusal('reset', 'ConstraintError')));
+        expect(result).toEqual(createLoggingFailedResult(refusal('reset', 'ConstraintError')));
         expect(entriesOf(await storage.get()).map(entry => entry.message)).toEqual(['kept']);
     });
 });
@@ -200,7 +200,7 @@ describe('an app searching entries IndexedDB holds', () => {
 
         const result = await storage.get(undefined, 'counted');
 
-        expect(result).toEqual({ ...failed({ source: 'IDBLogStorage:my-app', operation: 'read', message: 'Could not read the entries.' }), entries: [] });
+        expect(result).toEqual({ ...createLoggingFailedResult({ source: 'IDBLogStorage:my-app', operation: 'read', message: 'Could not read the entries.' }), entries: [] });
         expect(entriesOf(await storage.get()).map(entry => entry.message)).toEqual(['counted']);
     });
 });
@@ -236,7 +236,7 @@ describe('an app whose clean-up of old entries cannot run', () => {
 
         const result = await storage.forceClearOldEntries();
 
-        expect(result).toEqual(failed({ source: 'IDBLogStorage:my-app', operation: 'clear_old_entries', message: 'Could not clear old entries.' }));
+        expect(result).toEqual(createLoggingFailedResult({ source: 'IDBLogStorage:my-app', operation: 'clear_old_entries', message: 'Could not clear old entries.' }));
         expect(entriesOf(await storage.get()).map(entry => entry.message)).toEqual(['kept']);
     });
 });

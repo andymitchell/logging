@@ -7,6 +7,8 @@ import { ConsoleLogStorage } from "./log-storage/console/ConsoleLogStorage.ts";
 // @andymitchell/clone-to-json-safe directly: `sensitive_context_key_names: [...BUILT_IN_SENSITIVE_KEYS, 'myOrgToken']`.
 // That package stays the single source of truth for the list.
 import { BUILT_IN_SENSITIVE_KEYS } from "@andymitchell/clone-to-json-safe";
+// For store authors who extend `BaseLogStorage` and answer a hook (`commitEntry` etc.) with a failure.
+import { createLoggingFailedResult } from "./failures/results.ts";
 
 
 export {
@@ -15,6 +17,7 @@ export {
     ChannelsLogStorage,
     ConsoleLogStorage,
     BUILT_IN_SENSITIVE_KEYS,
+    createLoggingFailedResult,
 }
 
 export {

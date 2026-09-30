@@ -110,6 +110,7 @@ if (r.error) reportLoggingBroken(r.error);   // r.entry?.ulid and r.error?.messa
 - Send it to a **different** channel (your error reporter, a status flag). Never log it into the same store: that store is the one failing. A logging call made from inside a listener (a write, a read or a trace search) doesn't trigger the listener again, but an async listener that logs after an `await` is outside that protection.
 - A failure passes up through every store it touches. Listen on a child and on its Channels facade and you hear it twice.
 - Nothing is buffered: a listener added after a failure doesn't hear it.
+- Writing your own store (extending `BaseLogStorage`)? Answer a hook that failed with `createLoggingFailedResult({ source: 'MyStore:my-app', operation: 'write', message: 'Could not record the entry.' })`, so your failures look like every other store's.
 
 **`bestEffortSpanLog(span, s => s.log(...))`** is for logging as a side note to other work. It waits at most a second (`{ timeoutMs }` to change it) and does nothing when `span` is `undefined`. Call the span directly when you need the result.
 

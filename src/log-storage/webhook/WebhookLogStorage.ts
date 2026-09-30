@@ -4,7 +4,7 @@ import { BaseLogStorage } from "../BaseLogStorage.ts";
 import type { LogEntry, ILogStorage } from "../types.ts";
 import { uid } from "@andymitchell/utils/uid";
 import type { LogReadResult, LoggingFailure, LoggingResult } from "../../failures/types.ts";
-import { failed, ok } from "../../failures/results.ts";
+import { createLoggingFailedResult, ok } from "../../failures/results.ts";
 
 
 
@@ -103,14 +103,14 @@ export class WebhookLogStorage extends BaseLogStorage implements ILogStorage {
     protected override async commitEntry(logEntry: LogEntry): Promise<LoggingResult> {
         // Checked before the entry joins the buffer: one that cannot be sent as JSON would fail every batch it
         // was in, holding back every entry behind it for good.
-        if( !isSendableAsJson(logEntry) ) return failed(this.#writeFailure(NOT_JSON));
+        if( !isSendableAsJson(logEntry) ) return createLoggingFailedResult(this.#writeFailure(NOT_JSON));
 
         const awaited: AwaitedDelivery = { ulid: logEntry.ulid };
         this.#awaitedDeliveries.add(awaited);
         try {
             await this.#bufferStorage.add(logEntry);
             await this.#flushBuffer();
-            return awaited.result ?? failed(this.#writeFailure(HELD_BACK));
+            return awaited.result ?? createLoggingFailedResult(this.#writeFailure(HELD_BACK));
         } finally {
             this.#awaitedDeliveries.delete(awaited);
         }
@@ -134,10 +134,10 @@ export class WebhookLogStorage extends BaseLogStorage implements ILogStorage {
     #resultOf(delivery: Delivery): LoggingResult {
         switch( delivery.kind ) {
             case 'sent': return ok();
-            case 'unreachable': return failed(this.#writeFailure(UNREACHABLE));
-            case 'timed_out': return failed(this.#writeFailure(TIMED_OUT));
-            case 'retry': return failed(this.#writeFailure(TEMPORARY_ERROR, { status: delivery.status }));
-            case 'refused': return failed(this.#writeFailure(REFUSED, { status: delivery.status }));
+            case 'unreachable': return createLoggingFailedResult(this.#writeFailure(UNREACHABLE));
+            case 'timed_out': return createLoggingFailedResult(this.#writeFailure(TIMED_OUT));
+            case 'retry': return createLoggingFailedResult(this.#writeFailure(TEMPORARY_ERROR, { status: delivery.status }));
+            case 'refused': return createLoggingFailedResult(this.#writeFailure(REFUSED, { status: delivery.status }));
         }
     }
 

@@ -6,7 +6,7 @@ import type { ILogStorage } from './types.ts';
 import { FailingLogStorage, type HookFailure } from './testing-helpers/FailingLogStorage.ts';
 import { entryOf, recordFailures } from './testing-helpers/results.ts';
 import { recordUnhandledRejections } from './testing-helpers/recordUnhandledRejections.ts';
-import { failed } from '../failures/results.ts';
+import { createLoggingFailedResult } from '../failures/results.ts';
 import type { LogReadResult, LoggingResult } from '../failures/types.ts';
 
 // `never` answers: these only throw or reject, so they fit every hook.
@@ -149,7 +149,7 @@ describe('an app that configures an unusable max age', () => {
 describe('a store author whose hook answers for itself', () => {
 
     it('passes on, as the same object, a failed read the store described itself', async () => {
-        const described = { ...failed({ source: 'IDBLogStorage:my-app', operation: 'read', message: 'The database is closed.', details: { name: 'InvalidStateError' } }), entries: [] };
+        const described = { ...createLoggingFailedResult({ source: 'IDBLogStorage:my-app', operation: 'read', message: 'The database is closed.', details: { name: 'InvalidStateError' } }), entries: [] };
         const storage = new FailingLogStorage('my-app', { queryEntries: { answers: described } });
         const failures = recordFailures(storage);
 
@@ -160,7 +160,7 @@ describe('a store author whose hook answers for itself', () => {
     });
 
     it('passes on, as the same object, a failed reset the store described itself', async () => {
-        const described = failed({ source: 'IDBLogStorage:my-app', operation: 'reset', message: 'The database is closed.' });
+        const described = createLoggingFailedResult({ source: 'IDBLogStorage:my-app', operation: 'reset', message: 'The database is closed.' });
         const storage = new FailingLogStorage('my-app', { resetEntries: { answers: described } });
 
         expect(await storage.reset()).toBe(described);

@@ -1,10 +1,10 @@
 import { describe, it, expect, onTestFinished } from 'vitest';
 import { MemoryLogStorage } from './memory/MemoryLogStorage.ts';
-import { failed } from '../failures/results.ts';
+import { createLoggingFailedResult } from '../failures/results.ts';
 import type { LoggingError } from '../failures/types.ts';
 import { recordUnhandledRejections } from './testing-helpers/recordUnhandledRejections.ts';
 
-const spanFailure = () => failed({ source: 'Span', operation: 'unexpected', message: 'The log storage threw instead of answering.' }).error;
+const spanFailure = () => createLoggingFailedResult({ source: 'Span', operation: 'unexpected', message: 'The log storage threw instead of answering.' }).error;
 
 describe('an app listening for failures on the store it built', () => {
 

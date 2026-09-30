@@ -4,7 +4,7 @@ import type { MinimumContext } from "../../types.ts";
 import type { GetTracesResult, TraceEntryFilter, TraceFilter, TraceSearchResult } from "./types.ts";
 import type { SpanMeta } from "../types.ts";
 import type { LoggingFailure } from "../../failures/types.ts";
-import { failed, resultFrom } from "../../failures/results.ts";
+import { createLoggingFailedResult, resultFrom } from "../../failures/results.ts";
 import { guardedRead } from "../../failures/guardedCalls.ts";
 
 
@@ -36,7 +36,7 @@ export async function getTraces<T extends MinimumContext = any>(rawLogger:ILogSt
         return await searchTraces(rawLogger, filter, includeAllTraceEntries);
     } catch {
         // The read is guarded, so only a bug in assembling the traces reaches here.
-        return { ...failed({ source: 'TraceViewer', operation: 'unexpected', message: 'Could not assemble the traces from the entries read.' }), traces: [] };
+        return { ...createLoggingFailedResult({ source: 'TraceViewer', operation: 'unexpected', message: 'Could not assemble the traces from the entries read.' }), traces: [] };
     }
 }
 

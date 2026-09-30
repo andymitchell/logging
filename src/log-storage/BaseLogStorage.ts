@@ -6,9 +6,9 @@ import type { AcceptLogEntry, ILogStorage, LogCallMaskingOptions, LogEntry, LogS
 import type { WhereFilterDefinition } from "@andymitchell/objects/where-filter";
 import { monotonicFactory } from "ulid";
 import type { IBreakpoints } from "../breakpoints/types.ts";
-import type { LogReadResult, LogWriteResult, LoggingError, LoggingFailed, LoggingFailure, LoggingFailureListener, LoggingOperation, LoggingResult } from "../failures/types.ts";
+import type { LogReadResult, LogWriteResult, LoggingError, LoggingFailedResult, LoggingFailure, LoggingFailureListener, LoggingOperation, LoggingResult } from "../failures/types.ts";
 import { FailureListeners, isInsideFailureListener } from "../failures/FailureListeners.ts";
-import { failed, isLogReadResult, isLoggingResult, resultFrom } from "../failures/results.ts";
+import { createLoggingFailedResult, isLogReadResult, isLoggingResult, resultFrom } from "../failures/results.ts";
 
 
 
@@ -276,7 +276,7 @@ export class BaseLogStorage implements ILogStorage {
                 ulid: acceptEntry.ulid ?? this.ulid()
             }
         } catch(cause) {
-            return this.#settle(failed(this.#describe('write', cause)), deliverFailure);
+            return this.#settle(createLoggingFailedResult(this.#describe('write', cause)), deliverFailure);
         }
 
         const committed = await this.#answer('write', () => this.commitEntry(logEntry, options), isLoggingResult, result => result);
@@ -290,12 +290,12 @@ export class BaseLogStorage implements ILogStorage {
      * Run a hook, turning a throw, a rejection or a malformed answer into a failure described by
      * {@link toFailure}, which `crashed` completes with the payload the caller always gets (e.g. no entries).
      */
-    async #answer<A extends LoggingResult>(operation: LoggingOperation, hook: () => Promise<A>, isWellFormed: (answer: unknown) => boolean, crashed: (failure: LoggingFailed) => A): Promise<A> {
+    async #answer<A extends LoggingResult>(operation: LoggingOperation, hook: () => Promise<A>, isWellFormed: (answer: unknown) => boolean, crashed: (failure: LoggingFailedResult) => A): Promise<A> {
         try {
             const answer = await hook();
-            return isWellFormed(answer)? answer : crashed(failed(this.#describe(operation, answer)));
+            return isWellFormed(answer)? answer : crashed(createLoggingFailedResult(this.#describe(operation, answer)));
         } catch(cause) {
-            return crashed(failed(this.#describe(operation, cause)));
+            return crashed(createLoggingFailedResult(this.#describe(operation, cause)));
         }
     }
 

@@ -560,6 +560,18 @@ Instead `span.warn` resolves `{ ok: false, error }` and sign-in is unaffected.
 **Example:** `const r = await span.warn('x'); if (r.error) reportLoggingBroken(r.error);` — no `try`, and a
 caller that ignores the result loses nothing but the log.
 
+#### dec-failed-result-factory-exported
+**Store authors build a failure with the exported `createLoggingFailedResult(...failures)`**, never by hand.
+Every failed result then has the same shape and the same one-line `message` summary, whichever store (built-in
+or custom) produced it. The two halves of a result are the exported types `LoggingOkResult` and
+`LoggingFailedResult` (`LoggingOk` / `LoggingFailed` remain as deprecated aliases).
+
+**Example:** a custom store's write hook that cannot reach its backend returns
+`createLoggingFailedResult({ source: 'MyStore:my-app', operation: 'write', message: 'Could not record the entry.' })`;
+the caller sees `error.message === '[MyStore:my-app] Could not record the entry.'`, exactly as it would from
+IndexedDB. A hand-built `{ ok: false, error: { message: 'oops', failures: [...] } }` would give reporters a
+summary in a different format from every other store's.
+
 #### dec-partial-results-are-explicit
 When a call consults several sources (a Channels facade, or a trace viewer over one), some can succeed while
 others fail. The result says so, and never presents a partial answer as complete.

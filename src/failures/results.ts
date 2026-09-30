@@ -1,5 +1,5 @@
 import { isLogEntrySimple } from "../log-storage/types.ts";
-import type { LogReadResult, LogWriteResult, LoggingError, LoggingFailed, LoggingFailure, LoggingOk, LoggingOperation, LoggingResult } from "./types.ts";
+import type { LogReadResult, LogWriteResult, LoggingError, LoggingFailedResult, LoggingFailure, LoggingOkResult, LoggingOperation, LoggingResult } from "./types.ts";
 
 
 /**
@@ -7,7 +7,7 @@ import type { LogReadResult, LogWriteResult, LoggingError, LoggingFailed, Loggin
  *
  * @returns `{ ok: true }`. Add `entry`, `entries` or `traces` to make it the result of a write, read or trace search.
  */
-export function ok(): LoggingOk {
+export function ok(): LoggingOkResult {
     return { ok: true };
 }
 
@@ -15,21 +15,30 @@ export function ok(): LoggingOk {
 /**
  * Build the failed result of a logging call from the failures behind it.
  *
+ * Every logging call resolves a result rather than throwing. A store author uses this from a hook
+ * (`commitEntry`, `queryEntries`, `resetEntries`, `clearOldEntries`) to say why the call failed, listing one
+ * {@link LoggingFailure} per source that failed. Built this way, every failed result has the same shape and the
+ * same one-line `message` summary, whichever store produced it.
+ *
  * The failures are listed in the order given, as the same objects: a failure is described once, where it
- * happened, and never re-described on the way up. The error's `message` is a one-line summary of them.
+ * happened, and never re-described on the way up.
  *
  * @param failures - Every failure behind the call; at least one.
  * @returns `{ ok: false, error: { message, failures } }`. Add `entry`, `entries` or `traces` to make it the
  * result of a write, read or trace search.
  *
  * @example
- * failed({ source: 'IDBLogStorage:my-app', operation: 'write', message: 'Could not record the entry.' });
- * // { ok: false, error: { message: '[IDBLogStorage:my-app] Could not record the entry.', failures: [ … ] } }
+ * // A custom store's write hook
+ * protected override async commitEntry(entry: LogEntry): Promise<LoggingResult> {
+ *     if (!this.connected) return createLoggingFailedResult({ source: 'MyStore:my-app', operation: 'write', message: 'Could not record the entry.' });
+ *     ...
+ * }
+ * // { ok: false, error: { message: '[MyStore:my-app] Could not record the entry.', failures: [ … ] } }
  *
  * @example
- * return { ...failed(...childFailures), entries }; // a partial read
+ * return { ...createLoggingFailedResult(...childFailures), entries }; // a partial read
  */
-export function failed(...failures: [LoggingFailure, ...LoggingFailure[]]): LoggingFailed {
+export function createLoggingFailedResult(...failures: [LoggingFailure, ...LoggingFailure[]]): LoggingFailedResult {
     return {
         ok: false,
         error: {
@@ -44,11 +53,11 @@ export function failed(...failures: [LoggingFailure, ...LoggingFailure[]]): Logg
  * Build the result of a logging call from every failure it collected: success if there were none.
  *
  * @param failures - The failures of every source the call consulted, possibly none.
- * @returns `ok()` when `failures` is empty, else `failed(...failures)`.
+ * @returns `ok()` when `failures` is empty, else `createLoggingFailedResult(...failures)`.
  */
 export function resultFrom(failures: LoggingFailure[]): LoggingResult {
     const [first, ...rest] = failures;
-    return first ? failed(first, ...rest) : ok();
+    return first ? createLoggingFailedResult(first, ...rest) : ok();
 }
 
 
