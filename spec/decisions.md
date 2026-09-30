@@ -570,9 +570,9 @@ others fail. The result says so, and never presents a partial answer as complete
   every source that failed. A UI renders what it has and flags what broke:
   `setRows(r.entries); setBroken(r.error?.failures.map(f => f.source) ?? [])`.
 - One failure event per call: `onFailure` receives the combined error once, never once per child plus once
-  for the total. A trace search is two calls on the store (find the matching traces, then fill them), so a
-  failing store's listeners hear two; the search's own result lists a failure both reads hit once, and skips
-  the second read when nothing matched.
+  for the total. A trace search reads the store once and builds every trace from that read, so a failing
+  store's listeners hear one failure per search, and a trace is never shown without the entries that were read
+  for it.
 - Tests are strict by default: the test helper `entriesOf` fails on any `error`, so a dead child cannot hide
   behind a healthy one.
 - Accepted cost: `if (!r.ok) return` drops the partial rows. That fails loudly and the developer fixes the UI;
@@ -653,6 +653,10 @@ the listener runs and writes again, and because each write settles in a microtas
 the event loop. So a module-level counter is non-zero while listeners run, and a public call **started** while
 it is non-zero returns its result as normal but does not deliver its failure. The mark is taken when the call
 starts, so failures that arrive later (IndexedDB, a rejecting hook) are covered.
+
+This holds because every public call makes at most one call on a store, started before its first `await`. A
+second store call made after an `await` would start outside the window, so the trace viewer reads the store
+once rather than twice.
 
 Known limit: an async listener that logs after an `await` is outside the window. The README says to report
 through a different channel, never into the same store.

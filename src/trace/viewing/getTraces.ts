@@ -1,7 +1,7 @@
-import { matchJavascriptObject, type WhereFilterDefinition } from "@andymitchell/objects/where-filter";
+import { matchJavascriptObject } from "@andymitchell/objects/where-filter";
 import type { ILogStorage, LogEntry } from "../../log-storage/types.ts";
 import type { MinimumContext } from "../../types.ts";
-import type { GetTracesResult, TraceEntryFilter, TraceFilter, TraceResultFilter, TraceSearchResult } from "./types.ts";
+import type { GetTracesResult, TraceEntryFilter, TraceFilter, TraceSearchResult } from "./types.ts";
 import type { SpanMeta } from "../types.ts";
 import type { LoggingFailure } from "../../failures/types.ts";
 import { failed, resultFrom } from "../../failures/results.ts";
@@ -14,23 +14,28 @@ import { guardedRead } from "../../failures/guardedCalls.ts";
 /**
  * Retrieve traces and all their entries.
  *
- * Reads the store once to find the matching traces, then once more for all their entries. Every failure is
- * passed on in the result, alongside the traces that could still be assembled; nothing throws or rejects.
+ * Reads the store once, groups its entries into traces, and keeps each trace with an entry matching the filter.
+ * Every failure is passed on in the result, alongside the traces that could still be assembled; nothing throws
+ * or rejects.
  *
  * @param rawLogger The storage of the entries
  * @param filter Filter the traces
- * @param includeAllTraceEntries Fill each trace's `logs` with every entry in the trace, not just the matching
- * ones. Defaults to `true`.
- * @returns The traces, sorted by timestamp asc; each with an id, timestamp and containing an array of all
- * entries in the trace (and an optional 'matches' list of entries just matching the traceEntryFilter).
- * `ok` is `false` if either read failed or `results_filter` could not be applied to a trace (that trace is
- * left out); a failure both reads hit is listed once.
+ * @param includeAllTraceEntries Fill each trace's `logs` with every entry in the trace. When `false`, `logs` is
+ * empty and a filtered search's `matches` says why each trace was found. Defaults to `true`.
+ * @returns The traces, sorted by timestamp asc; each with its id (its root span's id), the timestamp of its first
+ * entry, its entries in `logs`, and, when the search had an entries filter or full-text search, its first
+ * matching entry in `matches`. `ok` is `false` if the read failed (the traces are built from whatever entries it
+ * returned), or if the filters could not be applied to every entry or trace (those are left out).
+ *
+ * @remarks
+ * Reading once means every trace comes from the same snapshot of the store, and a search made from inside a
+ * failure listener does not tell the listener about its own failure (the store is called before this returns).
  */
 export async function getTraces<T extends MinimumContext = any>(rawLogger:ILogStorage, filter?: TraceFilter<T>, includeAllTraceEntries = true): Promise<GetTracesResult<T>> {
     try {
         return await searchTraces(rawLogger, filter, includeAllTraceEntries);
     } catch {
-        // Every read is guarded, so only a bug in assembling the traces reaches here.
+        // The read is guarded, so only a bug in assembling the traces reaches here.
         return { ...failed({ source: 'TraceViewer', operation: 'unexpected', message: 'Could not assemble the traces from the entries read.' }), traces: [] };
     }
 }
@@ -38,89 +43,79 @@ export async function getTraces<T extends MinimumContext = any>(rawLogger:ILogSt
 
 async function searchTraces<T extends MinimumContext = any>(rawLogger:ILogStorage, filter: TraceFilter<T> | undefined, includeAllTraceEntries: boolean): Promise<GetTracesResult<T>> {
 
-    // Lock results to just span entries in the log
+    const read = await guardedRead(rawLogger, 'TraceViewer', () => rawLogger.get<LogEntry<any, SpanMeta>>());
+
+    // Lock matches to just span entries in the log
     const lockedTraceEntryFilter:TraceEntryFilter = filter?.entries_filter? {...filter.entries_filter, 'meta.type': 'span'} : {'meta.type': 'span'};
+    const fullText = filter?.entries_full_text_search;
+    const isMatch = (entry: LogEntry<any, SpanMeta>) => matchJavascriptObject<LogEntry<any, SpanMeta>>(entry, lockedTraceEntryFilter) && (!fullText || JSON.stringify(entry).includes(fullText));
+    const recordMatches = !!(filter?.entries_filter || fullText);
 
-
-    // Find all matching items for the filter
-    const matches = await guardedRead(rawLogger, 'TraceViewer', () => rawLogger.get<LogEntry<any, SpanMeta>>(lockedTraceEntryFilter, filter?.entries_full_text_search));
-
-    // Extract trace ids:
-    const traceEntries:Record<string, TraceSearchResult<T>> = {};
-    for( const entry of matches.entries ) {
-        const spanId = entry.meta?.span?.top_id;
-        if( spanId && !traceEntries[spanId] ) {
-            traceEntries[spanId] = {id: '', timestamp: -1, logs: [], matches: []};
-            if( filter?.entries_filter || filter?.entries_full_text_search ) {
-                // Record filter matches
-                traceEntries[spanId].matches.push(entry);
-            }
-        }
-    }
-
-    // Find all entries for each trace (there is nothing to fill when no trace matched)
-    const traceIds = Object.keys(traceEntries);
-    let allTracesFailures: LoggingFailure[] = [];
-    if( includeAllTraceEntries && traceIds.length>0 ) {
-        const tracesFilter:WhereFilterDefinition<LogEntry<any, SpanMeta>> = {
-            $or: traceIds.map(x => ({
-                'meta.span.top_id': x
-            }))
-        }
-
-        // Add each entry to its corresponding trace results object, in the 'all' array
-        const allTracesEntries = await guardedRead(rawLogger, 'TraceViewer', () => rawLogger.get(tracesFilter));
-        allTracesFailures = allTracesEntries.error?.failures ?? [];
-        for( const entry of allTracesEntries.entries ) {
-            const spanId = entry.meta?.span?.top_id;
-            const entries = spanId && traceEntries[spanId];
-            if( entries ) {
-                entries.logs.push(entry);
-
-
-                if( !entries.id && entry.meta?.span?.id ) {
-                    // Set the top level data
-                    entries.id = entry.meta?.span.id;
-                    entries.timestamp = entry.timestamp;
-                }
-            }
-        }
+    let unmatchableEntries = false;
+    const found: TraceSearchResult<T>[] = [];
+    for( const [id, entries] of groupByTrace(read.entries) ) {
+        const { kept: matching, unmatchable } = keepMatching(entries, isMatch);
+        unmatchableEntries ||= unmatchable;
+        const [firstMatch] = matching;
+        if( !firstMatch ) continue;
+        found.push({
+            id,
+            timestamp: entries[0]!.timestamp,
+            logs: includeAllTraceEntries? entries : [],
+            matches: recordMatches? [firstMatch] : []
+        });
     }
 
     // Filter the final results
-    const filterFailures = filter?.results_filter? removeUnmatchedTraces(traceEntries, filter.results_filter) : [];
+    const resultsFilter = filter?.results_filter;
+    const { kept: traces, unmatchable: unmatchableTraces } = resultsFilter? keepMatching(found, trace => matchJavascriptObject(trace, resultsFilter)) : { kept: found, unmatchable: false };
 
-    const matchesFailures = matches.error?.failures ?? [];
-    const failures = [
-        ...matchesFailures,
-        // Both reads ask the same store, so a broken source usually fails both: one failure, not two.
-        ...allTracesFailures.filter(failure => !matchesFailures.some(listed => JSON.stringify(listed)===JSON.stringify(failure))),
-        ...filterFailures,
+    const failures: LoggingFailure[] = [
+        ...(read.error?.failures ?? []),
+        ...(unmatchableEntries? [{ source: 'TraceViewer', operation: 'read', message: 'Could not apply the entries filter or full-text search to every entry; those entries are left out.' } as const] : []),
+        ...(unmatchableTraces? [{ source: 'TraceViewer', operation: 'read', message: 'Could not apply the results filter to every trace; those traces are left out.' } as const] : []),
     ];
 
-    const traces = Object.values(traceEntries).sort((a, b) => a.timestamp-b.timestamp);
+    traces.sort((a, b) => a.timestamp-b.timestamp);
     return { ...resultFrom(failures), traces };
 
 }
 
 
 /**
- * Delete every trace that does not match `resultsFilter`, including any it cannot be matched against.
- *
- * @returns A `read` failure if matching threw for any trace, else none.
+ * Group entries by the trace they belong to (the `top_id` every span in a trace carries), keeping the store's
+ * order within each trace. Entries outside any trace are left out.
  */
-function removeUnmatchedTraces<T extends MinimumContext>(traceEntries: Record<string, TraceSearchResult<T>>, resultsFilter: TraceResultFilter<T>): LoggingFailure[] {
-    let unfilterable = false;
-    for( const key in traceEntries ) {
-        try {
-            if( !matchJavascriptObject(traceEntries[key]!, resultsFilter) ) {
-                delete traceEntries[key];
-            }
-        } catch {
-            // Whether it matches is unknown, so it is not presented as a match.
-            delete traceEntries[key];
-            unfilterable = true;
+function groupByTrace<E extends LogEntry<any, SpanMeta>>(entries: E[]): Map<string, E[]> {
+    const byTrace = new Map<string, E[]>();
+    for( const entry of entries ) {
+        const traceId = entry.meta?.span?.top_id;
+        if( !traceId ) continue;
+        const trace = byTrace.get(traceId);
+        if( trace ) {
+            trace.push(entry);
+        } else {
+            byTrace.set(traceId, [entry]);
         }
     }
-    return unfilterable? [{ source: 'TraceViewer', operation: 'read', message: 'Could not apply the results filter to every trace; those traces are left out.' }] : [];
+    return byTrace;
+}
+
+
+/**
+ * Keep the items `matches` accepts. An item it throws on is left out, since whether it matches is unknown.
+ *
+ * @returns The kept items, and whether `matches` threw on any item.
+ */
+function keepMatching<I>(items: I[], matches: (item: I) => boolean): { kept: I[], unmatchable: boolean } {
+    let unmatchable = false;
+    const kept = items.filter(item => {
+        try {
+            return matches(item);
+        } catch {
+            unmatchable = true;
+            return false;
+        }
+    });
+    return { kept, unmatchable };
 }

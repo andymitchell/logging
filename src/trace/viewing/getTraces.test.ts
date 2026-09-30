@@ -1,5 +1,5 @@
 import { MemoryLogStorage } from "../../log-storage/memory/MemoryLogStorage.ts";
-import { tracesOf } from "../../log-storage/testing-helpers/results.ts";
+import { entriesOf, tracesOf } from "../../log-storage/testing-helpers/results.ts";
 import { getTraces } from "./getTraces.ts";
 import { Trace } from "../Trace.ts";
 import { convertArrayToRecord, sleep } from "@andymitchell/utils";
@@ -269,8 +269,21 @@ describe('toggle include all', () => {
         const tracesArray = tracesOf(await getTraces(rawLogger, {entries_filter: {message: 'abc1'}}, false));
         expect(tracesArray[0]?.matches[0]?.message).toBe('abc1');
         expect(tracesArray[0]?.logs).toEqual([]);
-        
-    
+
+
+    })
+
+    it('names each trace and when it started, though it leaves out their entries', async () => {
+        const rawLogger = new MemoryLogStorage('');
+        const trace1 = new Trace(rawLogger);
+        await trace1.log('abc1');
+        await trace1.end();
+        const [firstEntry] = entriesOf(await rawLogger.get());
+
+        const tracesArray = tracesOf(await getTraces(rawLogger, {entries_filter: {message: 'abc1'}}, false));
+
+        expect(tracesArray.map(trace => ({ id: trace.id, timestamp: trace.timestamp, logs: trace.logs })))
+            .toEqual([{ id: trace1.getId(), timestamp: firstEntry?.timestamp, logs: [] }]);
     })
 })
 

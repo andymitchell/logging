@@ -68,7 +68,7 @@ if (r.error) reportLoggingBroken(r.error);   // r.entry?.ulid and r.error?.messa
 **`storage.onFailure`** is the one place to hear about failures you didn't await. Subscribe once at startup, on the store you gave your logger. It only exists on stores; loggers and spans have none. The listener gets the same error the failed call returns, once per failed call.
 
 - The error is plain JSON written by the store: no logged data, no raw exception messages. Forward it as it is.
-- Send it to a **different** channel (your error reporter, a status flag). Never log it into the same store: that store is the one failing. A write made from inside a listener doesn't trigger the listener again, but an async listener that logs after an `await` is outside that protection.
+- Send it to a **different** channel (your error reporter, a status flag). Never log it into the same store: that store is the one failing. A logging call made from inside a listener (a write, a read or a trace search) doesn't trigger the listener again, but an async listener that logs after an `await` is outside that protection.
 - A failure passes up through every store it touches. Listen on a child and on its Channels facade and you hear it twice.
 - Nothing is buffered: a listener added after a failure doesn't hear it.
 

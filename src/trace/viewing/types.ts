@@ -31,12 +31,12 @@ export interface ITraceViewer {
     /**
      * Retrieve traces and all their entries
      * @param filter Filter the traces
-     * @param includeAllTraceEntries Fill each trace's `logs` with every entry in the trace, not just the matching
-     * ones. Defaults to `true`.
-     * @returns `{ ok, traces, error? }`. `traces` is always an array, sorted by timestamp asc; each trace has an
-     * id, timestamp and an array of all entries in the trace (and an optional 'matches' list of entries just
-     * matching the traceEntryFilter). When some of the store's sources failed, `traces` holds what the healthy
-     * ones returned and `error` names the rest. Never rejects.
+     * @param includeAllTraceEntries Fill each trace's `logs` with every entry in the trace. When `false`, `logs`
+     * is empty and a filtered search's `matches` says why each trace was found. Defaults to `true`.
+     * @returns `{ ok, traces, error? }`. `traces` is always an array, sorted by timestamp asc; each trace has its
+     * id, the timestamp of its first entry, its entries in `logs` (and, for a filtered search, its first matching
+     * entry in `matches`). When some of the store's sources failed, `traces` holds what the healthy ones returned
+     * and `error` names the rest. Never rejects.
      */
     getTraces<T extends MinimumContext = any>(filter?: TraceFilter<T>, includeAllTraceEntries?: boolean): Promise<GetTracesResult<T>>;
 }
