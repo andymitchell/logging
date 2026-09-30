@@ -1,6 +1,5 @@
 import type { JsonValueCapped } from "@andymitchell/clone-to-json-safe";
 import type { LogEntry } from "../log-storage/types.ts";
-import type { MinimumContext } from "../types.ts";
 
 
 /**
@@ -121,7 +120,7 @@ export type LoggingResult = LoggingOkResult | LoggingFailedResult;
  * if (r.error) reportLoggingBroken(r.error);
  * else console.log(r.entry.ulid);
  */
-export type LogWriteResult<C = any, M extends MinimumContext = any> =
+export type LogWriteResult<C = any, M = any> =
     | ({ entry: LogEntry<C, M> } & LoggingOkResult)
     | ({ entry?: LogEntry<C, M> } & LoggingFailedResult);
 

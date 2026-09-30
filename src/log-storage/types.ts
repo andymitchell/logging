@@ -3,6 +3,7 @@ import type { PreserveUnmaskedPath } from "@andymitchell/clone-to-json-safe";
 import type { IBreakpoints } from "../breakpoints/types.ts";
 import type { MaxAge, MinimumContext } from "../types.ts";
 import type { LogReadResult, LogWriteResult, LoggingError, LoggingFailureListener, LoggingResult } from "../failures/types.ts";
+import type { LogEntryFormatVersion } from "./format/version.ts";
 
 
 /**
@@ -15,7 +16,7 @@ export function isLogEntrySimple(x: unknown):x is LogEntry {
     return typeof x==='object' && x!==null && "ulid" in x && "type" in x;
 }
 
-export type BaseLogEntry<C = any, M extends MinimumContext = any> = {
+export type BaseLogEntry<C = any, M = any> = {
     
     /**
      * The Universally Unique Lexicographically Sortable Identifier. 
@@ -32,34 +33,43 @@ export type BaseLogEntry<C = any, M extends MinimumContext = any> = {
     timestamp: number,
 
     /**
+     * The envelope format of this entry. Stamped by the store when the entry is recorded; a caller cannot set it.
+     *
+     * A store only ever returns entries of the current format, migrating or discarding older ones when it
+     * cleans up.
+     */
+    format_version: LogEntryFormatVersion,
+
+    /**
      * Externally passed-in context (e.g. a parameter when the .log function is called)
      */
     context?: C, //DeepSerializable<any>,
 
     /**
-     * Internal data used by the logging system. Does not get security-reduced. Use for things like Span ID.
+     * Internal data used by the logging system (a span's ids, for example). Not masked. Any shape: narrow it
+     * before use.
      */
     meta?: M,
     
     stack_trace?: string
 }
-type DebugLogEntry<C = any, M extends MinimumContext = any> = BaseLogEntry<C, M> & {
+type DebugLogEntry<C = any, M = any> = BaseLogEntry<C, M> & {
     type: 'debug',
     message: string
 };
-type InfoLogEntry<C = any, M extends MinimumContext = any> = BaseLogEntry<C, M> & {
+type InfoLogEntry<C = any, M = any> = BaseLogEntry<C, M> & {
     type: 'info',
     message: string
 };
-type WarnLogEntry<C = any, M extends MinimumContext = any> = BaseLogEntry<C, M> & {
+type WarnLogEntry<C = any, M = any> = BaseLogEntry<C, M> & {
     type: 'warn',
     message: string
 };
-type ErrorLogEntry<C = any, M extends MinimumContext = any> = BaseLogEntry<C, M> & {
+type ErrorLogEntry<C = any, M = any> = BaseLogEntry<C, M> & {
     type: 'error',
     message: string
 };
-type CriticalLogEntry<C = any, M extends MinimumContext = any> = BaseLogEntry<C, M> & {
+type CriticalLogEntry<C = any, M = any> = BaseLogEntry<C, M> & {
     type: 'critical',
     message: string
 };
@@ -75,7 +85,7 @@ type EndEventDetail = BaseEventDetail & {
 }
 export type EventDetail = StartEventDetail | EndEventDetail;
 
-export type EventLogEntry<C = any, M extends MinimumContext = any, E extends EventDetail = EventDetail> = BaseLogEntry<C, M> & {
+export type EventLogEntry<C = any, M = any, E extends EventDetail = EventDetail> = BaseLogEntry<C, M> & {
     type: 'event',
     message?: string
     event: E
@@ -104,7 +114,7 @@ export function isEventLogEntry(x: unknown): x is EventLogEntry {
 /**
  * Union of all possible entry types
  */
-export type LogEntry<C = any, M extends MinimumContext = any> = 
+export type LogEntry<C = any, M = any> = 
     DebugLogEntry<C, M> |
     InfoLogEntry<C, M> | 
     WarnLogEntry<C, M> | 
@@ -115,15 +125,18 @@ export type LogEntry<C = any, M extends MinimumContext = any> =
 
 
 /**
- * Like LogEntry, but context can be anything (not yet serialised down)
+ * Like LogEntry, but context can be anything (not yet serialised down).
+ *
+ * The store sets `timestamp` and `format_version` when it records the entry, so neither can be passed; `ulid`
+ * is optional and minted when absent.
  */
-export type AcceptLogEntry<C = any, M extends MinimumContext = any> =
-  | (Omit<DebugLogEntry<C, M>, 'timestamp' | 'ulid'> & { ulid?: string })
-  | (Omit<InfoLogEntry<C, M>, 'timestamp' | 'ulid'> & { ulid?: string })
-  | (Omit<WarnLogEntry<C, M>, 'timestamp' | 'ulid'> & { ulid?: string })
-  | (Omit<ErrorLogEntry<C, M>, 'timestamp' | 'ulid'> & { ulid?: string })
-  | (Omit<CriticalLogEntry<C, M>, 'timestamp' | 'ulid'> & { ulid?: string })
-  | (Omit<EventLogEntry<C, M>, 'timestamp' | 'ulid'> & { ulid?: string });
+export type AcceptLogEntry<C = any, M = any> =
+  | (Omit<DebugLogEntry<C, M>, 'timestamp' | 'ulid' | 'format_version'> & { ulid?: string })
+  | (Omit<InfoLogEntry<C, M>, 'timestamp' | 'ulid' | 'format_version'> & { ulid?: string })
+  | (Omit<WarnLogEntry<C, M>, 'timestamp' | 'ulid' | 'format_version'> & { ulid?: string })
+  | (Omit<ErrorLogEntry<C, M>, 'timestamp' | 'ulid' | 'format_version'> & { ulid?: string })
+  | (Omit<CriticalLogEntry<C, M>, 'timestamp' | 'ulid' | 'format_version'> & { ulid?: string })
+  | (Omit<EventLogEntry<C, M>, 'timestamp' | 'ulid' | 'format_version'> & { ulid?: string });
 
 
 

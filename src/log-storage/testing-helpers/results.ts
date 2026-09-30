@@ -11,7 +11,7 @@ import type { GetTracesResult, TraceSearchResults } from "../../trace/viewing/ty
  * const entry = entryOf(await logger.warn('slow'));
  * expect(entry.type).toBe('warn');
  */
-export function entryOf<C, M extends MinimumContext>(result: LogWriteResult<C, M>): LogEntry<C, M> {
+export function entryOf<C, M>(result: LogWriteResult<C, M>): LogEntry<C, M> {
     if (result.error) throw new Error(`Expected the write to succeed, but it failed: ${JSON.stringify(result.error)}`);
     return result.entry;
 }

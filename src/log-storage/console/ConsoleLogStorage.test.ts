@@ -2,6 +2,7 @@
 import { vi } from "vitest";
 import { ConsoleLogStorage } from "./ConsoleLogStorage.ts";
 import type { LogEntry } from "../types.ts";
+import { LOG_ENTRY_FORMAT_VERSION } from "../format/version.ts";
 import { entryOf } from "../testing-helpers/results.ts";
 
 
@@ -30,6 +31,7 @@ describe('ConsoleLogStorage', () => {
             type: 'info',
             ulid: '',
             timestamp: 0,
+            format_version: LOG_ENTRY_FORMAT_VERSION,
             message: 'Test message',
             context: { key: 'value' }
         };
@@ -50,6 +52,7 @@ describe('ConsoleLogStorage', () => {
             type: 'info',
             ulid: '',
             timestamp: 0,
+            format_version: LOG_ENTRY_FORMAT_VERSION,
             message: 'Test message',
             context: [{ a: '1' }, {b: '2'}]
         };
@@ -72,6 +75,7 @@ describe('ConsoleLogStorage', () => {
             type: 'info',
             ulid: '',
             timestamp: 0,
+            format_version: LOG_ENTRY_FORMAT_VERSION,
             message: 'Test message',
             context: { a: '1' }
         };
@@ -94,6 +98,7 @@ describe('ConsoleLogStorage', () => {
             type: 'error',
             ulid: '',
             timestamp: 0,
+            format_version: LOG_ENTRY_FORMAT_VERSION,
             message: 'Test message',
             context: { key: 'value' }
         };

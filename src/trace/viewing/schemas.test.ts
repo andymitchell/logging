@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
 import { createTraceSearchResultsSchema, TraceSearchResultsSchema, TraceFilterSchema } from './schemas.ts';
+import { LOG_ENTRY_FORMAT_VERSION } from '../../log-storage/format/version.ts';
 
 /**
  * Anti-regression lockdown for the trace-viewing schemas (search results + filter).
@@ -9,9 +10,10 @@ import { createTraceSearchResultsSchema, TraceSearchResultsSchema, TraceFilterSc
  * never error message text. TraceFilterSchema composes the external where-filter
  * schema; assertions stay at clearly-valid / clearly-invalid inputs so they hold
  * across the where-filter package swap. Must stay green unchanged on Zod 3 and 4.
+ * Every log fixture carries the current `format_version`.
  */
 
-const validLog = { type: 'info', ulid: 'u1', timestamp: 1, message: 'm' };
+const validLog = { type: 'info', ulid: 'u1', timestamp: 1, format_version: LOG_ENTRY_FORMAT_VERSION, message: 'm' };
 const validResult = { id: 't1', timestamp: 1, logs: [validLog], matches: [validLog] };
 
 describe('Trace search results schema', () => {
@@ -39,7 +41,7 @@ describe('Trace search results schema', () => {
 
     it('createTraceSearchResultsSchema enforces a caller-supplied context schema', () => {
         const schema = createTraceSearchResultsSchema(z.object({ region: z.string() }));
-        const result = { id: 't1', timestamp: 1, logs: [{ type: 'info', ulid: 'u1', timestamp: 1, message: 'm', context: { region: 'eu' } }], matches: [] };
+        const result = { id: 't1', timestamp: 1, logs: [{ type: 'info', ulid: 'u1', timestamp: 1, format_version: LOG_ENTRY_FORMAT_VERSION, message: 'm', context: { region: 'eu' } }], matches: [] };
         expect(schema.safeParse([result]).success).toBe(true);
     });
 

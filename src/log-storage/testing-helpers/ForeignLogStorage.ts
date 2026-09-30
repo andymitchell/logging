@@ -1,5 +1,6 @@
 import type { LoggingError } from "../../failures/types.ts";
 import type { AcceptLogEntry, ILogStorage, LogEntry } from "../types.ts";
+import { LOG_ENTRY_FORMAT_VERSION } from "../format/version.ts";
 
 
 /**
@@ -36,7 +37,7 @@ export class ForeignLogStorage implements ILogStorage {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- a foreign store answers whatever it likes; that is what is under test
     add(entry: AcceptLogEntry): Promise<any> {
-        return this.#answer(() => ({ ...entry, ulid: 'foreign', timestamp: 0 } satisfies LogEntry));
+        return this.#answer(() => ({ ...entry, ulid: 'foreign', timestamp: 0, format_version: LOG_ENTRY_FORMAT_VERSION } satisfies LogEntry));
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- as above

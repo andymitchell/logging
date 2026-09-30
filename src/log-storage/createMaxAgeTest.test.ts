@@ -1,6 +1,7 @@
 import { ulid } from "ulid";
 import type { EventLogEntry, LogEntry } from "./types.ts";
 import createMaxAgeTest from "./createMaxAgeTest.ts";
+import { LOG_ENTRY_FORMAT_VERSION } from "./format/version.ts";
 
 function createTestLogEntry(type:LogEntry['type'] = 'info', message?: string, timestampAgoMs: number = 0):LogEntry {
     
@@ -10,6 +11,7 @@ function createTestLogEntry(type:LogEntry['type'] = 'info', message?: string, ti
             type,
             message,
             timestamp: Date.now()-timestampAgoMs,
+            format_version: LOG_ENTRY_FORMAT_VERSION,
             event: {
                 name: 'span_start'
             }
@@ -21,6 +23,7 @@ function createTestLogEntry(type:LogEntry['type'] = 'info', message?: string, ti
             type,
             message: message ?? 'Generic Message',
             timestamp: Date.now()-timestampAgoMs,
+            format_version: LOG_ENTRY_FORMAT_VERSION,
         }
         return logEntry;
     }

@@ -9,14 +9,15 @@ import type { IBreakpoints } from "../breakpoints/types.ts";
 import type { LogReadResult, LogWriteResult, LoggingError, LoggingFailedResult, LoggingFailure, LoggingFailureListener, LoggingOperation, LoggingResult } from "../failures/types.ts";
 import { FailureListeners, isInsideFailureListener } from "../failures/FailureListeners.ts";
 import { createLoggingFailedResult, isLogReadResult, isLoggingResult, resultFrom } from "../failures/results.ts";
+import { LOG_ENTRY_FORMAT_VERSION } from "./format/version.ts";
 
 
 
 /**
  * Use this to build specific LogStorage.
  *
- * The base does the shared work of every store (building and masking entries, stack traces, breakpoints,
- * failure listeners) and upholds the {@link ILogStorage} guarantee that no public method throws or rejects.
+ * The base does the shared work of every store (building and masking entries, stamping each with the current
+ * `format_version`, stack traces, breakpoints, failure listeners) and upholds the {@link ILogStorage} guarantee that no public method throws or rejects.
  * A subclass provides the hooks, which answer with a result rather than throwing:
  * - `commitEntry(entry)` → `{ ok: true }`, or `{ ok: false, error }` describing what went wrong.
  * - `queryEntries(filter, fullTextFilter)` → `{ ok: true, entries }`, or a failed result with whatever
@@ -268,8 +269,11 @@ export class BaseLogStorage implements ILogStorage {
             // Called directly from `add`, so the trace starts at the caller of `add` (see generateStackTrace).
             const stackTrace:string | undefined = this.includeStackTrace[acceptEntry.type]? this.generateStackTrace() : undefined;
 
+            // `format_version` is set after the spread so nothing a caller passes can choose it. A Channels facade
+            // re-adds a finished entry to each child, and every child stamps it again.
             logEntry = {
                 ...acceptEntry,
+                format_version: LOG_ENTRY_FORMAT_VERSION,
                 timestamp: Date.now(),
                 context: this.prepareContext(acceptEntry.context, options),
                 stack_trace: acceptEntry.stack_trace ?? stackTrace,

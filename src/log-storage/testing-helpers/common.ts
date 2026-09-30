@@ -1,6 +1,7 @@
 import { entriesOf } from "./results.ts";
 import type { LogCallMaskingOptions, LogStorageOptions } from "../types.ts";
 import type { ILogStorage, LogEntry } from "../types.ts";
+import { LOG_ENTRY_FORMAT_VERSION } from "../format/version.ts";
 import { it, onTestFinished, vi } from 'vitest';
 
 
@@ -12,9 +13,9 @@ const DETAIL_ITEM_ERROR = new Error('error1');
 function entriesAgedForCleanUp(): LogEntry[] {
     const anHourAgo = Date.now() - 3_600_000;
     return [
-        { type: 'info', message: 'expired first', timestamp: anHourAgo, ulid: 'expired-first' },
-        { type: 'info', message: 'expired second', timestamp: anHourAgo + 1, ulid: 'expired-second' },
-        { type: 'info', message: 'kept', timestamp: Date.now(), ulid: 'kept' },
+        { type: 'info', message: 'expired first', timestamp: anHourAgo, format_version: LOG_ENTRY_FORMAT_VERSION, ulid: 'expired-first' },
+        { type: 'info', message: 'expired second', timestamp: anHourAgo + 1, format_version: LOG_ENTRY_FORMAT_VERSION, ulid: 'expired-second' },
+        { type: 'info', message: 'kept', timestamp: Date.now(), format_version: LOG_ENTRY_FORMAT_VERSION, ulid: 'kept' },
     ];
 }
 
@@ -303,6 +304,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                             description: 'Timed out waiting for the response to helloWorld. Possible reasons: 1) no listener has been set up for it, 2) another listener responded first and blocked it. '
                         },
                         timestamp: 0,
+                        format_version: LOG_ENTRY_FORMAT_VERSION,
                         ulid: 'ulid1'
                     }
 
@@ -772,6 +774,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                     id: i + 1,
                     ulid: i + 1 + '',
                     timestamp: Date.now() + i,
+                    format_version: LOG_ENTRY_FORMAT_VERSION,
                     message: `Test log ${i + 1}`,
                     context: {}
                 }));
