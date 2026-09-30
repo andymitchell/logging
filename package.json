@@ -1,6 +1,6 @@
 {
     "name": "@andymitchell/logging",
-    "version": "0.13.1",
+    "version": "0.14.0",
     "description": "",
     "type": "module",
     "sideEffects": false,
