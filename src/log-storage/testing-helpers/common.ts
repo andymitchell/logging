@@ -1,8 +1,7 @@
-import { sleep } from "@andymitchell/utils";
 import { entriesOf } from "./results.ts";
 import type { LogCallMaskingOptions, LogStorageOptions } from "../types.ts";
 import type { ILogStorage, LogEntry } from "../types.ts";
-import { it } from 'vitest';
+import { it, onTestFinished, vi } from 'vitest';
 
 
 const DETAIL_ITEM_MESSAGE = 'Message 1';
@@ -17,6 +16,16 @@ function entriesAgedForCleanUp(): LogEntry[] {
         { type: 'info', message: 'expired second', timestamp: anHourAgo + 1, ulid: 'expired-second' },
         { type: 'info', message: 'kept', timestamp: Date.now(), ulid: 'kept' },
     ];
+}
+
+/**
+ * Stops the clock the stores read, so time passes only when the test moves it on.
+ * Timers keep running, so a store that waits on them (IndexedDB, a webhook flush) works as usual.
+ */
+function freezeClock(): { advance: (ms: number) => void } {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    onTestFinished(() => { vi.useRealTimers(); });
+    return { advance: ms => { vi.setSystemTime(Date.now() + ms); } };
 }
 
 type CreateTestLogger = (options?: LogStorageOptions) => {
@@ -154,6 +163,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
 
             it('cleans before max age', async () => {
                 const aging = 4;
+                const clock = freezeClock();
                 const logger = createLogger({ max_age: [{ max_ms: aging }] }).logger;
 
                 await logger.add({
@@ -165,7 +175,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                     }
                 });
 
-                await sleep(aging * 2);
+                clock.advance(aging * 2);
 
                 await logger.add({
                     type: 'info',
@@ -207,6 +217,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
 
             it('runs clean on constructor', async (cx) => {
                 const aging = 4;
+                const clock = freezeClock();
                 const loggerTest = createLogger({ max_age: [{ max_ms: aging }] });
                 if (loggerTest.cannot_recreate_with_same_data) cx.skip();
 
@@ -220,7 +231,7 @@ export async function commonLogStorageTests(createLogger: CreateTestLogger) {
                     }
                 });
 
-                await sleep(aging * 2);
+                clock.advance(aging * 2);
 
                 await loggerTest.logger.add({
                     type: 'info',
