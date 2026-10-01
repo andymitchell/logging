@@ -121,7 +121,17 @@ A store only ever holds, and only ever returns, valid entries in the current for
 
 - **`add` and `reset` refuse anything that is not an entry.** A malformed entry (a non-string `message` or an unknown `type`, passed from JavaScript or through a cast) resolves `{ ok: false, error }` and is never recorded; `onFailure` hears it. `reset` fails as a whole if any entry is not a valid current entry, and the store keeps what it had.
 - **`get` skips records it can't read.** An IndexedDB database can hold rows written by an older version of this library, by a newer one, or by another script. `get` returns only current entries, and is still `ok`. Reading never changes or removes anything.
-- **Clean-up upgrades and removes.** When an `IDBLogStorage` opens, and whenever you call `forceClearOldEntries`, the store upgrades entries from older formats in place, removes records it can't read, and removes entries older than `max_age`, in one pass. Calls made while it is opening wait for it. Several tabs opening one database at once are safe: each entry ends up there exactly once.
+- **Clean-up upgrades and removes.** When an `IDBLogStorage` opens, and whenever you call `forceClearOldEntries`, the store upgrades entries from older formats in place, removes records it can't read, and removes entries older than `max_age`, in one pass. Calls made while it is opening wait for it. Several tabs opening one database at once are safe: each entry ends up there exactly once. Traces recorded before an upgrade still show.
+- **Entries are kept until you set `max_age`.** The default, `[]`, keeps them for good. Each rule is a `max_ms`, optionally with a `filter`; the first rule that matches an entry decides, and an entry no rule matches is kept. Clean-up applies them.
+
+  ```ts
+  const DAY = 24 * 60 * 60 * 1000;
+
+  new IDBLogStorage('my-app', { max_age: [{ max_ms: 30 * DAY }] });
+
+  // Errors for 90 days, everything else for 7
+  new IDBLogStorage('my-app', { max_age: [{ filter: { type: 'error' }, max_ms: 90 * DAY }, { max_ms: 7 * DAY }] });
+  ```
 - **Records from a newer version are left alone.** After a downgrade, or while two versions of an app share one database, the older library neither returns nor deletes what the newer one wrote. Those records don't age out until the newer version runs again.
 - **`context` and `meta` are whatever was logged.** One store can hold a string context next to an object one. Narrow them before use. `LogEntrySchema` accepts any value for both, unless you pass schemas to `createLogEntrySchema`.
 
@@ -162,7 +172,7 @@ Entries carry a format version, and stores refuse, skip or clean up anything tha
 | `LogEntrySchema` requires `context` and `meta` to be objects | it accepts any value for both; `LogEntry`'s second type parameter (`meta`) no longer has to be an object type |
 
 - **`LogEntrySchema` and `TraceSearchResultsSchema` reject entries written by an older version**, which have no `format_version`. If you validate entries or traces that crossed a boundary (to a UI, a worker, a server), upgrade both sides together, or run each entry through `migrateLogEntry` first.
-- **`@andymitchell/logging-ui-react`** only reads entries, so it works unchanged. Fixtures of your own that build `LogEntry` literals need the `format_version` field.
+- **Use `@andymitchell/logging-ui-react` 0.4.0 or later.** It only reads entries, so the format version changes nothing for it; 0.4.0 is the first version that reads `getTraces`' `{ ok, traces }` result (see [Upgrading to 0.15.0](#upgrading-to-0150)). Fixtures of your own that build `LogEntry` literals need the `format_version` field.
 - **The main entry now loads zod**, to check entries. Nothing new is installed (zod is a required peer) and the where-filter already loaded it.
 - **Store authors** can import `createLoggingFailedResult`, `migrateLogEntry`, `isCurrentLogEntry` and `LOG_ENTRY_FORMAT_VERSION`. See "Writing your own store?" above.
 
@@ -182,7 +192,7 @@ Every logging call now resolves a result instead of a bare value, and never thro
 
 - A store you wrote yourself (including test fakes of `ILogStorage`) needs `onFailure(listener) → unsubscribe` and `reportInternalFailure(error)`, and must resolve results. `Logger`, `Span` and `Trace` throw straight away if given a store without those two methods. Extending `BaseLogStorage` provides them.
 - Fakes of `ILogger` / `ISpan` must resolve results from their writes and `get`.
-- **Requires `@andymitchell/logging-ui-react` 0.3.0 or later.** Older UIs install without complaint but fail at runtime, because `getTraces` no longer resolves an array. Upgrade both packages together.
+- **Requires `@andymitchell/logging-ui-react` 0.4.0 or later.** Older UIs install without complaint but fail at runtime, because `getTraces` no longer resolves an array. Upgrade both packages together.
 
 
 # React UI
@@ -205,7 +215,7 @@ const viewer = new TraceViewer(new IDBLogStorage('my-app'));
 export const Traces = () => <TraceInspector tracesSource={viewer} template="neutral" />;
 ```
 
-Logging 0.15.0 needs `@andymitchell/logging-ui-react` 0.3.0 or later; see [Upgrading to 0.15.0](#upgrading-to-0150).
+Logging 0.15.0 and later need `@andymitchell/logging-ui-react` 0.4.0 or later; see [Upgrading to 0.15.0](#upgrading-to-0150).
 
 The `@andymitchell/logging/react` entry point was removed in 0.13.0. Replace `from "@andymitchell/logging/react"` with `from "@andymitchell/logging-ui-react"`; the exported components are unchanged.
 
@@ -213,6 +223,11 @@ The `@andymitchell/logging/react` entry point was removed in 0.13.0. Replace `fr
 
 
 # Roadmap
+
+## Export the test helpers
+
+- **The `ILogStorage` conformance suite**, as `@andymitchell/logging/conformance`, so the author of any store can prove it meets the stored-entry rules. It lives in `src/conformance` and needs only vitest, zod, ulid and this package's own format code.
+- **Failing test stores**, as `@andymitchell/logging/testing`: stores that refuse writes, throw, or fail reads, for testing how an app copes when logging fails. Authension, store2 and GTDInbox each build their own today.
 
 ## Optimise package size
 
