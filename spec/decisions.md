@@ -8,6 +8,10 @@ Convention: `### dec-<slug>` = one decision; `#### dec-<slug>` = a sub-decision 
 **Example** (often the *averted attack*). Spans the three packages `@andymitchell/objects` →
 `@andymitchell/clone-to-json-safe` → `@andymitchell/logging`.
 
+Every decision that constrains an `ILogStorage` implementation is proven by the conformance suite in
+`src/conformance`, whose tests carry the slug they prove (`[dec-slug]`). A decision without a tagged test is not
+yet a rule. Coverage today: the stored-entries decisions; the rest is future work.
+
 ---
 
 ### dec-percall-api-with-options-methods
@@ -805,3 +809,128 @@ itself, and a span id is written to the `meta` of every entry the receiver logs,
 **Example — averted leak:** a compromised page sends `log_span: { id: 'alice@example.com', top_id: 'x'.repeat(1e6) }`.
 Unchecked, every background entry for that request carries the email in unmasked `meta`, plus a megabyte of id.
 With the bounded schema both ids fail, and the background drops them and starts its own trace.
+
+---
+
+## Stored entries: format, migration and clean-up
+
+A durable store (IndexedDB) outlives the library version that wrote it, and anything can write to the same
+substrate. These decisions keep what a store holds, and what it returns, readable by the version that is running.
+Each one's **Example** is the failure its conformance test reproduces.
+
+### dec-log-entry-context-is-opaque
+**`context` is whatever the caller logged, per entry.** Two entries in one store may hold different shapes (an
+object, a string, an array, a number); no store promises a `context` type. Consumers narrow with their own type
+guard (the React trace viewer renders any shape as JSON). So `createLogEntrySchema()` defaults `context` to
+`z.any()`; a caller who wants a shape passes a schema.
+
+**Example:** one store holding `logger.log('x', 5)` next to `logger.log('y', { a: 1 })` returns both intact. A
+record default would reject the first, and once stores check what they read, hide it and then purge it.
+
+### dec-log-entry-meta-is-opaque
+**`meta` is the library's own slot (a span's ids), never masked, and of any shape:** the schema default and the
+type are both `any`, with no record constraint.
+- Its shape was never enforced on write (`add` copies it verbatim) and masking never touches it, so a record
+  shape protects nothing (see dec-masker-floor-known-limitation).
+- A Channels facade records `'redact:uncopyable'` in its place when it cannot be copied, so a record default
+  would make the library reject its own entries.
+- Readers narrow or optional-chain (`getTraces` does; a where-filter on `meta.type` simply does not match).
+
+**Example — averted data loss:** a channel-copied entry whose `meta` is the string `'redact:uncopyable'`, hidden
+by a read check and then purged by clean-up, had the default stayed a record.
+
+### dec-log-entry-format-version
+**Every stored entry carries `format_version`, a number literal stamped by the writer (`LOG_ENTRY_FORMAT_VERSION`,
+currently 2).** Rejected alternative: identifying an old entry by matching it against each previous schema in
+turn, because:
+1. A version says which WRITER produced the record, so a record from a newer library is recognised as "newer than
+   me" and left alone. A schema mismatch cannot tell "newer" from "corrupt", and would purge the newer entry.
+2. An additive change (a new optional field) leaves an old record parsing under the new schema, so
+   schema-matching treats it as current and never migrates it.
+3. Cost: one integer comparison per record, against one parse per historic schema per record on every clean-up.
+
+**Example:** after a downgrade, a store holding `format_version: 3` records keeps them; under schema-matching they
+would be "unrecognised" and deleted.
+
+#### dec-format-version-stamped-by-store-only
+**Only `BaseLogStorage.add` stamps `format_version`, after spreading the caller's entry.** `AcceptLogEntry` cannot
+carry it, and a value passed from JavaScript is overwritten.
+
+**Example:** a Channels facade re-adds a finished entry to each child, and every child stamps it again, so a
+channel's transform can never downgrade one.
+
+### dec-store-only-holds-current-entries
+**The invariant: an `ILogStorage` never holds, and never returns, a record that is not a valid entry in the
+current format.** Every door enforces it, and a store never writes what it would refuse to read. The base `get`
+keeps only its check on the shape of the hook's answer (`isLogReadResult`) and does not re-check each entry
+(which would parse every entry twice per read): per-entry correctness is the store's job, proven by conformance.
+
+**Example:** an interleaving of valid adds, rejected adds, a rejected reset, junk / unversioned / newer records
+written straight to the substrate, and a clean-up; after it, every entry `get` returns parses under
+`LogEntrySchema` with the current `format_version`.
+
+#### dec-add-rejects-invalid-entry
+**`add` checks the finished entry (masked and stamped) with `isCurrentLogEntry`** and otherwise answers
+`ok: false`, operation `write`, message `'The entry is not a valid log entry.'`: nothing committed, no breakpoint
+check, no console echo; listeners hear it once; the failure never quotes the entry. Checking after masking keeps
+`context`/`meta` opaque: a hostile context is masked, never rejected.
+
+**Example:** `add({ type: 'shout', message: 42 })` from JavaScript is refused, rather than recorded and then
+hidden by every read.
+
+#### dec-reset-rejects-invalid-entries
+**`reset` checks every entry before its hook.** A non-array (or a sparse or unreadable one), or one invalid
+entry, fails the whole call (operation `reset`, message `'Some entries are not valid log entries.'`) and the store
+is unchanged. Unversioned entries are rejected, not migrated: a caller restoring a backup from an older library
+maps it through `migrateLogEntry` first.
+
+**Example:** `reset([good, { ...good, format_version: undefined }])` leaves the previous entries in place.
+
+#### dec-read-skips-non-current-records
+**`queryEntries` returns only records that carry the current version AND parse under `LogEntrySchema`.** Junk,
+unversioned and newer records are skipped; the read is `ok: true` with no `error`; a read never deletes or
+rewrites anything on the substrate.
+
+**Example:** a junk row another script wrote into the same IndexedDB is neither returned nor deleted by `get`.
+
+#### dec-newer-format-left-alone
+**A record whose `format_version` is above the current one was written by a newer library.** It is skipped on
+read and kept untouched (every field, including unknown ones) by clean-up. It never ages out until that library
+runs again (accepted).
+
+**Why:** two app versions share one IndexedDB during a rollout or after a downgrade.
+
+**Example:** an older tab cleaning up after a newer one wrote `format_version: 3` entries leaves them, field for
+field, for the newer tab to read.
+
+#### dec-clean-up-migrates-or-purges
+**Clean-up runs at construction (durable stores) and on `forceClearOldEntries`, in one pass over the substrate
+(`decideCleanUp`):** migrate what the store migrates, purge the unrecognised (junk and unmigratable), purge the
+aged, keep the newer. Atomic: a failing `max_age` test aborts the pass and changes nothing (accepted cost: while
+`max_age` is broken, old-format entries stay hidden).
+
+**Example:** an IndexedDB holding an unversioned entry, a junk row and an hour-old entry, opened with a `max_age`
+of a minute, ends up holding the upgraded entry only.
+
+#### dec-store-may-discard-instead-of-migrate
+**A store may choose not to migrate.** It then declares `{ mode: 'discards-old-entries', because }` in its
+conformance harness, and its clean-up must still leave the substrate free of old entries.
+
+**Example:** a store whose substrate cannot rewrite a row in place deletes unversioned entries instead.
+
+### dec-migration-is-one-pure-map
+**`migrateLogEntry(record) → outcome` (current / migrated / newer / unrecognised), shared by every store.** A
+store's clean-up is "read, map, write back". The map never throws (a hostile record is unrecognised) and never
+changes its input; a migrated entry keeps every key of the record, so a substrate's row key (IndexedDB's `id`)
+survives the rewrite. Each format has one file under `log-entry-schema-versions/`; older ones are frozen copies.
+
+**Example:** IndexedDB and Memory classify the same junk row identically, because neither has its own rule.
+
+#### dec-unversioned-is-v1
+**Format 1 is an entry with no `format_version`; its `timestamp` is optional** (the field's contract allowed
+discarding it in favour of the ulid's time). Upgrading stamps `format_version: 2` and fills a missing timestamp
+from the ulid; with neither, it is unrecognised. The upgrade is checked against the current schema, so a faulty
+step fails closed. An unversioned entry ages out exactly as a current one of the same age.
+
+**Example:** `{ type: 'info', message: 'x', ulid: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }` becomes the same entry with
+`timestamp: 1469922850259, format_version: 2`; `{ type: 'info', message: 'x', ulid: 'expired-first' }` is purged.
