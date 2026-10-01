@@ -179,6 +179,12 @@ export type LogCallMaskingOptions<C extends MinimumContext = MinimumContext> = {
  * fails resolves a result saying so (`{ ok: false, error }`), and the same error is told to the store's
  * {@link ILogStorage.onFailure} listeners. Every failure is plain JSON, written by the store where it
  * happened, and never quotes logged data. Extend `BaseLogStorage` to get these guarantees for free.
+ *
+ * A store only ever holds, and only ever returns, valid entries in the current format (see
+ * `LOG_ENTRY_FORMAT_VERSION`). `add` and `reset` refuse anything else with a failed result; `get` skips any
+ * record on the store's substrate it cannot read (written by an older or newer library, or by another script);
+ * clean-up upgrades entries from older formats and removes records it cannot read. Reading never changes what
+ * is stored.
  */
 export interface ILogStorage {
 
@@ -194,6 +200,12 @@ export interface ILogStorage {
      * @returns `{ ok: true, entry }` with the recorded entry, or `{ ok: false, entry, error }`; `entry` is
      * present on failure whenever it was built. Never rejects. Resolving means the store committed the
      * entry or failed to.
+     *
+     * @remarks
+     * The store stamps `ulid`, `timestamp` and `format_version`. An entry that is not a valid log entry once
+     * masked and stamped (a non-string `message` or an unknown `type`, passed from JavaScript or through a
+     * cast) is never recorded: the call fails with `{ ok: false, error }` and no `entry`, and the error does
+     * not quote the entry.
      */
     add<T extends any>(entry:AcceptLogEntry<T>, options?: LogCallMaskingOptions):Promise<LogWriteResult<T>>;
 
@@ -212,12 +224,19 @@ export interface ILogStorage {
      * setBroken(r.error?.failures.map(f => f.source) ?? []);
      *
      * @remarks
+     * Every entry is valid and in the current format. A record the store cannot read is skipped, not
+     * reported: the read is still `ok`. A read never changes or removes anything stored.
+     *
      * A store that keeps no entries (console, webhook) answers `{ ok: true, entries: [] }`.
      */
     get<T extends LogEntry = LogEntry>(filter?:WhereFilterDefinition<T>, fullTextFilter?: string): Promise<LogReadResult<T>>;
 
     /**
-     * Remove items older than the max age stated in LogStorageOptions.
+     * Clean up: upgrade entries from older formats, remove records the store cannot read, and remove entries
+     * older than `max_age` (see {@link LogStorageOptions}).
+     *
+     * Records written by a newer version of the library are left untouched, whatever their age. A store
+     * whose substrate outlives it (IndexedDB) also cleans up as it opens, before it answers any call.
      *
      * @returns `{ ok: true }`, or `{ ok: false, error }`. Never rejects.
      */
@@ -227,8 +246,10 @@ export interface ILogStorage {
     /**
      * Manually reset the database and populate it with the passed in entries.
      *
-     * @param entries The entries the store holds afterwards; none if omitted.
-     * @returns `{ ok: true }`, or `{ ok: false, error }`. Never rejects.
+     * @param entries The entries the store holds afterwards; none if omitted. Each must be a valid entry in the
+     * current format: upgrade entries saved by an older version of the library with `migrateLogEntry` first.
+     * @returns `{ ok: true }`, or `{ ok: false, error }`. Never rejects. If `entries` is not an array, or any
+     * entry is not a valid current entry, the whole call fails and the store is unchanged.
      */
     reset(entries?:LogEntry[]): Promise<LoggingResult>;
 
@@ -285,8 +306,10 @@ export interface LogStorageOptions {
     log_to_console?:boolean,
 
     /**
-     * Cull logs based on age. Set different times for different filters (matching first found in array)
-     * 
+     * Cull logs based on age, when the store cleans up. Set different times for different filters (matching first found in array)
+     *
+     * Records written by a newer version of the library are never culled: this version cannot read them.
+     *
      * @example [{filter: {type: 'error'}, max_ms: dayMs*30}, {max_ms: dayMs*5}] 
      */
     max_age?: MaxAge,

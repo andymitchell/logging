@@ -8,7 +8,8 @@ import type { LogEntry } from "../log-storage/types.ts";
  * - `write`: recording an entry.
  * - `read`: retrieving entries (a store's `get`, or a trace search).
  * - `reset`: replacing or clearing every entry.
- * - `clear_old_entries`: removing entries older than their maximum age.
+ * - `clear_old_entries`: cleaning up (upgrading entries from older formats, removing records the store cannot read,
+ *   and removing entries older than their maximum age).
  * - `breakpoint`: checking the entry against breakpoints after it was recorded.
  * - `unexpected`: a failure the store did not describe itself — for example a store that threw instead of
  *   answering with a result — caught by the logger or span that called it.

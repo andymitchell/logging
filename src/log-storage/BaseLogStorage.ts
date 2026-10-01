@@ -22,10 +22,17 @@ import { LOG_ENTRY_FORMAT_VERSION, isCurrentLogEntry } from "./format/index.ts";
  * A subclass provides the hooks, which answer with a result rather than throwing:
  * - `commitEntry(entry)` → `{ ok: true }`, or `{ ok: false, error }` describing what went wrong.
  * - `queryEntries(filter, fullTextFilter)` → `{ ok: true, entries }`, or a failed result with whatever
- *   entries were obtained.
- * - `resetEntries(entries)` and `clearOldEntries()` → `{ ok: true }` or `{ ok: false, error }`.
+ *   entries were obtained. Only current entries leave the store: filter what the substrate holds with
+ *   `isCurrentLogEntry` before matching.
+ * - `resetEntries(entries)` and `clearOldEntries()` → `{ ok: true }` or `{ ok: false, error }`. Clean-up
+ *   decides what to do with each stored record with `migrateLogEntry`.
  *
  * A hook that throws or rejects anyway is caught and described by {@link BaseLogStorage.toFailure}.
+ *
+ * @remarks
+ * The base cannot see a store's substrate, so it does not check what `queryEntries` returns entry by entry,
+ * and it does not clean up on its own. A store over a substrate that outlives it (IndexedDB) cleans up as it
+ * opens, before it answers any call.
  */
 export class BaseLogStorage implements ILogStorage {
     protected includeStackTrace: Required<LogStorageOptions>['include_stack_trace'];
@@ -149,7 +156,16 @@ export class BaseLogStorage implements ILogStorage {
      * @param _filter Match entries against this where-filter.
      * @param _fullTextFilter Match entries whose JSON contains this text.
      * @returns `{ ok: true, entries }`, or a failed result saying why the entries could not be read, with
-     * whatever entries were obtained (usually none).
+     * whatever entries were obtained (usually none). `entries` holds only valid entries in the current format:
+     * a record the store cannot read (junk, or written by an older or newer library) is skipped, and the
+     * result is still `ok`.
+     *
+     * @example
+     * const entries = rows.filter(isCurrentLogEntry); // before the filters are matched
+     *
+     * @remarks
+     * Reading never changes the substrate: an older entry is upgraded, and junk removed, only by
+     * {@link clearOldEntries}.
      */
     protected queryEntries<T extends LogEntry = LogEntry>(_filter?: WhereFilterDefinition<T>, _fullTextFilter?: string): Promise<LogReadResult<T>> {
         throw new Error("Method not implemented");
@@ -167,9 +183,19 @@ export class BaseLogStorage implements ILogStorage {
     }
 
     /**
-     * Remove entries older than their maximum age (`max_age`). Called by {@link forceClearOldEntries}.
+     * Clean up the substrate in one pass. Called by {@link forceClearOldEntries}.
      *
-     * @returns `{ ok: true }`, or `{ ok: false, error }` saying why old entries could not be removed.
+     * Each record is passed to `migrateLogEntry`, and then:
+     * - `current` → kept, unless it is older than `max_age`.
+     * - `migrated` → its upgraded entry is written in place of the record, unless it is older than `max_age`.
+     * - `newer` → kept untouched, whatever its age: a newer version of the library wrote it.
+     * - `unrecognised` → removed.
+     *
+     * @returns `{ ok: true }`, or `{ ok: false, error }` saying why the substrate could not be cleaned up.
+     *
+     * @remarks
+     * The pass is all or nothing: if any step throws (a malformed `max_age`, say), the substrate is left as it
+     * was. Running it again straight away changes nothing.
      */
     protected clearOldEntries(): Promise<LoggingResult> {
         throw new Error("Method not implemented");
@@ -177,7 +203,9 @@ export class BaseLogStorage implements ILogStorage {
 
 
     /**
-     * Remove entries older than their maximum age (`max_age`) now, rather than waiting for the store to.
+     * Clean up now, rather than waiting for the store to: upgrade entries from older formats, remove records
+     * the store cannot read, and remove entries older than `max_age`. Records written by a newer version of
+     * the library are left untouched.
      *
      * @returns `{ ok: true }`, or `{ ok: false, error }`. Never rejects; a failure is also told to
      * {@link onFailure} listeners.
@@ -213,7 +241,8 @@ export class BaseLogStorage implements ILogStorage {
      * @param filter Match entries against this where-filter.
      * @param fullTextFilter Match entries whose JSON contains this text.
      * @returns `{ ok: true, entries }`, or `{ ok: false, entries, error }`, where `entries` holds whatever was
-     * obtained (e.g. the healthy children of a `ChannelsLogStorage`). Never rejects; a failure is also told
+     * obtained (e.g. the healthy children of a `ChannelsLogStorage`). Every entry is valid and in the current
+     * format; a record the store cannot read is skipped, not reported. Never rejects; a failure is also told
      * to {@link onFailure} listeners.
      */
     public async get<T extends LogEntry = LogEntry>(filter?: WhereFilterDefinition<T>, fullTextFilter?: string): Promise<LogReadResult<T>> {

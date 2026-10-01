@@ -115,6 +115,58 @@ if (r.error) reportLoggingBroken(r.error);   // r.entry?.ulid and r.error?.messa
 **`bestEffortSpanLog(span, s => s.log(...))`** is for logging as a side note to other work. It waits at most a second (`{ timeoutMs }` to change it) and does nothing when `span` is `undefined`. Call the span directly when you need the result.
 
 
+# Stored entries and upgrades
+
+A store only ever holds, and only ever returns, valid entries in the current format. Every entry carries `format_version` (`LOG_ENTRY_FORMAT_VERSION`), stamped by the store when it records the entry; a caller can't set it.
+
+- **`add` and `reset` refuse anything that is not an entry.** A malformed entry (a non-string `message` or an unknown `type`, passed from JavaScript or through a cast) resolves `{ ok: false, error }` and is never recorded; `onFailure` hears it. `reset` fails as a whole if any entry is not a valid current entry, and the store keeps what it had.
+- **`get` skips records it can't read.** An IndexedDB database can hold rows written by an older version of this library, by a newer one, or by another script. `get` returns only current entries, and is still `ok`. Reading never changes or removes anything.
+- **Clean-up upgrades and removes.** When an `IDBLogStorage` opens, and whenever you call `forceClearOldEntries`, the store upgrades entries from older formats in place, removes records it can't read, and removes entries older than `max_age`, in one pass. Calls made while it is opening wait for it. Several tabs opening one database at once are safe: each entry ends up there exactly once.
+- **Records from a newer version are left alone.** After a downgrade, or while two versions of an app share one database, the older library neither returns nor deletes what the newer one wrote. Those records don't age out until the newer version runs again.
+- **`context` and `meta` are whatever was logged.** One store can hold a string context next to an object one. Narrow them before use. `LogEntrySchema` accepts any value for both, unless you pass schemas to `createLogEntrySchema`.
+
+Restoring entries saved by an older version? `reset` accepts only current entries, so upgrade them first:
+
+```ts
+import { migrateLogEntry } from '@andymitchell/logging';
+
+const entries = backup.flatMap(record => {
+  const outcome = migrateLogEntry(record);   // status: 'current' | 'migrated' | 'newer' | 'unrecognised'
+  return outcome.status === 'current' || outcome.status === 'migrated' ? [outcome.entry] : [];
+});
+await storage.reset(entries);
+```
+
+**Writing your own store?** Extend `BaseLogStorage`: it stamps `format_version`, and refuses invalid entries in `add` and `reset`, for you. Then:
+
+- In `queryEntries`, keep only `rows.filter(isCurrentLogEntry)` before matching the filters.
+- In `clearOldEntries`, pass each record to `migrateLogEntry`: keep a `current` entry and write a `migrated` one back in place of its record (unless either is older than `max_age`), leave a `newer` record untouched, and delete an `unrecognised` one. Make the pass all or nothing.
+- If your substrate outlives the store (a database, a file, a server), clean up as the store opens, before it answers any call.
+- Answer a hook that failed with `createLoggingFailedResult(...)`.
+
+The built-in stores are checked against each of these rules by a conformance suite (`src/conformance`), which is not yet part of the package. See the stored-entries decisions in [spec/decisions.md](./spec/decisions.md).
+
+
+# Upgrading to 0.18.0
+
+Entries carry a format version, and stores refuse, skip or clean up anything that is not a valid current entry. See [Stored entries and upgrades](#stored-entries-and-upgrades).
+
+| 0.17 | 0.18 |
+|---|---|
+| `LoggingOk`, `LoggingFailed` | `LoggingOkResult`, `LoggingFailedResult` (the old names still work, deprecated) |
+| a `LogEntry` you build yourself (test fixtures, a fake store) | add `format_version: LOG_ENTRY_FORMAT_VERSION` |
+| `add` records a malformed entry (from JavaScript or a cast) | it resolves `{ ok: false, error }` and records nothing |
+| `reset(entries)` stores whatever it is given | it fails as a whole, leaving the store unchanged, if any entry is not a valid current entry; run a backup from an older version through `migrateLogEntry` first |
+| `IDBLogStorage` removes entries older than `max_age` when it opens and on `forceClearOldEntries` | it also upgrades older entries in place and removes rows it can't read |
+| `get` returns whatever the store holds | it skips anything that is not a valid current entry |
+| `LogEntrySchema` requires `context` and `meta` to be objects | it accepts any value for both; `LogEntry`'s second type parameter (`meta`) no longer has to be an object type |
+
+- **`LogEntrySchema` and `TraceSearchResultsSchema` reject entries written by an older version**, which have no `format_version`. If you validate entries or traces that crossed a boundary (to a UI, a worker, a server), upgrade both sides together, or run each entry through `migrateLogEntry` first.
+- **`@andymitchell/logging-ui-react`** only reads entries, so it works unchanged. Fixtures of your own that build `LogEntry` literals need the `format_version` field.
+- **The main entry now loads zod**, to check entries. Nothing new is installed (zod is a required peer) and the where-filter already loaded it.
+- **Store authors** can import `createLoggingFailedResult`, `migrateLogEntry`, `isCurrentLogEntry` and `LOG_ENTRY_FORMAT_VERSION`. See "Writing your own store?" above.
+
+
 # Upgrading to 0.15.0
 
 Every logging call now resolves a result instead of a bare value, and never throws or rejects. (0.14.0 has the same API as 0.13.)
@@ -167,6 +219,8 @@ The `@andymitchell/logging/react` entry point was removed in 0.13.0. Replace `fr
 ### Work on the upstream @andyrmitchell/objects to make sure that importing @andyrmitchell/objects/where-filter will not import zod
 
 At least not after being tree-shaken. Try compiling this with iife and tree-shaking.
+
+On its own this no longer keeps zod out: since 0.18.0 the main entry loads zod to check entries.
 
 ## Rethink the debugger
 

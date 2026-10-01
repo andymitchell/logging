@@ -37,6 +37,14 @@ import { LOG_ENTRY_FORMAT_VERSION } from "./version.ts";
  *     }
  * }
  *
+ * @example
+ * // Restoring entries saved by an older library: `reset` accepts only current entries
+ * const entries = backup.flatMap(record => {
+ *     const outcome = migrateLogEntry(record);
+ *     return outcome.status === 'current' || outcome.status === 'migrated' ? [outcome.entry] : [];
+ * });
+ * await storage.reset(entries);
+ *
  * @remarks
  * The format is read from `format_version`, never guessed by trying each historic schema in turn: a version says
  * which writer produced the record, so "newer than me" is told apart from "corrupt", and a record costs one

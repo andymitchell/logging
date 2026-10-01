@@ -215,9 +215,10 @@ export class ChannelsLogStorage extends BaseLogStorage implements ILogStorage {
 
 
     /**
-     * Clear old entries from every channel, each by its own `max_age`.
+     * Clean up every channel with its `forceClearOldEntries`, each by its own `max_age`.
      *
-     * @returns `ok()` only if every channel cleared; otherwise every failure, in channel order.
+     * @returns `ok()` only if every channel cleaned up; otherwise every failure, in channel order. A channel
+     * that cleaned up keeps its changes when another fails.
      */
     protected override async clearOldEntries(): Promise<LoggingResult> {
         const perChannel = this.channels.map((channel, index) => this.#askChannel(index, CLEAR_OLD_ENTRIES, () => channel.storage.forceClearOldEntries(), isLoggingResult));
