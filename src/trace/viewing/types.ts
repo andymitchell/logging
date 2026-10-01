@@ -68,12 +68,15 @@ export type TraceResult<T extends MinimumContext = any> = {
 }
 
 /**
- * A {@link TraceResult} returned by a search, plus the entries in it that matched the search filter.
+ * A {@link TraceResult} returned by a search, plus the entry that made the search find it.
  */
 export type TraceSearchResult<T extends MinimumContext = any> = TraceResult<T> & {
-    
+
     /**
-     * Entries that match the filter, if provided 
+     * The trace's first entry that matched the search's entries filter or full-text search, as a one-item list.
+     *
+     * It holds only that first match, not every matching entry: it says why the trace was found. It is empty when
+     * the search had neither an entries filter nor a full-text search, since then no entry is the reason.
      */
     matches: TraceEntry<T>[]
 }
