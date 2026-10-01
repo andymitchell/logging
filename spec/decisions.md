@@ -156,8 +156,30 @@ reached.
 
 #### dec-facade-omits-unmask-config
 The facade `Omit` keeps suppressing unmask **config** (`permit_dangerous_context_properties`,
-`preserve_unmasked_context_paths`, and the new `allow_per_call_unmasking`) — meaningless on a non-masking
-facade.
+`preserve_unmasked_context_paths`, and the new `allow_per_call_unmasking`): the facade masks nothing it hands to
+a child, and masks what it exposes with the default config only (dec-channels-facade-masks-what-it-exposes).
+
+#### dec-channels-facade-masks-what-it-exposes
+**A facade hands its children the raw context, and never exposes it itself.** The entry a facade echoes to the
+console (`log_to_console`) and returns as `result.entry` has its `context` masked with the default masking
+config. Per-call unmasking is not applied to it. What each child records is unchanged, and breakpoints still
+test the entry as logged.
+- Every store exposes its entry through one hook, `makeEntrySafeToExpose`. A normal store has already masked
+  the entry, so the default returns it as it is. If an override throws, or returns something that is not that
+  entry, the entry is exposed without its `context` and the write fails with "Could not make the entry safe to
+  expose…", though the entry was recorded.
+- A context that cannot be masked at all (nested too deeply) is exposed as `'redact:uncopyable'`, and the write
+  is still `ok`.
+- The facade ignores masking options handed to it at run time, as its type already omits them.
+- **Known limit:** the facade knows no child's config. A key only a child lists as sensitive (`myOrgToken`) is
+  masked in what the facade exposes only if its value looks like a secret; a value a child keeps readable is
+  still masked there.
+
+**Example — averted leak:** `logger.log('signed in', { password: 'hunter2' })` through a facade with
+`log_to_console` printed `hunter2` and returned it as `result.entry.context.password`, though every child
+recorded it masked. Both now show the masked value.
+
+It is about the Channels facade alone, so it is proven by that store's own tests, not by the conformance suite.
 
 ---
 

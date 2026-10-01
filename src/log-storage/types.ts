@@ -198,8 +198,9 @@ export interface ILogStorage {
      * `allow_per_call_unmasking: true`). Non-generic on purpose — typed paths live at the `*WithOptions`
      * call sites; `C` cannot be reliably inferred from the entry's union here.
      * @returns `{ ok: true, entry }` with the recorded entry, or `{ ok: false, entry, error }`; `entry` is
-     * present on failure whenever it was built. Never rejects. Resolving means the store committed the
-     * entry or failed to.
+     * present on failure whenever it was built. Its context is always masked: a Channels facade, whose
+     * channels each record the entry masked by their own options, returns it masked with the default options.
+     * Never rejects. Resolving means the store committed the entry or failed to.
      *
      * @remarks
      * The store stamps `ulid`, `timestamp` and `format_version`. An entry that is not a valid log entry once
@@ -330,7 +331,8 @@ export interface LogStorageOptions {
      * Matched WHOLE-TOKEN and case-insensitively: `dbPassword`, `password_hash` and `x-api-key` match; a benign
      * `passwordless` or a bare `key` do not. Set `false` to disable key-name redaction while keeping value-shape
      * masking. Like {@link permit_dangerous_context_properties} this is masking **config**, so the
-     * {@link ChannelsLogStorage} facade omits it and each child storage applies its own.
+     * {@link ChannelsLogStorage} facade does not take it: each child storage applies its own, and what the
+     * facade shows itself is masked with the default.
      *
      * @default true
      */
@@ -360,8 +362,9 @@ export interface LogStorageOptions {
      * holds a UUID today may hold an email after a refactor), so a path-only exemption would be silently
      * left wide open on the wrong type. Pairing with a shape is fail-closed. Like
      * {@link permit_dangerous_context_properties}, this is masking **config**: the {@link ChannelsLogStorage}
-     * facade omits it from its options type (a pure fan-out facade never masks), while each child storage
-     * still applies its own.
+     * facade omits it from its options type, while each child storage still applies its own. The facade hands
+     * its children the context unmasked, and masks what it shows itself with the default config, which keeps
+     * no value readable.
      *
      * @default [] (no exemptions)
      * @example

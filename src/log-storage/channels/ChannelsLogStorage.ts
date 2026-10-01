@@ -34,10 +34,10 @@ export interface Channel {
     transform?: (entry: LogEntry) => LogEntry;
 }
 
-// The fan-out sink must not carry sensitive-data masking CONFIG of its own: it forwards entries untouched to
-// its sub-storages (see prepareContext override), so any unmasking — standing config OR the per-call gate — is
-// decided there, per-sub-storage, intentionally. (Per-call DIRECTIVES still propagate through, via commitEntry;
-// it's only the facade's own masking config that would be meaningless here.)
+// The facade takes no masking config of its own. It hands each child the raw context (see the prepareContext
+// override), so what a child records is masked by that child's config and gate alone. (Per-call DIRECTIVES still
+// reach the children, via commitEntry.) What the facade shows itself, its console echo and the entry a write
+// returns, is masked with the default config (see makeEntrySafeToExpose), so no option could loosen it.
 type LogStorageOptionsWithoutSensitive = Omit<LogStorageOptions, 'permit_dangerous_context_properties' | 'redact_sensitive_context_keys' | 'sensitive_context_key_names' | 'preserve_unmasked_context_paths' | 'allow_per_call_unmasking'>;
 
 /**
@@ -58,6 +58,11 @@ type LogStorageOptionsWithoutSensitive = Omit<LogStorageOptions, 'permit_dangero
  * value becomes a `redact:<Type>` marker, as it would in a single store. A context nested too deeply to copy
  * at all is recorded as `'redact:uncopyable'`.
  *
+ * What the facade shows itself (its console echo with `log_to_console`, and the `entry` a write returns) has its
+ * context masked as a store with the default options masks it, whatever the children's options or the call's
+ * per-call directives. A key only a child lists as sensitive is masked there only if its value looks like a
+ * secret.
+ *
  * @example
  * const r = await storage.get();
  * setRows(r.entries); // the healthy channels' entries
@@ -75,7 +80,7 @@ export class ChannelsLogStorage extends BaseLogStorage implements ILogStorage {
      * @param options Standard logger options.
      */
     constructor(dbNamespace: string, channels: Channel[], options?: LogStorageOptionsWithoutSensitive) {
-        super(dbNamespace, options);
+        super(dbNamespace, optionsActedOn(options));
         if (!channels || channels.length === 0) {
             throw new Error("ChannelsLogStorage requires at least one channel in its configuration.");
         }
@@ -83,14 +88,41 @@ export class ChannelsLogStorage extends BaseLogStorage implements ILogStorage {
     }
 
     /**
-     * Pure passthrough: forward the raw context unchanged so each sub-storage masks ONCE, with its own config
-     * and gate (avoids double-stripping). Per-call options are forwarded separately in {@link commitEntry}, not
-     * consumed here.
-     * @param context
-     * @returns the context, untouched.
+     * Leave the context unmasked, so each child masks it once, with its own options and gate.
+     *
+     * Masking it here as well would mask it twice, and a child could not keep a value readable that its own
+     * options allow. Per-call options are passed to the children by {@link commitEntry}, not used here. What
+     * the facade shows itself is masked by {@link makeEntrySafeToExpose}.
+     *
+     * @param context The context as logged.
+     * @returns The context, untouched.
      */
     protected override prepareContext(context?: any, _options?: LogCallMaskingOptions) {
         return context;
+    }
+
+    /**
+     * Mask the context of the entry this facade echoes to the console and returns from a write.
+     *
+     * The children are handed the raw context and each masks it with its own options. What the facade shows
+     * itself has no child's options to go by, so it is masked as a store with the default options masks it,
+     * without per-call directives.
+     *
+     * @param entry The entry as handed to the children, with its raw context.
+     * @returns A copy of `entry` whose `context` is masked, or is `'redact:uncopyable'` when it is nested too
+     * deeply to mask.
+     */
+    protected override makeEntrySafeToExpose(entry: LogEntry): LogEntry {
+        return { ...entry, context: this.#maskedForExposure(entry.context) };
+    }
+
+    #maskedForExposure(context: unknown): unknown {
+        try {
+            // The base's masking, with this facade's options, whose masking config is always the default.
+            return super.prepareContext(context);
+        } catch {
+            return UNCOPYABLE;
+        }
     }
 
     /**
@@ -255,6 +287,25 @@ const WRITE: ChannelQuestion = { operation: 'write', threw: 'threw while filteri
 const READ: ChannelQuestion = { operation: 'read', threw: 'threw instead of answering the read with a result.', answer: 'a read result' };
 const RESET: ChannelQuestion = { operation: 'reset', threw: 'threw while filtering or handing over the entries.', answer: 'a result' };
 const CLEAR_OLD_ENTRIES: ChannelQuestion = { operation: 'clear_old_entries', threw: 'threw instead of answering with a result.', answer: 'a result' };
+
+/**
+ * The options a facade acts on, and no others.
+ *
+ * Masking options handed to a facade at run time (past its type) are dropped here, so its own masking config
+ * is always the default, and what it shows can never be less masked than that.
+ *
+ * @remarks
+ * Every option is listed by name: adding a non-masking option to {@link LogStorageOptions} fails to compile
+ * here until it is passed on.
+ */
+function optionsActedOn(options?: LogStorageOptionsWithoutSensitive): { [K in keyof Required<LogStorageOptionsWithoutSensitive>]: LogStorageOptionsWithoutSensitive[K] } {
+    return {
+        include_stack_trace: options?.include_stack_trace,
+        log_to_console: options?.log_to_console,
+        max_age: options?.max_age,
+        breakpoints: options?.breakpoints,
+    };
+}
 
 /**
  * A channel whose `accept` filter rejects the entry is not asked to record it.

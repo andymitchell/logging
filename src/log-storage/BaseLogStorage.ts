@@ -99,6 +99,31 @@ export class BaseLogStorage implements ILogStorage {
     }
 
     /**
+     * Make an entry safe to show outside the store: in the console echo (`log_to_console`) and as the `entry`
+     * a write returns.
+     *
+     * A store masks the context while it builds the entry (see {@link prepareContext}), so what it records is
+     * already safe to show, and the default returns the entry as it is. A store that records the context
+     * unmasked (a Channels facade, which leaves masking to each child) overrides this to mask what it shows.
+     *
+     * @param entry The entry as committed. Never change it: return a new object.
+     * @returns The same entry (same `ulid`, still a valid entry in the current format), safe to show.
+     *
+     * @example
+     * protected override makeEntrySafeToExpose(entry: LogEntry): LogEntry {
+     *     return { ...entry, context: maskForDisplay(entry.context) };
+     * }
+     *
+     * @remarks
+     * If this throws, or answers with anything but that entry, the entry is shown without its `context` and the
+     * write fails with "Could not make the entry safe to expose…", although the entry was recorded. What
+     * {@link commitEntry} records and what breakpoints test is always the entry as committed.
+     */
+    protected makeEntrySafeToExpose(entry: LogEntry): LogEntry {
+        return entry;
+    }
+
+    /**
      * Describe a failure this store did not describe itself: a hook that threw or rejected, or a breakpoint
      * check that failed.
      *
@@ -299,10 +324,14 @@ export class BaseLogStorage implements ILogStorage {
      * Build the entry, commit it with {@link commitEntry}, check it against breakpoints, and echo it to the
      * console if `log_to_console` is set.
      *
+     * The echo and the returned `entry` are the entry made safe to show by {@link makeEntrySafeToExpose}: for
+     * most stores, the entry exactly as recorded.
+     *
      * @returns `{ ok: true, entry }`, or `{ ok: false, entry, error }` listing every step that failed. A
-     * failed breakpoint check or console echo fails the result even though the entry was recorded. Something
-     * that is not a log entry (e.g. a non-string `message` from JavaScript) fails with no `entry`, and is never
-     * committed, checked or echoed. Never rejects; a failure is also told to {@link onFailure} listeners.
+     * failed breakpoint check or console echo, or an entry that could not be made safe to show (returned
+     * without its `context`), fails the result even though the entry was recorded. Something that is not a
+     * log entry (e.g. a non-string `message` from JavaScript) fails with no `entry`, and is never committed,
+     * checked or echoed. Never rejects; a failure is also told to {@link onFailure} listeners.
      */
     async add<C extends any>(acceptEntry: AcceptLogEntry<C>, options?: LogCallMaskingOptions): Promise<LogWriteResult<C>> {
         const deliverFailure = !isInsideFailureListener();
@@ -334,10 +363,29 @@ export class BaseLogStorage implements ILogStorage {
         }
 
         const committed = await this.#answer('write', () => this.commitEntry(logEntry, options), isLoggingResult, result => result);
-        const afterwards = [...await this.#testBreakpoints(logEntry), ...this.#echoToConsole(logEntry)];
+        const exposed = this.#expose(logEntry);
+        const afterwards = [...await this.#testBreakpoints(logEntry), ...exposed.failures, ...this.#echoToConsole(exposed.entry)];
         const outcome = afterwards.length===0? committed : resultFrom([...(committed.error?.failures ?? []), ...afterwards]);
 
-        return this.#settle(outcome.ok? { ok: true, entry: logEntry } : { ok: false, error: outcome.error, entry: logEntry }, deliverFailure);
+        return this.#settle(outcome.ok? { ok: true, entry: exposed.entry } : { ok: false, error: outcome.error, entry: exposed.entry }, deliverFailure);
+    }
+
+    /**
+     * The entry to echo and return: made safe by {@link makeEntrySafeToExpose}, or, if that throws or answers
+     * with anything but this entry, the entry without its `context` and the failure saying so (fail closed).
+     */
+    #expose(logEntry: LogEntry): { entry: LogEntry, failures: LoggingFailure[] } {
+        let cause: unknown;
+        try {
+            const answer = this.makeEntrySafeToExpose(logEntry);
+            // Identity first, so the default, which answers with the entry itself, costs no second check.
+            if( answer===logEntry || (isCurrentLogEntry(answer) && answer.ulid===logEntry.ulid) ) return { entry: answer, failures: [] };
+            cause = answer;
+        } catch(thrown) {
+            cause = thrown;
+        }
+        const { context: _unsafe, ...withoutContext } = logEntry;
+        return { entry: withoutContext, failures: [{ ...this.#describe('write', cause), message: COULD_NOT_MAKE_SAFE }] };
     }
 
     /**
@@ -461,6 +509,11 @@ function areAllCurrentEntries(entries: unknown): boolean {
  * What `add` says when handed something that is not a log entry (e.g. a non-string message from JavaScript).
  */
 const INVALID_ENTRY = 'The entry is not a valid log entry.';
+
+/**
+ * What `add` says when the entry could not be made safe to show, so it was shown without its context.
+ */
+const COULD_NOT_MAKE_SAFE = 'Could not make the entry safe to expose, so its context was left out.';
 
 /**
  * What `reset` says when any of the entries it was handed is not a current, valid log entry.

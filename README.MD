@@ -16,6 +16,8 @@ import { config } from './config';   // your app's config; holds the alert webho
 
 // 1. One store, built once at app startup. Channels fans each entry out to its children.
 //    Each child masks sensitive values with its own options; the Channels facade takes none.
+//    What the facade shows itself (a write's `result.entry`, its `log_to_console` echo) is masked with the
+//    default options, so there `myOrgToken` is masked only if its value looks like a secret.
 const masking = { sensitive_context_key_names: [...BUILT_IN_SENSITIVE_KEYS, 'myOrgToken'] };
 const storage = new ChannelsLogStorage('my-app', [
   { storage: new IDBLogStorage('my-app', masking) },                          // everything, kept for the trace viewer

@@ -112,8 +112,10 @@ export type LoggingResult = LoggingOkResult | LoggingFailedResult;
 /**
  * The outcome of writing a log entry, e.g. from `logger.log(...)` or `span.warn(...)`.
  *
- * On success `entry` is the recorded entry. On failure `error` says what went wrong, and `entry` is still
- * present whenever the entry was built (it may have been recorded by some sources but not others).
+ * On success `entry` is the recorded entry, its context masked (through a Channels facade, masked with the
+ * default options, whatever each channel's own options kept). On failure `error` says what went wrong, and
+ * `entry` is still present whenever the entry was built (it may have been recorded by some sources but not
+ * others).
  * `result.entry?.ulid` and `result.error?.message` work without narrowing.
  *
  * @example
