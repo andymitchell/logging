@@ -771,6 +771,20 @@ It is now `Could not reach the webhook. Backing off.`
 **Example — averted duplicate:** two channels of one facade route the same entry to one Webhook store. The
 webhook received it twice in one batch. It now receives it once, and both writes answer `ok`.
 
+### dec-logging-never-holds-the-process-open
+**Logging never decides when a program exits.** Nothing the library leaves pending between calls keeps a Node
+process running. The Webhook store's retry timer is unref'd, and its flushes run one at a time on a promise chain
+rather than a queue with a timer of its own.
+- Entries still buffered when the process exits are lost: they only ever lived in memory. A caller who needs to
+  know awaits the write, whose result says it was not delivered (dec-awaited-write-means-recorded).
+- An attempt already in flight holds the process until the webhook answers or `TIMEOUT_MS` passes. Once it has
+  answered nothing is held: the answer's body is released unread (dec-webhook-write-answers-for-its-own-entry).
+
+**Example — averted hang:** a command-line tool logs one `critical` entry to a webhook that is down, then
+finishes. The process never exited: the store retried every minute for good.
+
+It is about the Webhook store alone, so it is proven by that store's own tests, not by the conformance suite.
+
 ### dec-channels-isolate-channels
 **One channel's filter, transform or store failure never stops the others.**
 - A write succeeds only if every matching channel recorded it; otherwise it resolves `{ ok: false, entry,

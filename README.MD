@@ -102,7 +102,7 @@ if (r.error) reportLoggingBroken(r.error);   // r.entry?.ulid and r.error?.messa
   `if (!r.ok) return;` throws away the entries a partial read did get.
 - **`reset` / `forceClearOldEntries`** resolve `{ ok, error? }`.
 - Stores that keep nothing (`ConsoleLogStorage`, `WebhookLogStorage`) read as `{ ok: true, entries: [] }`.
-- A `WebhookLogStorage` write says what became of **its own** entry: sent, refused by the webhook (`details: { status }`, discarded), or kept for a retry (unreachable, no answer within 10 seconds, a temporary 429/5xx, or waiting behind an earlier retry). An entry that can't be turned into JSON fails without being sent. An entry written twice before it is sent (same `ulid`) is sent once; delivery is at least once, so one written again after it was sent is sent again.
+- A `WebhookLogStorage` write says what became of **its own** entry: sent, refused by the webhook (`details: { status }`, discarded), or kept for a retry (unreachable, no answer within 10 seconds, a temporary 429/5xx, or waiting behind an earlier retry). An entry that can't be turned into JSON fails without being sent. An entry written twice before it is sent (same `ulid`) is sent once; delivery is at least once, so one written again after it was sent is sent again. A retry that is waiting never keeps a Node process alive; entries still buffered when it exits are lost.
 
 **`storage.onFailure`** is the one place to hear about failures you didn't await. Subscribe once at startup, on the store you gave your logger. It only exists on stores; loggers and spans have none. The listener gets the same error the failed call returns, once per failed call.
 

@@ -1,4 +1,3 @@
-import { QueueMemory } from "@andymitchell/utils/queue-memory";
 import type { LogStorageOptions } from "../types.ts";
 import { BaseLogStorage } from "../BaseLogStorage.ts";
 import type { LogEntry, ILogStorage } from "../types.ts";
@@ -54,6 +53,12 @@ export type PostBody = {
  * const result = await storage.add({ type: 'critical', message: 'payments down' });
  * if (result.error) report(result.error);
  * // e.g. failures: [{ source: 'WebhookLogStorage:my-app', operation: 'write', message: 'The webhook answered with a temporary error. …', details: { status: 503 } }]
+ *
+ * @remarks
+ * A retry that is waiting never keeps a Node process running: a program that has finished its own work exits,
+ * and entries still in the buffer then are lost, since they only ever lived in memory. Await the write to learn
+ * whether its entry was delivered. An attempt already in flight holds the process until the webhook answers or
+ * {@link WebhookLogStorage.TIMEOUT_MS} passes.
  */
 export class WebhookLogStorage extends BaseLogStorage implements ILogStorage {
 
@@ -76,11 +81,11 @@ export class WebhookLogStorage extends BaseLogStorage implements ILogStorage {
      */
     #awaitedDeliveries = new Set<AwaitedDelivery>();
 
-    
     /**
-     * Make sure fetch functions run sequentially in a guaranteed order
+     * The latest flush. Each starts when the one before has finished, so batches are sent one at a time, in call
+     * order.
      */
-    #queue = new QueueMemory('WebhookLogStorage');
+    #flushing: Promise<void> = Promise.resolve();
 
     #callbackId?: NodeJS.Timeout | number
 
@@ -176,37 +181,49 @@ export class WebhookLogStorage extends BaseLogStorage implements ILogStorage {
     }
 
 
-    async #flushBuffer(): Promise<void> {
-        // Flush the buffer to the endpoint 
-        await this.#queue.enqueue(async () => {
-            const backOffUntil = this.#bufferStorage.getBackOffUntil();
-            if (Date.now() < backOffUntil.timestamp) {
-                this.#requestFutureFlushBuffer();
-                return;
+    /**
+     * Send what the buffer holds, once every flush requested before this one has finished.
+     *
+     * @returns Resolves when this flush has finished. Rejects only if it threw, and then only to this caller.
+     */
+    #flushBuffer(): Promise<void> {
+        const flush = this.#flushing.then(() => this.#flush());
+        // A flush that rejects must neither stop later flushes nor go unhandled here: its own caller hears it.
+        this.#flushing = flush.catch(() => {});
+        return flush;
+    }
+
+    /**
+     * Send the buffer to the webhook in batches, stopping at the first batch that must wait for a retry.
+     */
+    async #flush(): Promise<void> {
+        const backOffUntil = this.#bufferStorage.getBackOffUntil();
+        if (Date.now() < backOffUntil.timestamp) {
+            this.#requestFutureFlushBuffer();
+            return;
+        }
+
+        let buffer = this.#bufferStorage.getBuffer();
+
+        // Continue sending batches as long as there are items in the buffer
+        while (buffer.length > 0) {
+            const batch = buffer.slice(0, WebhookLogStorage.MAX_BATCH_SIZE);
+            const delivery = await this.#send(batch);
+            // Settled and removed from the buffer in one turn. A write of one of these entries arriving in
+            // between would be skipped by the buffer (its ulid is still there), then removed unsent and
+            // never answered.
+            this.#settle(batch, delivery);
+
+            if (delivery.kind === 'sent' || delivery.kind === 'refused') {
+                // Sent, or discarded so a batch the webhook will never accept does not block the queue.
+                this.#bufferStorage.markComplete(batch.map(x => x.ulid));
+                buffer.splice(0, batch.length);
+            } else {
+                // Stop processing batches and wait for the backoff period.
+                this.#handleFailure();
+                break;
             }
-
-            let buffer = this.#bufferStorage.getBuffer();
-
-            // Continue sending batches as long as there are items in the buffer
-            while (buffer.length > 0) {
-                const batch = buffer.slice(0, WebhookLogStorage.MAX_BATCH_SIZE);
-                const delivery = await this.#send(batch);
-                // Settled and removed from the buffer in one turn. A write of one of these entries arriving in
-                // between would be skipped by the buffer (its ulid is still there), then removed unsent and
-                // never answered.
-                this.#settle(batch, delivery);
-
-                if (delivery.kind === 'sent' || delivery.kind === 'refused') {
-                    // Sent, or discarded so a batch the webhook will never accept does not block the queue.
-                    this.#bufferStorage.markComplete(batch.map(x => x.ulid));
-                    buffer.splice(0, batch.length);
-                } else {
-                    // Stop processing batches and wait for the backoff period.
-                    this.#handleFailure();
-                    break;
-                }
-            }
-        });
+        }
     }
 
     /**
@@ -217,6 +234,7 @@ export class WebhookLogStorage extends BaseLogStorage implements ILogStorage {
     async #send(batch: Buffered[]): Promise<Delivery> {
         const controller = new AbortController();
         let timedOut = false;
+        // Left holding the process, unlike the retry timer: it lives only while an attempt is in flight.
         const timer = setTimeout(() => { timedOut = true; controller.abort(); }, WebhookLogStorage.TIMEOUT_MS);
         try {
             // A PostBody, written out from each entry's JSON rather than stringified again: the same text
@@ -283,7 +301,7 @@ export class WebhookLogStorage extends BaseLogStorage implements ILogStorage {
     }
 
     /**
-     * Set up a callback to flush buffer a tick after the next paused timestamp.
+     * Schedule a flush for just after the back-off ends, on a timer that never keeps the process running.
      */
     #requestFutureFlushBuffer(): void {
         const backOffUntil = this.#bufferStorage.getBackOffUntil();
@@ -297,6 +315,7 @@ export class WebhookLogStorage extends BaseLogStorage implements ILogStorage {
             // No call waits on this retry, so no result can carry its outcome and a failure is ignored; the next
             // write's result says how delivery is going.
             this.#callbackId = setTimeout(() => { this.#flushBuffer().catch(() => {}); }, delay + 1); // +1ms to ensure timestamp has passed
+            letProcessExitBefore(this.#callbackId);
         }
     }
 
@@ -364,6 +383,19 @@ function releaseBody(response: Response): void {
 }
 
 /**
+ * Stop a timer from keeping a Node process running: the process may exit before it fires.
+ *
+ * A pending retry is the store's business, not the program's. A command-line tool that logs to a webhook that is
+ * down must still exit once its own work is done, rather than wait on retries for ever.
+ *
+ * @param timer What `setTimeout` returned. In Node it is an object that can be unref'd; in a browser it is a
+ * number, and a page's timers never keep anything open, so it is left as it is.
+ */
+function letProcessExitBefore(timer: unknown): void {
+    if( typeof timer==='object' && timer!==null && 'unref' in timer && typeof timer.unref==='function' ) timer.unref();
+}
+
+/**
  * The entry as the JSON text a batch carries, or `undefined` if it cannot be turned into JSON.
  *
  * `JSON.stringify` throws on some values (a bigint, a circular reference) and gives `undefined`, not text, for
@@ -382,7 +414,7 @@ function toJson(entry: LogEntry): string | undefined {
  * The entries waiting to be posted, at most one per ulid, and the back-off.
  *
  * Every method is synchronous. The store relies on a write being registered and buffered in one turn, and on a
- * batch being settled and removed in one turn (see `#flushBuffer`), so nothing may happen in between.
+ * batch being settled and removed in one turn (see `#flush`), so nothing may happen in between.
  */
 class BufferStorage {
     #buffer: Buffered[] = []
