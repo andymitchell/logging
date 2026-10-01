@@ -10,7 +10,7 @@ Convention: `### dec-<slug>` = one decision; `#### dec-<slug>` = a sub-decision 
 
 Every decision that constrains an `ILogStorage` implementation is proven by the conformance suite in
 `src/conformance`, whose tests carry the slug they prove (`[dec-slug]`). A decision without a tagged test is not
-yet a rule. Coverage today: the stored-entries decisions; the rest is future work.
+yet a rule. Coverage today: the stored-entries and conformance-suite decisions; the rest is future work.
 
 ---
 
@@ -935,6 +935,62 @@ step fails closed. An unversioned entry ages out exactly as a current one of the
 **Example:** `{ type: 'info', message: 'x', ulid: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }` becomes the same entry with
 `timestamp: 1469922850259, format_version: 2`; `{ type: 'info', message: 'x', ulid: 'expired-first' }` is purged.
 
+### dec-shared-substrate
+**A store whose substrate several live instances can sit over at once (IndexedDB, a file, a server) declares
+`substrate: { mode: 'shared' }`, and its instances are then bound by the rules below.** Conformance proves them by
+minting siblings from one harness and checking the state they settle on: never an interleaving, and no timers.
+
+**Example:** an app tab writing and a trace-viewer tab reading the same IndexedDB are two instances over one
+substrate; neither owns it.
+
+#### dec-shared-write-visibility
+**An `add`, `reset` or `forceClearOldEntries` that has resolved on one instance is reflected by the next `get` on
+any sibling.**
+
+**Example:** a trace viewer tab reads what the app tab has just logged, and stops showing an entry as soon as the
+app tab's clean-up has removed it.
+
+#### dec-shared-start-up-converges
+**Any number of instances constructed at once over a substrate holding old, junk, aged and newer records all serve
+the same current entries.** Each upgraded entry is on the substrate exactly once; nothing is lost or duplicated;
+the newer record is untouched. No lock, leader or queue is required of a store whose substrate runs writes one
+after another (IndexedDB does: dec-idb-clean-up-relies-on-transaction-serialisation); a store over a substrate
+that does not must provide its own mutual exclusion, and still meets this rule.
+
+**Example — averted duplication:** two tabs opening after a library upgrade each upgrade the same unversioned
+entry; had each appended its upgrade rather than rewriting the record, the substrate would hold it twice.
+
+#### dec-shared-substrate-outlives-instances
+**The substrate belongs to no instance:** an instance that stops being used leaves every entry in place for its
+siblings and for instances built later.
+
+**Example:** a store built after two others wrote sees both writes, and so do the two that wrote them.
+
+#### dec-start-up-clean-up-before-first-answer
+**A store over a substrate that can hold records from before it existed finishes its construction clean-up
+(upgrade, purge, age out) before it answers any `get`, `add`, `reset` or `forceClearOldEntries`.** A call made
+before then is held, in call order: never refused, never dropped, never answered from the un-cleaned substrate.
+The constructor still returns at once; a consumer never awaits construction. IndexedDB meets it with no flag of
+its own: the clean-up transaction is created in the open callback, before the store's connection promise
+resolves, and every hook awaits that promise, so IndexedDB's own transaction order holds the calls.
+
+**Example — averted:** a trace viewer that constructs a store and reads in the same tick shows a junk row, or an
+hour-old entry that the clean-up was about to remove.
+
+#### dec-add-preserves-call-order
+**Entries one instance adds, awaited or not, come back from `get` in call order, with ascending ulids.** It binds
+every store that keeps entries; it is listed here because siblings make it matter. Across siblings writing in the
+same millisecond, each instance mints its own ulids, so no order between their entries is promised.
+
+**Example:** ten un-awaited adds in a tight loop come back in the order they were called.
+
+#### dec-clean-up-is-idempotent
+**A second clean-up, by the same instance or a sibling, leaves the substrate exactly as the first did.** It binds
+every store that keeps entries.
+
+**Example:** two instances each run their construction clean-up over the same substrate; the second changes
+nothing.
+
 ### dec-idb-clean-up-relies-on-transaction-serialisation
 **Several IndexedDB stores over one database each run their clean-up when they open, with no lock, leader or
 queue.** IndexedDB runs read-write transactions on the same object store one after another, even across
@@ -948,3 +1004,37 @@ format is per row, and a version bump would fail every older tab's open with `Ve
 
 **Example:** two tabs opening after a library upgrade both clean up the same database; it ends up holding each
 upgraded entry once, in its original row, and both tabs read the same entries.
+
+It is about the IndexedDB store alone, so it is proven by that store's own tests, not by the conformance suite.
+
+## Conformance suite
+
+`src/conformance` checks every `ILogStorage` against the decisions that bind it. These decisions are the suite's
+own spec.
+
+### dec-conformance-harness-factory
+**The suite is written once, against `ILogStorage`; a store's author supplies a factory that builds a harness**
+(`instance`, `raw`, `capabilities`, `dispose`). One harness owns one substrate. Each test builds a fresh harness
+inside its own body, with a namespace no earlier harness had (counted, never drawn from the clock or randomness),
+constructs the store with the options that test is about, and disposes the harness when the test finishes.
+
+**Example:** `runLogStorageConformance(factory)` in `IDBLogStorage-conformance.test.ts` gives the IndexedDB store
+the whole battery in one line; a new store gets it the same way.
+
+### dec-conformance-raw-only-for-substrate-claims
+**Raw access to the substrate is used only where a decision speaks about what is persisted:** to place records
+the store's doors would refuse (junk, entries from an older library), and to see what the store really holds.
+Raw reads are untrusted (`unknown`). Everything else goes through the interface, or the suite would test how a
+store is built rather than what it does.
+
+**Example:** "a read never deletes a junk row" is checked by reading the substrate after `get`; "a refused write is
+not returned" is checked through `get`.
+
+### dec-conformance-declared-choices
+**Capabilities that decide what binds a store are declared as unions with no "undeclared" arm**
+(`SubstrateChoice`, `MigrationChoice`), and checked at run time too, for JavaScript or cast callers. A rule that
+does not bind a store shows as a skip whose reason names what the store owes. A declaration the harness does not
+back fails, never skips: absence is a checked claim.
+
+**Example:** a harness that declares a `private` substrate but mints a new store on every `instance()` fails,
+rather than silently skipping every shared-substrate rule it should have run.
