@@ -386,7 +386,7 @@ describe('ChannelsLogStorage: sensitive-data options are not part of the facade 
         // @ts-expect-error permit_dangerous_context_properties is likewise stripped
         const withDangerous = new ChannelsLogStorage('ns', channels, { permit_dangerous_context_properties: true });
 
-        // @ts-expect-error allow_per_call_unmasking is a masking-config gate, meaningless on the non-masking facade
+        // @ts-expect-error allow_per_call_unmasking is a masking-config gate, which the facade does not take
         const withPerCall = new ChannelsLogStorage('ns', channels, { allow_per_call_unmasking: true });
 
         // Construction still succeeds at runtime — the options are simply absent from the facade's surface.

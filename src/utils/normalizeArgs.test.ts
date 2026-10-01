@@ -147,7 +147,7 @@ describe('normalizeArgs', () => {
 
     // --- Group 3: Robustness and Edge Cases (The "Break It" Suite) ---
     describe('Robustness and Edge Cases', () => {
-        // Suppress console.error during known-to-fail tests
+        // Spy on console.error, to prove nothing is printed
         beforeEach(() => {
             vi.spyOn(console, 'error').mockImplementation(() => {});
         });

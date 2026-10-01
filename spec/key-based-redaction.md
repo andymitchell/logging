@@ -103,9 +103,10 @@ sensitive_context_key_names?: readonly string[];  // @default BUILT_IN_SENSITIVE
 ```
 `BaseLogStorage.prepareContext` threads them into `cloneToJsonSafeUnknown` beside the hardcoded
 `strip_sensitive_info: true`. Both are masking CONFIG, so `ChannelsLogStorage` omits them from its options type
-(the fan-out facade never masks — each child storage applies its own). `BUILT_IN_SENSITIVE_KEYS` is re-exported
-from `logging` so consumers can extend without a deep import. Per-call (`LogCallMaskingOptions`): NOT surfaced —
-per-call masking is fail-closed ALLOW-only, so a per-call deny/enable toggle does not fit.
+(the fan-out facade masks nothing it hands to a child, each child storage applies its own, and what it shows
+itself is masked with the default config: `dec-channels-facade-masks-what-it-exposes`). `BUILT_IN_SENSITIVE_KEYS`
+is re-exported from `logging` so consumers can extend without a deep import. Per-call (`LogCallMaskingOptions`):
+NOT surfaced — per-call masking is fail-closed ALLOW-only, so a per-call deny/enable toggle does not fit.
 
 **Behaviour change:** consumers upgrading to this version now get `password`/`secret`/`apiKey`/`ssn`-keyed context
 values (and their subtrees) → `redact:sensitive-key` by default. Disable per-storage via
