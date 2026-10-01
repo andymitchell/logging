@@ -29,8 +29,9 @@ export interface NormalizedLogArgs<TContext = any> {
  * @example normalizeArgs({c: 3}) // {message: '{"c": 3}', context: undefined} note it was turned to json
  *
  * @remarks
- * Never throws: a message that cannot be read at all (e.g. a revoked Proxy, or an Error whose `message`
- * getter throws) becomes `'[Unstringifiable value]'`.
+ * Never throws, and prints nothing. A message object that `JSON.stringify` refuses (a circular reference, a
+ * `toJSON` that throws) becomes `'[Unserializable Object]'`. A message that cannot be read at all (e.g. a revoked
+ * Proxy, or an Error whose `message` getter throws) becomes `'[Unstringifiable value]'`.
  */
 export function normalizeArgs<T extends any[]>(args:[...T]): NormalizedLogArgs<InferContextTypeFromLogArgs<T>> {
     const message = args.shift() as any;
@@ -83,9 +84,8 @@ function stringifyMessage(message: any): string {
         try {
             // Pretty-print with an indent of 2 spaces for readability in logs
             return JSON.stringify(message, null, 2);
-        } catch (error) {
+        } catch {
             // This catches circular references or other serialization errors
-            console.error("Failed to stringify log message object. It may contain circular references.", error);
             return '[Unserializable Object]';
         }
     }
@@ -97,8 +97,7 @@ function stringifyMessage(message: any): string {
     else {
         try {
            return message.toString();
-        } catch (e) {
-            console.error("Failed to convert log message to string.", e);
+        } catch {
             return '[Unstringifiable value]';
         }
     }

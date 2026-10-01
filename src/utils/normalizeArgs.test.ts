@@ -170,8 +170,7 @@ describe('normalizeArgs', () => {
             
             expect(result.message).toBe('[Unserializable Object]');
             expect(result.context).toBeUndefined();
-            // Verify that an internal error was logged
-            expect(console.error).toHaveBeenCalled();
+            expect(console.error).not.toHaveBeenCalled();
         });
 
         it('should handle an object with a toJSON method that throws an error', () => {
@@ -182,7 +181,7 @@ describe('normalizeArgs', () => {
             };
             const result = logger.log(badObject);
             expect(result.message).toBe('[Unserializable Object]');
-            expect(console.error).toHaveBeenCalled();
+            expect(console.error).not.toHaveBeenCalled();
         });
 
         it('should handle weird types in the context without crashing', () => {

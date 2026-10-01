@@ -1,4 +1,4 @@
-import { describe, it, expect, onTestFinished, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, onTestFinished, afterEach, vi } from 'vitest';
 import { Logger } from './log/Logger.ts';
 import { Trace } from './trace/Trace.ts';
 import type { ILogger } from './types.ts';
@@ -34,8 +34,6 @@ const loggers: [string, (storage: MemoryLogStorage) => ILogger][] = [
 
 describe.each(loggers)('%s on a healthy store, given a value it cannot read', (_name, build) => {
 
-    // Stringifying some message values prints a diagnostic; it is not what these tests are about.
-    beforeEach(() => { vi.spyOn(console, 'error').mockImplementation(() => undefined); });
     afterEach(() => { vi.restoreAllMocks(); });
 
     it.each(hostileValues)('records the entry when the message is %s', async (_label, value) => {
