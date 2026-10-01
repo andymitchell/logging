@@ -184,7 +184,7 @@ export const oldTraceReadsBackAfterUpgrade: ConformanceClaim = {
         const read = await new TraceViewer(store).getTraces();
         expect(read.ok).toBe(true);
         expect(read.traces.map(trace => trace.id)).toEqual([unversionedTraceId]);
-        expect(read.traces[0]?.logs).toEqual(unversionedTrace.map(record => expect.objectContaining({ ...record, format_version: LOG_ENTRY_FORMAT_VERSION })));
+        expect(read.traces[0]?.logs).toEqual(unversionedTrace.map(record => ({ ...record, format_version: LOG_ENTRY_FORMAT_VERSION })));
     },
 };
 

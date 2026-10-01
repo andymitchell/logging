@@ -18,6 +18,7 @@ export type * from "./harness-types.ts";
  * dec-log-entry-context-is-opaque           entry-doors       contextAndMetaAreKeptAsLogged
  * dec-log-entry-meta-is-opaque              entry-doors       contextAndMetaAreKeptAsLogged
  * dec-add-preserves-call-order              entry-doors       addsComeBackInCallOrder
+ * dec-read-returns-entries-as-recorded      entry-doors       readEntriesAreAsRecorded
  * dec-read-skips-non-current-records        stored-entries    readsCurrentEntriesWrittenUnderneath, readSkipsJunk, readSkipsUnversionedEntries, readsNeverChangeTheSubstrate
  * dec-newer-format-left-alone               stored-entries    newerRecordsAreLeftAlone
  * dec-clean-up-migrates-or-purges           stored-entries    cleanUpRemovesJunkAndAgedEntries, cleanUpRemovesUnmigratableEntries, startUpCleanUpPrecedesTheFirstRead

@@ -22,6 +22,10 @@ import { decideCleanUp, isCurrentLogEntry } from "../format/index.ts";
  * in an older format, removes rows it cannot read, and removes entries older than `max_age`. Rows written by a
  * newer version of the library are left as they are. A read never changes the database.
  *
+ * The database keeps each row under a key it chooses, `id`, which never leaves it: a read returns each entry
+ * exactly as it was recorded, without the key, and an entry written with an `id` of its own is recorded without
+ * that `id`. So an entry read from one store can be written back to it, or to any other store.
+ *
  * Like every store it never throws or rejects. A failure carries the name of the exception IndexedDB raised
  * as `details`, e.g. `{ name: 'QuotaExceededError' }`, when it is one of the names IndexedDB defines; any other
  * name is left out, since it might quote logged data. A store whose database cannot be opened (it exists at a
@@ -115,7 +119,7 @@ export class IDBLogStorage extends BaseLogStorage implements ILogStorage {
 
     protected override async commitEntry(logEntry: LogEntry): Promise<LoggingResult> {
         const db = await this.#db;
-        await inTransaction(db, 'readwrite', logs => { logs.add(logEntry); });
+        await inTransaction(db, 'readwrite', logs => { logs.add(withoutRowKey(logEntry)); });
         return ok();
     }
 
@@ -124,7 +128,7 @@ export class IDBLogStorage extends BaseLogStorage implements ILogStorage {
         // One transaction, so an entry the database refuses leaves every entry as it was.
         await inTransaction(db, 'readwrite', logs => {
             logs.clear();
-            for( const entry of entries ) logs.add(entry);
+            for( const entry of entries ) logs.add(withoutRowKey(entry));
         });
         return ok();
     }
@@ -137,8 +141,10 @@ export class IDBLogStorage extends BaseLogStorage implements ILogStorage {
         // Filtered once the transaction has finished, so a filter that throws fails only this read.
         // The database can hold rows this version cannot read (older, newer, or junk), and only current entries
         // leave the store (dec-read-skips-non-current-records). A read never removes them: clean-up does.
+        // Each row is checked before its key is dropped, and its key is dropped before the filters see it, so an
+        // entry is matched and returned exactly as it was recorded (dec-read-returns-entries-as-recorded).
         // TODO Filter IndexedDb properly
-        let entries = all.result.filter(isCurrentLogEntry) as T[];
+        let entries = all.result.filter(isCurrentLogEntry).map(withoutRowKey) as T[];
         entries = filter? entries.filter(x => matchJavascriptObject(x, filter)) : entries;
         if( fullTextFilter ) {
             entries = entries.filter(x => {
@@ -209,6 +215,17 @@ function openDatabase(name: string, onOpen: (db: IDBDatabase) => void): Promise<
             reject(new CouldNotOpen(request.error));
         };
     });
+}
+
+/**
+ * The entry without `id`, the key the database keeps each row under.
+ *
+ * Dropped from every entry going in, so the database always chooses the key, and from every row coming out,
+ * since the key belongs to this database alone: written to another, it would be refused wherever a row already
+ * holds it.
+ */
+function withoutRowKey({ id: _rowKey, ...entry }: LogEntry & { id?: unknown }): LogEntry {
+    return entry;
 }
 
 /**

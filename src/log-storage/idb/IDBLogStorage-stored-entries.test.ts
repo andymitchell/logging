@@ -1,7 +1,7 @@
 import "fake-indexeddb/auto"; // Prevent any long-term IDB storage
 import { IDBFactory } from "fake-indexeddb";
 import { describe, it, expect, beforeEach, onTestFinished, vi } from 'vitest';
-import type { LogEntry, LogStorageOptions } from '../types.ts';
+import type { LogStorageOptions } from '../types.ts';
 import { IDBLogStorage } from './IDBLogStorage.ts';
 import { idbRawAccess } from './testing-helpers/idbRawAccess.ts';
 import { entriesOf } from '../testing-helpers/results.ts';
@@ -20,11 +20,6 @@ function clockAt(ms: number): void {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(ms);
     onTestFinished(() => { vi.useRealTimers(); });
-}
-
-/** An entry as `get` returns it, without the row key IndexedDB adds. */
-function withoutRowKey({ id: _id, ...entry }: LogEntry & { id?: unknown }): LogEntry {
-    return entry;
 }
 
 /** A store over a database that exists, and a raw connection to that database. */
@@ -65,7 +60,7 @@ describe('a database holding records the store did not record', () => {
             const storage = new IDBLogStorage('my-app', { max_age: [{ max_ms: 60_000 }] });
             const result = await storage.get();
 
-            expect(entriesOf(result).map(withoutRowKey)).toEqual([currentEntry(1, now - 5), currentEntry(2, now)]);
+            expect(entriesOf(result)).toEqual([currentEntry(1, now - 5), currentEntry(2, now)]);
             expect(await raw.readKeyed()).toEqual(new Map([[withTimestamp, { ...currentEntry(1, now - 5), id: withTimestamp }], [withoutTimestamp, { ...currentEntry(2, now), id: withoutTimestamp }]]));
         });
 
@@ -83,7 +78,7 @@ describe('a database holding records the store did not record', () => {
             const storage = new IDBLogStorage('my-app', { max_age: [{ max_ms: 60_000 }] });
             const result = await storage.get();
 
-            expect(entriesOf(result).map(withoutRowKey)).toEqual([currentEntry(4, now)]);
+            expect(entriesOf(result)).toEqual([currentEntry(4, now)]);
             expect(await raw.readAll()).toEqual([newer, currentEntry(4, now)]);
         });
 
@@ -116,7 +111,7 @@ describe('a database holding records the store did not record', () => {
             const reads = await Promise.all(stores.map(store => store.get()));
 
             const upgraded = [currentEntry(1, now), currentEntry(2, now), currentEntry(3, now)];
-            for( const read of reads ) expect(entriesOf(read).map(withoutRowKey)).toEqual(upgraded);
+            for( const read of reads ) expect(entriesOf(read)).toEqual(upgraded);
             expect([...(await raw.readKeyed()).entries()]).toEqual([
                 ...upgraded.map((entry, index) => [keys[index], { ...entry, id: keys[index] }]),
                 [keys.at(-1), { ...newer, id: keys.at(-1) }],

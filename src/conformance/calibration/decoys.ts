@@ -80,6 +80,14 @@ class LeakyReadDecoy extends RawMemoryLogStorage {
     }
 }
 
+/** Breaks the read door: returns each entry with a key of its own beside it, as a row key a substrate keeps would. */
+class LeaksRowKeyDecoy extends RawMemoryLogStorage {
+    protected override async queryEntries<T extends LogEntry = LogEntry>(filter?: WhereFilterDefinition<T>, fullTextFilter?: string): Promise<LogReadResult<T>> {
+        const read = await super.queryEntries(filter, fullTextFilter);
+        return { ...read, entries: read.entries.map((entry, index) => ({ ...entry, id: index + 1 })) };
+    }
+}
+
 /** Breaks the read door: cleans up as it reads, so a read upgrades and removes records. */
 class CleansUpOnReadDecoy extends RawMemoryLogStorage {
     protected override async queryEntries<T extends LogEntry = LogEntry>(filter?: WhereFilterDefinition<T>, fullTextFilter?: string): Promise<LogReadResult<T>> {
@@ -198,6 +206,7 @@ export const CALIBRATION_HARNESSES = {
     outOfOrderAdd: privateMemoryHarnessFactory((namespace, options) => new OutOfOrderAddDecoy(namespace, options)),
     leakyRead: privateMemoryHarnessFactory((namespace, options) => new LeakyReadDecoy(namespace, options)),
     cleansUpOnRead: privateMemoryHarnessFactory((namespace, options) => new CleansUpOnReadDecoy(namespace, options)),
+    leaksRowKey: privateMemoryHarnessFactory((namespace, options) => new LeaksRowKeyDecoy(namespace, options)),
     neverPurges: privateMemoryHarnessFactory((namespace, options) => new NeverPurgesDecoy(namespace, options)),
     purgesNewerRecords: privateMemoryHarnessFactory((namespace, options) => new PurgesNewerRecordsDecoy(namespace, options)),
     dropsMetaWhenUpgrading: privateMemoryHarnessFactory((namespace, options) => new DropsMetaWhenUpgradingDecoy(namespace, options)),

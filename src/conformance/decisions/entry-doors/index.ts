@@ -1,6 +1,6 @@
 import type { LogStorageConformanceContext } from "../../harness-types.ts";
 import { registerRules } from "../../helpers/register-rules.ts";
-import { addRefusesNonEntries, addsComeBackInCallOrder, aRefusedAddRecordsNothing, contextAndMetaAreKeptAsLogged, resetRefusesAnyNonEntry, resetRefusesUnversionedEntriesAndNonLists, resetReplacesWithCurrentEntries, stampsTheCurrentFormatVersion } from "./assertions.ts";
+import { addRefusesNonEntries, addsComeBackInCallOrder, aRefusedAddRecordsNothing, contextAndMetaAreKeptAsLogged, readEntriesAreAsRecorded, resetRefusesAnyNonEntry, resetRefusesUnversionedEntriesAndNonLists, resetReplacesWithCurrentEntries, stampsTheCurrentFormatVersion } from "./assertions.ts";
 
 
 /**
@@ -24,6 +24,10 @@ export function runEntryDoorDecisions(ctx: LogStorageConformanceContext): void {
         {
             rule: '[dec-log-entry-context-is-opaque] [dec-log-entry-meta-is-opaque] context and meta are whatever was logged',
             claims: [contextAndMetaAreKeptAsLogged],
+        },
+        {
+            rule: '[dec-read-returns-entries-as-recorded] a read returns each entry as it was recorded, ready to be written to any store',
+            claims: [readEntriesAreAsRecorded],
         },
         {
             rule: '[dec-add-preserves-call-order] entries come back in the order add was called',

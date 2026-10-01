@@ -148,6 +148,23 @@ export const contextAndMetaAreKeptAsLogged: ConformanceClaim = {
     },
 };
 
+// A read returns each entry as its write returned it, with no key the store keeps beside it, so it can be written back.
+export const readEntriesAreAsRecorded: ConformanceClaim = {
+    name: 'returns each entry exactly as its write returned it, with no key of its own, and records it again when it is written back [dec-read-returns-entries-as-recorded]',
+    async check(harness) {
+        const store = await harness.instance();
+        // Plain entries only: `add` keeps any extra key a caller passes, which would hide one the store added.
+        const added = [entryOf(await store.add({ type: 'info', message: 'first', context: { a: 1 } })), entryOf(await store.add({ type: 'info', message: 'second' }))];
+
+        const read = entriesOf(await store.get());
+
+        // `toEqual` ignores a key holding `undefined`, but fails on any extra key that holds a value.
+        expect(read).toEqual(keepsEntries(harness) ? added : []);
+        for( const entry of read ) expect((await store.add(entry)).ok).toBe(true);
+        expect((await store.reset(read)).ok).toBe(true);
+    },
+};
+
 // Entries come back in the order `add` was called, even when no call waited for the one before, with ulids ascending.
 export const addsComeBackInCallOrder: ConformanceClaim = {
     name: 'returns entries in the order add was called, even when no call waited for the one before, with ascending ulids [dec-add-preserves-call-order]',

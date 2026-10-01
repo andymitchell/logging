@@ -2,6 +2,7 @@ import "fake-indexeddb/auto"; // Prevent any long-term IDB storage
 import { IDBFactory } from "fake-indexeddb";
 import { describe, it, expect, beforeEach, onTestFinished, vi } from 'vitest';
 import { IDBLogStorage } from "./IDBLogStorage.ts";
+import { idbRawAccess } from "./testing-helpers/idbRawAccess.ts";
 import { recordUnhandledRejections } from "../testing-helpers/recordUnhandledRejections.ts";
 import { entriesOf, entryOf, recordFailures } from "../testing-helpers/results.ts";
 import { MemoryLogStorage } from "../memory/MemoryLogStorage.ts";
@@ -118,8 +119,16 @@ describe('an app whose IndexedDB database cannot be opened', () => {
 
 describe('an app whose entries IndexedDB refuses to store', () => {
 
-    /** The database keys each entry by its `id`, so it refuses a second entry carrying an `id` it already holds. */
-    const alreadyKeyed = { type: 'info' as const, message: 'first', id: 1 };
+    /**
+     * Leave the database no key to choose for a new row, so it refuses every entry added from now on with a
+     * `ConstraintError`. A row stored under the largest key the database can choose does that, and a read skips
+     * it. The store's database must already exist.
+     */
+    async function useUpRowKeys(namespace: string): Promise<void> {
+        const raw = idbRawAccess(namespace);
+        onTestFinished(raw.close);
+        await raw.writeAll([{ id: 2 ** 53, placeholder: true }]);
+    }
 
     const refusal = (operation: LoggingOperation, name: string): LoggingFailure => ({
         source: 'IDBLogStorage:my-app',
@@ -128,19 +137,20 @@ describe('an app whose entries IndexedDB refuses to store', () => {
         details: { name },
     });
 
-    it('answers a write the database refuses with a write failure naming the browser\'s reason, and keeps recording later writes', async () => {
+    it('answers a write the database refuses with a write failure naming the browser\'s reason, answers a later write the same way, and still reads what it holds', async () => {
         const unhandled = recordUnhandledRejections();
         onTestFinished(unhandled.stop);
         const storage = new IDBLogStorage('my-app');
-        await storage.add(alreadyKeyed);
+        await storage.add({ type: 'info', message: 'first' });
+        await useUpRowKeys('my-app');
 
-        const refused = await storage.add(alreadyKeyed);
+        const refused = await storage.add({ type: 'info', message: 'refused' });
         const later = await storage.add({ type: 'info', message: 'later' });
 
         expect(refused.ok).toBe(false);
         expect(refused.error?.failures).toEqual([refusal('write', 'ConstraintError')]);
-        expect(later.ok).toBe(true);
-        expect(entriesOf(await storage.get()).map(entry => entry.message)).toEqual(['first', 'later']);
+        expect(later.error?.failures).toEqual([refusal('write', 'ConstraintError')]);
+        expect(entriesOf(await storage.get()).map(entry => entry.message)).toEqual(['first']);
         expect(await unhandled.settled()).toEqual([]);
     });
 
@@ -182,9 +192,10 @@ describe('an app whose entries IndexedDB refuses to store', () => {
     it('answers a reset the database refuses with a reset failure naming the browser\'s reason, leaving the entries as they were', async () => {
         const storage = new IDBLogStorage('my-app');
         await storage.add({ type: 'info', message: 'kept' });
-        const replacement = entryOf(await new MemoryLogStorage('elsewhere').add(alreadyKeyed));
+        await useUpRowKeys('my-app');
+        const replacement = entryOf(await new MemoryLogStorage('elsewhere').add({ type: 'info', message: 'replacement' }));
 
-        const result = await storage.reset([replacement, replacement]);
+        const result = await storage.reset([replacement]);
 
         expect(result).toEqual(createLoggingFailedResult(refusal('reset', 'ConstraintError')));
         expect(entriesOf(await storage.get()).map(entry => entry.message)).toEqual(['kept']);

@@ -946,6 +946,17 @@ rewrites anything on the substrate.
 
 **Example:** a junk row another script wrote into the same IndexedDB is neither returned nor deleted by `get`.
 
+#### dec-read-returns-entries-as-recorded
+**An entry a store returns is the entry it recorded, with no key of the store's own.** A substrate may keep a key
+beside an entry (IndexedDB's row key, `id`); it stays on the substrate. So an entry read from any store can be
+written to any store, with `add` or `reset`.
+- IndexedDB drops `id` from every row it returns, before the filters are matched, and from every entry it is
+  given, so the database always chooses the row key. Its clean-up keeps `id`, which it needs to rewrite a row in
+  place.
+
+**Example — averted failure:** entries read from one IndexedDB store and added to another failed with
+`ConstraintError`: each carried the first database's row key, and the second already held a row under it.
+
 #### dec-newer-format-left-alone
 **A record whose `format_version` is above the current one was written by a newer library.** It is skipped on
 read and kept untouched (every field, including unknown ones) by clean-up. It never ages out until that library

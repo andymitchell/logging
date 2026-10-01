@@ -4,8 +4,8 @@ import type { ImplLogStorageHarness, RawLogAccess } from "../harness-types.ts";
 
 
 /**
- * What identifies each entry and its format. Entries a store returns are compared by these, since a store may
- * add keys of its own on the way out (IndexedDB adds its row key, `id`).
+ * What identifies each entry and its format: enough to tell which entries a store holds, and in what order,
+ * without comparing every field. A claim about whole entries compares them whole.
  */
 export function identities(entries: readonly LogEntry[]): Pick<LogEntry, 'ulid' | 'message' | 'timestamp' | 'format_version'>[] {
     return entries.map(({ ulid, message, timestamp, format_version }) => ({ ulid, message, timestamp, format_version }));
