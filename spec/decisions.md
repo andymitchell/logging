@@ -934,3 +934,17 @@ step fails closed. An unversioned entry ages out exactly as a current one of the
 
 **Example:** `{ type: 'info', message: 'x', ulid: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }` becomes the same entry with
 `timestamp: 1469922850259, format_version: 2`; `{ type: 'info', message: 'x', ulid: 'expired-first' }` is purged.
+
+### dec-idb-clean-up-relies-on-transaction-serialisation
+**Several IndexedDB stores over one database each run their clean-up when they open, with no lock, leader or
+queue.** IndexedDB runs read-write transactions on the same object store one after another, even across
+connections, and each pass is one transaction. So the passes never interleave: the first upgrades and removes,
+and the later ones find every row already clean and change nothing. Rejected: `navigator.locks` (absent in Node
+and in fake-indexeddb, so untestable), and `QueueIDB` from `@andymitchell/utils` (it would make `dexie` a
+declared dependency, and a dead tab can hold its queue). The pass walks the object store's own cursor, not the
+`timestamp` index, because an entry written without a timestamp is missing from that index. Upgraded rows are
+rewritten in place under their own `id`, and the database version is never bumped for a format change: the
+format is per row, and a version bump would fail every older tab's open with `VersionError`.
+
+**Example:** two tabs opening after a library upgrade both clean up the same database; it ends up holding each
+upgraded entry once, in its original row, and both tabs read the same entries.

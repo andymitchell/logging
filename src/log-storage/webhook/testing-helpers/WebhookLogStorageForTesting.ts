@@ -6,6 +6,7 @@ import createMaxAgeTest from "../../createMaxAgeTest.ts";
 import { matchJavascriptObject, type WhereFilterDefinition } from "@andymitchell/objects/where-filter";
 import type { LogReadResult, LoggingResult } from "../../../failures/types.ts";
 import { ok } from "../../../failures/results.ts";
+import { isCurrentLogEntry } from "../../format/index.ts";
 
 
 /**
@@ -44,7 +45,8 @@ export class WebhookLogStorageForTesting extends WebhookLogStorage implements IL
     }
 
     protected override async queryEntries<T extends LogEntry = LogEntry>(filter?: WhereFilterDefinition<T>, fullTextFilter?: string): Promise<LogReadResult<T>> {
-        let entries = structuredClone(this.#log) as T[];
+        // Like every retaining store, it lets only current entries out (dec-read-skips-non-current-records).
+        let entries = structuredClone(this.#log.filter(isCurrentLogEntry)) as T[];
         entries = filter? entries.filter(x => matchJavascriptObject(x, filter)) : entries;
 
         if( fullTextFilter ) {

@@ -5,6 +5,7 @@ import type { ILogStorage, LogEntry } from "../types.ts";
 import createMaxAgeTest from "../createMaxAgeTest.ts";
 import type { LogReadResult, LoggingFailure, LoggingOperation, LoggingResult } from "../../failures/types.ts";
 import { ok } from "../../failures/results.ts";
+import { decideCleanUp, isCurrentLogEntry } from "../format/index.ts";
 
 
 
@@ -13,8 +14,13 @@ import { ok } from "../../failures/results.ts";
  * (e.g. by a trace viewer).
  *
  * The database, `<dbNamespace>_logger`, starts opening when the store is constructed, and every call waits
- * for it. Entries older than `max_age` are removed as soon as it opens, and again on `forceClearOldEntries`.
- * A write resolves once its entry is committed.
+ * for it. A write resolves once its entry is committed.
+ *
+ * Other stores, other tabs, an older or newer version of this library, or another script can all write to the
+ * same database, so a read returns only the entries this version writes and skips every other row. As soon as
+ * the database opens, and again on `forceClearOldEntries`, the store cleans it up: it upgrades entries written
+ * in an older format, removes rows it cannot read, and removes entries older than `max_age`. Rows written by a
+ * newer version of the library are left as they are. A read never changes the database.
  *
  * Like every store it never throws or rejects. A failure carries the name of the exception IndexedDB raised
  * as `details`, e.g. `{ name: 'QuotaExceededError' }`, when it is one of the names IndexedDB defines; any other
@@ -43,9 +49,12 @@ export class IDBLogStorage extends BaseLogStorage implements ILogStorage {
         super(dbNamespace, options);
 
         this.#db = openDatabase(`${dbNamespace}_logger`, db => {
-            // Queued before any call's transaction, so the first read already leaves out expired entries. No call
-            // asked for this clean-up, so no result can carry its failure, and a failure is ignored.
-            this.#clearOldEntriesIn(db).catch(() => {});
+            // Queued before `#db` resolves, and so before any call's transaction: every call awaits `#db`, and
+            // IndexedDB runs transactions in the order they were created. So even a call made in the same tick as
+            // construction is answered from the cleaned database (dec-start-up-clean-up-before-first-answer), with
+            // no other flag to wait on. No call asked for this clean-up, so no result can carry its failure, and a
+            // failure is ignored.
+            this.#cleanUpIn(db).catch(() => {});
         });
         // Every call awaits the open and answers its failure. Until one does, this stops a failed open from also
         // being reported as an unhandled rejection.
@@ -70,24 +79,36 @@ export class IDBLogStorage extends BaseLogStorage implements ILogStorage {
     }
 
     /**
-     * Remove every entry older than its maximum age. The transaction is created before this returns, so it runs
-     * before any transaction requested afterwards.
+     * Clean up the database in one pass over every row: upgrade entries from older formats, remove rows the
+     * store cannot read, and remove entries older than their maximum age (dec-clean-up-migrates-or-purges).
+     *
+     * The transaction is created before this returns, so it runs before any transaction requested afterwards.
+     * It is one transaction, so a `max_age` that cannot be applied abandons the whole pass and leaves every row
+     * as it was. Several stores over one database each run this on opening without a lock: IndexedDB runs
+     * read-write transactions on the same store one after another, even across connections, and a pass over
+     * rows that are already clean changes nothing (dec-idb-clean-up-relies-on-transaction-serialisation).
      */
-    #clearOldEntriesIn(db: IDBDatabase): Promise<void> {
+    #cleanUpIn(db: IDBDatabase): Promise<void> {
         return inTransaction(db, 'readwrite', (logs, guard) => {
             const isWithinMaxAge = createMaxAgeTest(this.maxAge);
-            const cursorRequest = logs.index('timestamp').openCursor();
+            // The store's own cursor, not the `timestamp` index's: an entry written without a timestamp is
+            // missing from that index, and would never be upgraded or removed.
+            const cursorRequest = logs.openCursor();
             cursorRequest.onsuccess = guard(() => {
                 const cursor = cursorRequest.result;
                 if( !cursor ) return;
-                if( !isWithinMaxAge(cursor.value) ) cursor.delete();
+                const decision = decideCleanUp(cursor.value, isWithinMaxAge);
+                if( decision.action === 'delete' ) cursor.delete();
+                // The upgrade keeps every key of the row, including its `id`. Rewriting a row under a
+                // different key would fail the pass.
+                else if( decision.action === 'replace' ) cursor.update(decision.entry);
                 cursor.continue();
             });
         });
     }
 
     protected override async clearOldEntries(): Promise<LoggingResult> {
-        await this.#clearOldEntriesIn(await this.#db);
+        await this.#cleanUpIn(await this.#db);
         return ok();
     }
 
@@ -114,8 +135,10 @@ export class IDBLogStorage extends BaseLogStorage implements ILogStorage {
         const all = await inTransaction(db, 'readonly', logs => logs.getAll());
 
         // Filtered once the transaction has finished, so a filter that throws fails only this read.
+        // The database can hold rows this version cannot read (older, newer, or junk), and only current entries
+        // leave the store (dec-read-skips-non-current-records). A read never removes them: clean-up does.
         // TODO Filter IndexedDb properly
-        let entries: T[] = all.result;
+        let entries = all.result.filter(isCurrentLogEntry) as T[];
         entries = filter? entries.filter(x => matchJavascriptObject(x, filter)) : entries;
         if( fullTextFilter ) {
             entries = entries.filter(x => {
