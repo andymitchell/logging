@@ -9,7 +9,7 @@ import type { IBreakpoints } from "../breakpoints/types.ts";
 import type { LogReadResult, LogWriteResult, LoggingError, LoggingFailedResult, LoggingFailure, LoggingFailureListener, LoggingOperation, LoggingResult } from "../failures/types.ts";
 import { FailureListeners, isInsideFailureListener } from "../failures/FailureListeners.ts";
 import { createLoggingFailedResult, isLogReadResult, isLoggingResult, resultFrom } from "../failures/results.ts";
-import { LOG_ENTRY_FORMAT_VERSION } from "./format/version.ts";
+import { LOG_ENTRY_FORMAT_VERSION, isCurrentLogEntry } from "./format/index.ts";
 
 
 
@@ -17,7 +17,8 @@ import { LOG_ENTRY_FORMAT_VERSION } from "./format/version.ts";
  * Use this to build specific LogStorage.
  *
  * The base does the shared work of every store (building and masking entries, stamping each with the current
- * `format_version`, stack traces, breakpoints, failure listeners) and upholds the {@link ILogStorage} guarantee that no public method throws or rejects.
+ * `format_version`, refusing anything handed to `add` or `reset` that is not a valid current entry, stack
+ * traces, breakpoints, failure listeners) and upholds the {@link ILogStorage} guarantee that no public method throws or rejects.
  * A subclass provides the hooks, which answer with a result rather than throwing:
  * - `commitEntry(entry)` → `{ ok: true }`, or `{ ok: false, error }` describing what went wrong.
  * - `queryEntries(filter, fullTextFilter)` → `{ ok: true, entries }`, or a failed result with whatever
@@ -80,7 +81,8 @@ export class BaseLogStorage implements ILogStorage {
      * Call no `await` before the entry is committed where the store allows it: a caller that does not await
      * its write still expects the entry to be recorded straight away.
      *
-     * @param _entry The finished entry, already masked by {@link prepareContext}.
+     * @param _entry The finished entry, already masked by {@link prepareContext}, stamped with the current
+     * `format_version`, and checked: it is always a valid entry in the current format.
      * @param _options The per-call masking directives the entry was built with.
      * @returns `{ ok: true }` once the entry is committed, or `{ ok: false, error }` saying why it was not.
      * Written by the store, never quoting the entry or a caught error's message.
@@ -156,6 +158,8 @@ export class BaseLogStorage implements ILogStorage {
     /**
      * Replace every entry with `_entries` (none if omitted). Called by {@link reset}.
      *
+     * @param _entries Every entry to hold from now on. Already checked: each is a valid entry in the current
+     * format (a call with anything else fails before reaching this hook).
      * @returns `{ ok: true }`, or `{ ok: false, error }` saying why the entries could not be reset.
      */
     protected resetEntries(_entries?: LogEntry[]): Promise<LoggingResult> {
@@ -186,11 +190,20 @@ export class BaseLogStorage implements ILogStorage {
     /**
      * Replace every entry in the store with `entries`, or remove them all if omitted.
      *
-     * @returns `{ ok: true }`, or `{ ok: false, error }`. Never rejects; a failure is also told to
-     * {@link onFailure} listeners.
+     * @returns `{ ok: true }`, or `{ ok: false, error }`. If `entries` is not an array, or any of them is not a
+     * valid entry in the current format, the whole call fails and the store is left unchanged. Never rejects;
+     * a failure is also told to {@link onFailure} listeners.
      */
     public async reset(entries?: LogEntry[]): Promise<LoggingResult> {
         const deliverFailure = !isInsideFailureListener();
+
+        // Unversioned entries are rejected, not migrated: the type says `LogEntry[]`, and a caller restoring
+        // entries from an older version maps them through `migrateLogEntry` first. The hook is never called, so
+        // the store is unchanged (dec-reset-rejects-invalid-entries).
+        if( entries!==undefined && !areAllCurrentEntries(entries) ) {
+            return this.#settle(createLoggingFailedResult({ ...this.#genericFailure('reset'), message: INVALID_ENTRIES }), deliverFailure);
+        }
+
         return this.#settle(await this.#answer('reset', () => this.resetEntries(entries), isLoggingResult, result => result), deliverFailure);
     }
 
@@ -258,8 +271,9 @@ export class BaseLogStorage implements ILogStorage {
      * console if `log_to_console` is set.
      *
      * @returns `{ ok: true, entry }`, or `{ ok: false, entry, error }` listing every step that failed. A
-     * failed breakpoint check or console echo fails the result even though the entry was recorded. Never
-     * rejects; a failure is also told to {@link onFailure} listeners.
+     * failed breakpoint check or console echo fails the result even though the entry was recorded. Something
+     * that is not a log entry (e.g. a non-string `message` from JavaScript) fails with no `entry`, and is never
+     * committed, checked or echoed. Never rejects; a failure is also told to {@link onFailure} listeners.
      */
     async add<C extends any>(acceptEntry: AcceptLogEntry<C>, options?: LogCallMaskingOptions): Promise<LogWriteResult<C>> {
         const deliverFailure = !isInsideFailureListener();
@@ -281,6 +295,13 @@ export class BaseLogStorage implements ILogStorage {
             }
         } catch(cause) {
             return this.#settle(createLoggingFailedResult(this.#describe('write', cause)), deliverFailure);
+        }
+
+        // The finished entry is checked, after masking and stamping, so `context` and `meta` are opaque and a
+        // hostile context is masked rather than rejected. A store never writes what it would refuse to read
+        // (dec-add-rejects-invalid-entry). The failure names no part of the entry, which may be sensitive.
+        if( !isCurrentLogEntry(logEntry) ) {
+            return this.#settle(createLoggingFailedResult({ ...this.#genericFailure('write'), message: INVALID_ENTRY }), deliverFailure);
         }
 
         const committed = await this.#answer('write', () => this.commitEntry(logEntry, options), isLoggingResult, result => result);
@@ -392,6 +413,30 @@ const GENERIC_FAILURE_MESSAGES: Record<LoggingOperation, string> = {
     breakpoint: 'Could not check the entry against breakpoints.',
     unexpected: 'Failed unexpectedly.',
 }
+
+/**
+ * Whether `entries` is an array holding only valid entries in the current format. Never throws.
+ *
+ * `Array.from` visits every index, so a gap in a sparse array is checked as `undefined` (`every` would skip it),
+ * and a value that throws when inspected (a revoked Proxy) counts as not entries.
+ */
+function areAllCurrentEntries(entries: unknown): boolean {
+    try {
+        return Array.isArray(entries) && Array.from(entries, isCurrentLogEntry).every(Boolean);
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * What `add` says when handed something that is not a log entry (e.g. a non-string message from JavaScript).
+ */
+const INVALID_ENTRY = 'The entry is not a valid log entry.';
+
+/**
+ * What `reset` says when any of the entries it was handed is not a current, valid log entry.
+ */
+const INVALID_ENTRIES = 'Some entries are not valid log entries.';
 
 const DEFAULT_LOGGER_OPTIONS:Required<LogStorageOptions> = {
     include_stack_trace: {
