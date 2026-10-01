@@ -29,9 +29,15 @@ export class SharedMemoryLogStorage extends MemoryLogStorage {
             get: () => substrate.records,
             set: (records: LogEntry[]) => { substrate.records = records; },
         });
-        // Clean-up runs to completion here, before the constructor returns and so before any call is answered
-        // (dec-start-up-clean-up-before-first-answer). No call asked for it, so its failure is ignored, as
-        // IndexedDB's is.
+        this.startUpCleanUp();
+    }
+
+    /**
+     * Clean up the substrate as the store opens. It runs to completion before the constructor returns, and so
+     * before any call is answered (dec-start-up-clean-up-before-first-answer). No call asked for it, so its
+     * failure is ignored, as IndexedDB's is.
+     */
+    protected startUpCleanUp(): void {
         this.clearOldEntries().catch(() => {});
     }
 }
