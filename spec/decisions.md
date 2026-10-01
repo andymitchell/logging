@@ -710,7 +710,8 @@ original failure instead of forever.
 ### dec-unavailable-store-fails-every-call
 A store that cannot work (IndexedDB after a failed open) answers every public call with the same failure until
 it can. Reads resolve with no entries rather than waiting forever.
-- IndexedDB does not retry a failed open, so the failure lasts as long as the store. Each call's failure names
+- IndexedDB does not retry a failed open, so the failure lasts as long as the store. A connection that opened
+  and later closed is a different case: see dec-idb-reopens-a-closed-connection. Each call's failure names
   that call's `operation` and carries the open's reason: `message: 'Could not open the IndexedDB database.'`,
   `details: { name: 'VersionError' }`. A runtime with no IndexedDB (server rendering, a test without a
   polyfill) fails the same way, without `details`.
@@ -721,6 +722,32 @@ it can. Reads resolve with no entries rather than waiting forever.
 **Example — averted hang:** a browser profile where IndexedDB is blocked. Each `get` resolves
 `{ ok: false, entries: [], error }` immediately, so a trace viewer shows the error instead of a spinner that
 never stops.
+
+#### dec-idb-reopens-a-closed-connection
+**An IndexedDB store whose connection has closed opens another on its next call.** The browser can close a
+connection at any time (site data cleared or evicted: a `close` event). The store closes its own when another
+connection needs the database changed (a `versionchange` event: a newer tab upgrading it, or a script deleting
+it), so it never blocks them. Either way it forgets the connection. It also forgets one that refuses a
+transaction as closed (`InvalidStateError`), which covers a browser that closes it without saying so.
+- The next call opens a new connection, which cleans up before it answers, as at construction
+  (dec-start-up-clean-up-before-first-answer). Every call awaits the one current connection, so call order holds
+  across a reopen (dec-add-preserves-call-order).
+- A call already using the closed connection fails with the browser's reason (`details: { name:
+  'InvalidStateError' }`, or `'AbortError'`). It is not retried: a retry would record it after calls made later.
+- A reopen that fails is a failed open and is not retried. Once another script has upgraded the database past
+  this store's version, every call answers `VersionError`.
+- No `blocked` handler is needed: `blocked` fires only on an open that must upgrade a database other
+  connections hold, and this store only ever opens version 1.
+- **Known limit:** opens and deletes of one database run in turn. If another script's upgrade is itself blocked
+  by a connection that will not close (an older version of this library), this store's reopen waits behind it.
+
+**Example — averted dead store:** the user clears site data while the app is open. Every later write failed
+with `InvalidStateError` until the page was reloaded. The next call now reopens the database and is recorded.
+
+**Example — averted block:** a newer tab opens the database at version 2. This tab's store closes its
+connection, the upgrade proceeds without `blocked`, and this tab's calls answer `VersionError`.
+
+It is about the IndexedDB store alone, so it is proven by that store's own tests, not by the conformance suite.
 
 ### dec-stores-that-retain-nothing-answer-empty
 Console and Webhook hold no entries. Their `get` resolves `{ ok: true, entries: [] }` and their `reset` and
@@ -1038,7 +1065,8 @@ siblings and for instances built later.
 before then is held, in call order: never refused, never dropped, never answered from the un-cleaned substrate.
 The constructor still returns at once; a consumer never awaits construction. IndexedDB meets it with no flag of
 its own: the clean-up transaction is created in the open callback, before the store's connection promise
-resolves, and every hook awaits that promise, so IndexedDB's own transaction order holds the calls.
+resolves, and every hook awaits that promise, so IndexedDB's own transaction order holds the calls. The same
+holds each time it reopens a closed connection.
 
 **Example — averted:** a trace viewer that constructs a store and reads in the same tick shows a junk row, or an
 hour-old entry that the clean-up was about to remove.

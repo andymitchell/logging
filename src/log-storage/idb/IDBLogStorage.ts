@@ -16,11 +16,17 @@ import { decideCleanUp, isCurrentLogEntry } from "../format/index.ts";
  * The database, `<dbNamespace>_logger`, starts opening when the store is constructed, and every call waits
  * for it. A write resolves once its entry is committed.
  *
+ * The browser can close the connection at any time (e.g. when the user clears site data). The store closes it
+ * itself when another tab or script needs the database changed (upgrading it to a newer version, or deleting
+ * it), so it never blocks them. Either way, the next call opens the database again, and calls keep their order.
+ * A call already using the closed connection fails with the browser's reason (e.g. `InvalidStateError`) and is
+ * not retried.
+ *
  * Other stores, other tabs, an older or newer version of this library, or another script can all write to the
- * same database, so a read returns only the entries this version writes and skips every other row. As soon as
- * the database opens, and again on `forceClearOldEntries`, the store cleans it up: it upgrades entries written
- * in an older format, removes rows it cannot read, and removes entries older than `max_age`. Rows written by a
- * newer version of the library are left as they are. A read never changes the database.
+ * same database, so a read returns only the entries this version writes and skips every other row. Each time
+ * the database opens, and again on `forceClearOldEntries`, the store cleans it up before answering: it upgrades
+ * entries written in an older format, removes rows it cannot read, and removes entries older than `max_age`.
+ * Rows written by a newer version of the library are left as they are. A read never changes the database.
  *
  * The database keeps each row under a key it chooses, `id`, which never leaves it: a read returns each entry
  * exactly as it was recorded, without the key, and an entry written with an `id` of its own is recorded without
@@ -30,7 +36,8 @@ import { decideCleanUp, isCurrentLogEntry } from "../format/index.ts";
  * as `details`, e.g. `{ name: 'QuotaExceededError' }`, when it is one of the names IndexedDB defines; any other
  * name is left out, since it might quote logged data. A store whose database cannot be opened (it exists at a
  * newer version, or the runtime has no IndexedDB) answers every call with that failure, for as long as the
- * store lives.
+ * store lives. So does one whose reopen fails: once another tab has upgraded the database to a newer version,
+ * every call answers `VersionError`.
  *
  * @example
  * const storage = new IDBLogStorage('my-app');
@@ -39,8 +46,11 @@ import { decideCleanUp, isCurrentLogEntry } from "../format/index.ts";
  * // e.g. failures: [{ source: 'IDBLogStorage:my-app', operation: 'write', message: 'Could not record the entry.', details: { name: 'QuotaExceededError' } }]
  */
 export class IDBLogStorage extends BaseLogStorage implements ILogStorage {
-    /** The open database. Rejects with {@link CouldNotOpen}, for good, if it cannot be opened. */
-    #db: Promise<IDBDatabase>;
+    /**
+     * The connection every call awaits: opening, open, or failed for good (rejected with {@link CouldNotOpen}).
+     * Absent once the connection it resolved to has closed; the next call opens another.
+     */
+    #connection: Promise<IDBDatabase> | undefined;
 
     protected override readonly storeName: string = 'IDBLogStorage';
 
@@ -51,18 +61,58 @@ export class IDBLogStorage extends BaseLogStorage implements ILogStorage {
      */
     constructor(dbNamespace:string, options?: LogStorageOptions) {
         super(dbNamespace, options);
+        // Opened now, so the database is ready, and cleaned up, by the time the first call needs it.
+        this.#connect();
+    }
 
-        this.#db = openDatabase(`${dbNamespace}_logger`, db => {
-            // Queued before `#db` resolves, and so before any call's transaction: every call awaits `#db`, and
-            // IndexedDB runs transactions in the order they were created. So even a call made in the same tick as
-            // construction is answered from the cleaned database (dec-start-up-clean-up-before-first-answer), with
-            // no other flag to wait on. No call asked for this clean-up, so no result can carry its failure, and a
-            // failure is ignored.
-            this.#cleanUpIn(db).catch(() => {});
+    /**
+     * The current connection, opening one if there is none.
+     *
+     * Every call awaits this one promise, in the order the calls were made, so call order holds even across a
+     * reopen (dec-add-preserves-call-order).
+     */
+    #connect(): Promise<IDBDatabase> {
+        if( this.#connection ) return this.#connection;
+        const connection: Promise<IDBDatabase> = openDatabase(`${this.dbNamespace}_logger`, db => {
+            // The browser can close a connection at any time (e.g. site data cleared), firing `close`.
+            db.onclose = () => this.#forget(connection);
+            // Another connection needs the database changed: a newer version upgrading it, or a script deleting it.
+            db.onversionchange = () => {
+                // Closed first, so this store never blocks the change. A close asked for fires no `close` event,
+                // so the connection is forgotten here too.
+                closeQuietly(db);
+                this.#forget(connection);
+            };
+            // Queued before the connection resolves, and so before any call's transaction: every call awaits the
+            // connection, and IndexedDB runs transactions in the order they were created. So even a call made in
+            // the same tick as construction, or as a reopen, is answered from the cleaned database
+            // (dec-start-up-clean-up-before-first-answer), with no other flag to wait on. No call asked for this
+            // clean-up, so no result can carry its failure, and a failure is ignored.
+            inTransaction(db, 'readwrite', this.#cleanUp).catch(() => {});
         });
         // Every call awaits the open and answers its failure. Until one does, this stops a failed open from also
         // being reported as an unhandled rejection.
-        this.#db.catch(() => {});
+        connection.catch(() => {});
+        this.#connection = connection;
+        return connection;
+    }
+
+    /**
+     * Let the next call open a new connection, if `connection` is still the current one. A late event from a
+     * connection already replaced changes nothing.
+     */
+    #forget(connection: Promise<IDBDatabase>): void {
+        if( this.#connection===connection ) this.#connection = undefined;
+    }
+
+    /**
+     * Run `work` in one transaction on the `logs` store of the current connection; see {@link inTransaction}.
+     * A connection that refuses the transaction as closed is forgotten, so the next call opens another. This call
+     * is not retried: it would then be recorded after calls made later.
+     */
+    async #inLogs<R>(mode: IDBTransactionMode, work: (logs: IDBObjectStore, guard: Guard) => R): Promise<R> {
+        const connection = this.#connect();
+        return inTransaction(await connection, mode, work, () => this.#forget(connection));
     }
 
     /**
@@ -86,47 +136,43 @@ export class IDBLogStorage extends BaseLogStorage implements ILogStorage {
      * Clean up the database in one pass over every row: upgrade entries from older formats, remove rows the
      * store cannot read, and remove entries older than their maximum age (dec-clean-up-migrates-or-purges).
      *
-     * The transaction is created before this returns, so it runs before any transaction requested afterwards.
-     * It is one transaction, so a `max_age` that cannot be applied abandons the whole pass and leaves every row
-     * as it was. Several stores over one database each run this on opening without a lock: IndexedDB runs
-     * read-write transactions on the same store one after another, even across connections, and a pass over
-     * rows that are already clean changes nothing (dec-idb-clean-up-relies-on-transaction-serialisation).
+     * It is the work of one read-write transaction (see {@link inTransaction}), so a `max_age` that cannot be
+     * applied abandons the whole pass and leaves every row as it was. Several stores over one database each run
+     * this on opening without a lock: IndexedDB runs read-write transactions on the same store one after another,
+     * even across connections, and a pass over rows that are already clean changes nothing
+     * (dec-idb-clean-up-relies-on-transaction-serialisation).
      */
-    #cleanUpIn(db: IDBDatabase): Promise<void> {
-        return inTransaction(db, 'readwrite', (logs, guard) => {
-            const isWithinMaxAge = createMaxAgeTest(this.maxAge);
-            // The store's own cursor, not the `timestamp` index's: an entry written without a timestamp is
-            // missing from that index, and would never be upgraded or removed.
-            const cursorRequest = logs.openCursor();
-            cursorRequest.onsuccess = guard(() => {
-                const cursor = cursorRequest.result;
-                if( !cursor ) return;
-                const decision = decideCleanUp(cursor.value, isWithinMaxAge);
-                if( decision.action === 'delete' ) cursor.delete();
-                // The upgrade keeps every key of the row, including its `id`. Rewriting a row under a
-                // different key would fail the pass.
-                else if( decision.action === 'replace' ) cursor.update(decision.entry);
-                cursor.continue();
-            });
+    #cleanUp = (logs: IDBObjectStore, guard: Guard): void => {
+        const isWithinMaxAge = createMaxAgeTest(this.maxAge);
+        // The store's own cursor, not the `timestamp` index's: an entry written without a timestamp is
+        // missing from that index, and would never be upgraded or removed.
+        const cursorRequest = logs.openCursor();
+        cursorRequest.onsuccess = guard(() => {
+            const cursor = cursorRequest.result;
+            if( !cursor ) return;
+            const decision = decideCleanUp(cursor.value, isWithinMaxAge);
+            if( decision.action === 'delete' ) cursor.delete();
+            // The upgrade keeps every key of the row, including its `id`. Rewriting a row under a
+            // different key would fail the pass.
+            else if( decision.action === 'replace' ) cursor.update(decision.entry);
+            cursor.continue();
         });
-    }
+    };
 
     protected override async clearOldEntries(): Promise<LoggingResult> {
-        await this.#cleanUpIn(await this.#db);
+        await this.#inLogs('readwrite', this.#cleanUp);
         return ok();
     }
 
 
     protected override async commitEntry(logEntry: LogEntry): Promise<LoggingResult> {
-        const db = await this.#db;
-        await inTransaction(db, 'readwrite', logs => { logs.add(withoutRowKey(logEntry)); });
+        await this.#inLogs('readwrite', logs => { logs.add(withoutRowKey(logEntry)); });
         return ok();
     }
 
     protected override async resetEntries(entries: LogEntry[] = []):Promise<LoggingResult> {
-        const db = await this.#db;
         // One transaction, so an entry the database refuses leaves every entry as it was.
-        await inTransaction(db, 'readwrite', logs => {
+        await this.#inLogs('readwrite', logs => {
             logs.clear();
             for( const entry of entries ) logs.add(withoutRowKey(entry));
         });
@@ -135,8 +181,7 @@ export class IDBLogStorage extends BaseLogStorage implements ILogStorage {
 
 
     protected override async queryEntries<T extends LogEntry = LogEntry>(filter?: WhereFilterDefinition<T>, fullTextFilter?: string): Promise<LogReadResult<T>> {
-        const db = await this.#db;
-        const all = await inTransaction(db, 'readonly', logs => logs.getAll());
+        const all = await this.#inLogs('readonly', logs => logs.getAll());
 
         // Filtered once the transaction has finished, so a filter that throws fails only this read.
         // The database can hold rows this version cannot read (older, newer, or junk), and only current entries
@@ -162,7 +207,8 @@ const LOGS = 'logs';
 const COULD_NOT_OPEN = 'Could not open the IndexedDB database.';
 
 /**
- * Why the database could not be opened. Every call made on the store rejects with it.
+ * Why the database could not be opened. A failed open has no connection to close, so it is never replaced:
+ * every later call on the store rejects with it.
  */
 class CouldNotOpen extends Error {
     constructor(readonly reason: unknown) {
@@ -180,6 +226,9 @@ function openDatabase(name: string, onOpen: (db: IDBDatabase) => void): Promise<
     return new Promise<IDBDatabase>((resolve, reject) => {
         let request: IDBOpenDBRequest;
         try {
+            // No `blocked` handler is needed: `blocked` fires only on an open that must upgrade a database other
+            // connections hold, and version 1 upgrades only a database that does not exist yet, which no
+            // connection holds.
             request = indexedDB.open(name, 1);
         } catch(cause) {
             // The runtime has no IndexedDB, or refuses this page one.
@@ -241,13 +290,24 @@ type Guard = (handler: () => void) => () => void;
  * The transaction is created before this returns, so it runs before any transaction requested afterwards.
  *
  * @param work Makes the transaction's requests. Wrap each request handler it sets with `guard`.
+ * @param onClosed Called when `db` refuses the transaction because the connection has closed
+ * (`InvalidStateError`), which a browser may do without firing `close`.
  * @returns What `work` returned (e.g. a request, whose `result` is then ready). Rejects with why the
  * transaction did not commit: what `work` or a guarded handler threw, else the transaction's own error (e.g. a
- * `ConstraintError` or `QuotaExceededError`).
+ * `ConstraintError` or `QuotaExceededError`), or why `db` refused it.
  */
-function inTransaction<R>(db: IDBDatabase, mode: IDBTransactionMode, work: (logs: IDBObjectStore, guard: Guard) => R): Promise<R> {
+function inTransaction<R>(db: IDBDatabase, mode: IDBTransactionMode, work: (logs: IDBObjectStore, guard: Guard) => R, onClosed?: () => void): Promise<R> {
     return new Promise<R>((resolve, reject) => {
-        const transaction = db.transaction(LOGS, mode);
+        let transaction: IDBTransaction;
+        try {
+            transaction = db.transaction(LOGS, mode);
+        } catch(cause) {
+            // Only a closed connection is worth replacing. Any other refusal (e.g. a database with no `logs` store)
+            // would refuse a new connection too.
+            if( browserExceptionName(cause)==='InvalidStateError' ) onClosed?.();
+            reject(cause);
+            return;
+        }
         let thrown: { cause: unknown } | undefined;
         const abandon = (cause: unknown) => {
             thrown ??= { cause };
@@ -270,6 +330,17 @@ function inTransaction<R>(db: IDBDatabase, mode: IDBTransactionMode, work: (logs
             abandon(cause);
         }
     });
+}
+
+/**
+ * Close the connection. Event handlers call this, and a throw from one would escape to the browser.
+ */
+function closeQuietly(db: IDBDatabase): void {
+    try {
+        db.close();
+    } catch {
+        // Nothing to close.
+    }
 }
 
 /**

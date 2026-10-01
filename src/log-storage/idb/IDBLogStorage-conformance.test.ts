@@ -26,8 +26,7 @@ runLogStorageConformance(async ({ namespace, options }) => {
             readAll: () => raw.readAll(),
             writeAll: async records => { await raw.writeAll(records); },
         },
-        // Closes the raw connection only. A store never closes its own connection, so deleting the database would
-        // wait for ever; the fresh IDBFactory each test starts with discards the data anyway.
+        // Closes the raw connection only. The fresh IDBFactory each test starts with discards the data.
         dispose: async () => { raw.close(); },
     };
 });
