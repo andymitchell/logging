@@ -934,6 +934,8 @@ step fails closed. An unversioned entry ages out exactly as a current one of the
 
 **Example:** `{ type: 'info', message: 'x', ulid: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }` becomes the same entry with
 `timestamp: 1469922850259, format_version: 2`; `{ type: 'info', message: 'x', ulid: 'expired-first' }` is purged.
+A trace recorded before the upgrade (two spans, a log holding a masked value) reads back through `TraceViewer`
+as the same trace.
 
 ### dec-shared-substrate
 **A store whose substrate several live instances can sit over at once (IndexedDB, a file, a server) declares

@@ -1,6 +1,6 @@
 import type { LogStorageConformanceContext } from "../../harness-types.ts";
 import { registerRules } from "../../helpers/register-rules.ts";
-import { callsMadeDuringStartUpAreHeld, cleanUpIsIdempotent, cleanUpRemovesJunkAndAgedEntries, cleanUpRemovesUnmigratableEntries, cleanUpUpgradesUnversionedEntries, discardingStoresLeaveNoOldEntries, newerRecordsAreLeftAlone, readsCurrentEntriesWrittenUnderneath, readSkipsJunk, readSkipsUnversionedEntries, readsNeverChangeTheSubstrate, startUpCleanUpPrecedesTheFirstRead, unversionedEntriesAgeLikeCurrentOnes } from "./assertions.ts";
+import { callsMadeDuringStartUpAreHeld, cleanUpIsIdempotent, cleanUpRemovesJunkAndAgedEntries, cleanUpRemovesUnmigratableEntries, cleanUpUpgradesUnversionedEntries, discardingStoresLeaveNoOldEntries, newerRecordsAreLeftAlone, oldTraceReadsBackAfterUpgrade, readsCurrentEntriesWrittenUnderneath, readSkipsJunk, readSkipsUnversionedEntries, readsNeverChangeTheSubstrate, startUpCleanUpPrecedesTheFirstRead, unversionedEntriesAgeLikeCurrentOnes } from "./assertions.ts";
 
 
 /**
@@ -27,8 +27,8 @@ export function runStoredEntryDecisions(ctx: LogStorageConformanceContext): void
             claims: [cleanUpUpgradesUnversionedEntries],
         },
         {
-            rule: '[dec-unversioned-is-v1] an entry from before entries were versioned is the first format, and ages like any other',
-            claims: [unversionedEntriesAgeLikeCurrentOnes],
+            rule: '[dec-unversioned-is-v1] an entry from before entries were versioned is the first format: it ages like any other, and reads back whole once upgraded',
+            claims: [unversionedEntriesAgeLikeCurrentOnes, oldTraceReadsBackAfterUpgrade],
         },
         {
             rule: '[dec-start-up-clean-up-before-first-answer] a store over a substrate that outlives it cleans up before it answers any call',

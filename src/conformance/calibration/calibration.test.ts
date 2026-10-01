@@ -35,47 +35,50 @@ type ClaimName = keyof typeof CLAIMS;
 const COLUMNS = [
     'memory', 'sharedMemory', 'discardingMemory',
     'acceptsAnything', 'resetAppendsAnything', 'hidesUnusualContexts', 'outOfOrderAdd',
-    'leakyRead', 'cleansUpOnRead', 'neverPurges', 'purgesNewerRecords',
+    'leakyRead', 'cleansUpOnRead', 'neverPurges', 'purgesNewerRecords', 'dropsMetaWhenUpgrading',
     'duplicatingCleanUp', 'answersBeforeCleanUp', 'snapshotOnConstruct',
     'migratesButDeclaresDiscarding', 'undeclaredSiblings', 'forgottenMigrationChoice',
 ] as const satisfies readonly (keyof typeof CALIBRATION_HARNESSES)[];
 
 type OutcomeRow<Columns extends readonly unknown[]> = { readonly [Column in keyof Columns]: Outcome };
 
+// The `meta` column matches `mem` on every row but `oldTraceReadsBackAfterUpgrade`: every other older entry the
+// suite writes has no `meta` to lose, so that claim alone catches a clean-up that drops it.
 const EXPECTED: Record<ClaimName, OutcomeRow<typeof COLUMNS>> = {
-    //                                         controls               add / reset / context / order   read                clean-up            shared substrate                          declared choices
-    //                                         mem   shared discard   accept reset hides  order       leaky  onRead       never  newer        dup    before snap                        lies   undecl forgot
-    everyCapabilityIsDeclared:                 [pass, pass, pass,      pass,  pass,  pass,  pass,      pass,  pass,        pass,  pass,        pass,  pass,  pass,                        pass,  pass,  FAIL],
-    siblingsMatchTheDeclaredSubstrate:         [pass, pass, pass,      pass,  pass,  pass,  pass,      pass,  pass,        pass,  pass,        pass,  pass,  pass,                        pass,  FAIL,  pass],
+    //                                         controls               add / reset / context / order   read                clean-up                   shared substrate                          declared choices
+    //                                         mem   shared discard   accept reset hides  order       leaky  onRead       never  newer  meta         dup    before snap                        lies   undecl forgot
+    everyCapabilityIsDeclared:                 [pass, pass, pass,      pass,  pass,  pass,  pass,      pass,  pass,        pass,  pass,  pass,        pass,  pass,  pass,                        pass,  pass,  FAIL],
+    siblingsMatchTheDeclaredSubstrate:         [pass, pass, pass,      pass,  pass,  pass,  pass,      pass,  pass,        pass,  pass,  pass,        pass,  pass,  pass,                        pass,  FAIL,  pass],
 
-    stampsTheCurrentFormatVersion:             [pass, pass, pass,      FAIL,  pass,  pass,  pass,      pass,  pass,        pass,  pass,        pass,  pass,  FAIL,                        pass,  pass,  pass],
-    addRefusesNonEntries:                      [pass, pass, pass,      FAIL,  pass,  pass,  pass,      pass,  pass,        pass,  pass,        pass,  pass,  pass,                        pass,  pass,  pass],
-    aRefusedAddRecordsNothing:                 [pass, pass, pass,      FAIL,  pass,  pass,  pass,      pass,  pass,        pass,  pass,        pass,  pass,  FAIL,                        pass,  pass,  pass],
-    resetRefusesAnyNonEntry:                   [pass, pass, pass,      pass,  FAIL,  pass,  pass,      pass,  pass,        pass,  pass,        pass,  pass,  pass,                        pass,  pass,  pass],
-    resetRefusesUnversionedEntriesAndNonLists: [pass, pass, pass,      pass,  FAIL,  pass,  pass,      pass,  pass,        pass,  pass,        pass,  pass,  pass,                        pass,  pass,  pass],
-    resetReplacesWithCurrentEntries:           [pass, pass, pass,      pass,  FAIL,  pass,  pass,      pass,  pass,        pass,  pass,        pass,  pass,  pass,                        pass,  pass,  pass],
-    contextAndMetaAreKeptAsLogged:             [pass, pass, pass,      pass,  pass,  FAIL,  pass,      pass,  pass,        pass,  pass,        pass,  pass,  pass,                        pass,  pass,  pass],
-    addsComeBackInCallOrder:                   [pass, pass, pass,      pass,  pass,  pass,  FAIL,      pass,  pass,        pass,  pass,        pass,  pass,  pass,                        pass,  pass,  pass],
+    stampsTheCurrentFormatVersion:             [pass, pass, pass,      FAIL,  pass,  pass,  pass,      pass,  pass,        pass,  pass,  pass,        pass,  pass,  FAIL,                        pass,  pass,  pass],
+    addRefusesNonEntries:                      [pass, pass, pass,      FAIL,  pass,  pass,  pass,      pass,  pass,        pass,  pass,  pass,        pass,  pass,  pass,                        pass,  pass,  pass],
+    aRefusedAddRecordsNothing:                 [pass, pass, pass,      FAIL,  pass,  pass,  pass,      pass,  pass,        pass,  pass,  pass,        pass,  pass,  FAIL,                        pass,  pass,  pass],
+    resetRefusesAnyNonEntry:                   [pass, pass, pass,      pass,  FAIL,  pass,  pass,      pass,  pass,        pass,  pass,  pass,        pass,  pass,  pass,                        pass,  pass,  pass],
+    resetRefusesUnversionedEntriesAndNonLists: [pass, pass, pass,      pass,  FAIL,  pass,  pass,      pass,  pass,        pass,  pass,  pass,        pass,  pass,  pass,                        pass,  pass,  pass],
+    resetReplacesWithCurrentEntries:           [pass, pass, pass,      pass,  FAIL,  pass,  pass,      pass,  pass,        pass,  pass,  pass,        pass,  pass,  pass,                        pass,  pass,  pass],
+    contextAndMetaAreKeptAsLogged:             [pass, pass, pass,      pass,  pass,  FAIL,  pass,      pass,  pass,        pass,  pass,  pass,        pass,  pass,  pass,                        pass,  pass,  pass],
+    addsComeBackInCallOrder:                   [pass, pass, pass,      pass,  pass,  pass,  FAIL,      pass,  pass,        pass,  pass,  pass,        pass,  pass,  pass,                        pass,  pass,  pass],
 
-    readsCurrentEntriesWrittenUnderneath:      [pass, pass, pass,      pass,  pass,  pass,  pass,      pass,  pass,        pass,  pass,        pass,  pass,  FAIL,                        pass,  pass,  pass],
-    readSkipsJunk:                             [pass, pass, pass,      pass,  pass,  pass,  pass,      FAIL,  pass,        pass,  pass,        pass,  pass,  FAIL,                        pass,  pass,  pass],
-    readSkipsUnversionedEntries:               [pass, pass, pass,      pass,  pass,  pass,  pass,      FAIL,  FAIL,        pass,  pass,        pass,  pass,  FAIL,                        pass,  pass,  pass],
-    newerRecordsAreLeftAlone:                  [pass, pass, pass,      pass,  pass,  pass,  pass,      FAIL,  pass,        pass,  FAIL,        pass,  pass,  pass,                        pass,  pass,  pass],
-    readsNeverChangeTheSubstrate:              [pass, pass, pass,      pass,  pass,  pass,  pass,      pass,  FAIL,        pass,  pass,        pass,  pass,  pass,                        pass,  pass,  pass],
-    cleanUpRemovesJunkAndAgedEntries:          [pass, pass, pass,      pass,  pass,  pass,  pass,      pass,  pass,        FAIL,  pass,        pass,  pass,  FAIL,                        pass,  pass,  pass],
-    cleanUpUpgradesUnversionedEntries:         [pass, pass, skip,      pass,  pass,  pass,  pass,      pass,  pass,        FAIL,  pass,        FAIL,  pass,  FAIL,                        skip,  pass,  FAIL],
-    unversionedEntriesAgeLikeCurrentOnes:      [pass, pass, pass,      pass,  pass,  pass,  pass,      pass,  pass,        FAIL,  pass,        FAIL,  pass,  FAIL,                        FAIL,  pass,  FAIL],
-    cleanUpRemovesUnmigratableEntries:         [pass, pass, pass,      pass,  pass,  pass,  pass,      FAIL,  pass,        FAIL,  pass,        pass,  pass,  FAIL,                        pass,  pass,  pass],
-    startUpCleanUpPrecedesTheFirstRead:        [skip, pass, pass,      skip,  skip,  skip,  skip,      skip,  skip,        skip,  skip,        FAIL,  FAIL,  pass,                        FAIL,  skip,  skip],
-    callsMadeDuringStartUpAreHeld:             [skip, pass, pass,      skip,  skip,  skip,  skip,      skip,  skip,        skip,  skip,        FAIL,  FAIL,  FAIL,                        FAIL,  skip,  skip],
-    cleanUpIsIdempotent:                       [pass, pass, pass,      pass,  pass,  pass,  pass,      pass,  pass,        pass,  pass,        FAIL,  pass,  FAIL,                        pass,  pass,  pass],
-    discardingStoresLeaveNoOldEntries:         [skip, skip, pass,      skip,  skip,  skip,  skip,      skip,  skip,        skip,  skip,        skip,  skip,  skip,                        FAIL,  skip,  FAIL],
+    readsCurrentEntriesWrittenUnderneath:      [pass, pass, pass,      pass,  pass,  pass,  pass,      pass,  pass,        pass,  pass,  pass,        pass,  pass,  FAIL,                        pass,  pass,  pass],
+    readSkipsJunk:                             [pass, pass, pass,      pass,  pass,  pass,  pass,      FAIL,  pass,        pass,  pass,  pass,        pass,  pass,  FAIL,                        pass,  pass,  pass],
+    readSkipsUnversionedEntries:               [pass, pass, pass,      pass,  pass,  pass,  pass,      FAIL,  FAIL,        pass,  pass,  pass,        pass,  pass,  FAIL,                        pass,  pass,  pass],
+    newerRecordsAreLeftAlone:                  [pass, pass, pass,      pass,  pass,  pass,  pass,      FAIL,  pass,        pass,  FAIL,  pass,        pass,  pass,  pass,                        pass,  pass,  pass],
+    readsNeverChangeTheSubstrate:              [pass, pass, pass,      pass,  pass,  pass,  pass,      pass,  FAIL,        pass,  pass,  pass,        pass,  pass,  pass,                        pass,  pass,  pass],
+    cleanUpRemovesJunkAndAgedEntries:          [pass, pass, pass,      pass,  pass,  pass,  pass,      pass,  pass,        FAIL,  pass,  pass,        pass,  pass,  FAIL,                        pass,  pass,  pass],
+    cleanUpUpgradesUnversionedEntries:         [pass, pass, skip,      pass,  pass,  pass,  pass,      pass,  pass,        FAIL,  pass,  pass,        FAIL,  pass,  FAIL,                        skip,  pass,  FAIL],
+    unversionedEntriesAgeLikeCurrentOnes:      [pass, pass, pass,      pass,  pass,  pass,  pass,      pass,  pass,        FAIL,  pass,  pass,        FAIL,  pass,  FAIL,                        FAIL,  pass,  FAIL],
+    oldTraceReadsBackAfterUpgrade:             [pass, pass, skip,      pass,  pass,  pass,  pass,      pass,  pass,        FAIL,  pass,  FAIL,        pass,  pass,  FAIL,                        skip,  pass,  FAIL],
+    cleanUpRemovesUnmigratableEntries:         [pass, pass, pass,      pass,  pass,  pass,  pass,      FAIL,  pass,        FAIL,  pass,  pass,        pass,  pass,  FAIL,                        pass,  pass,  pass],
+    startUpCleanUpPrecedesTheFirstRead:        [skip, pass, pass,      skip,  skip,  skip,  skip,      skip,  skip,        skip,  skip,  skip,        FAIL,  FAIL,  pass,                        FAIL,  skip,  skip],
+    callsMadeDuringStartUpAreHeld:             [skip, pass, pass,      skip,  skip,  skip,  skip,      skip,  skip,        skip,  skip,  skip,        FAIL,  FAIL,  FAIL,                        FAIL,  skip,  skip],
+    cleanUpIsIdempotent:                       [pass, pass, pass,      pass,  pass,  pass,  pass,      pass,  pass,        pass,  pass,  pass,        FAIL,  pass,  FAIL,                        pass,  pass,  pass],
+    discardingStoresLeaveNoOldEntries:         [skip, skip, pass,      skip,  skip,  skip,  skip,      skip,  skip,        skip,  skip,  skip,        skip,  skip,  skip,                        FAIL,  skip,  FAIL],
 
-    siblingsSeeEachOthersWrites:               [skip, pass, pass,      skip,  skip,  skip,  skip,      skip,  skip,        skip,  skip,        pass,  pass,  FAIL,                        pass,  skip,  skip],
-    siblingsStartingTogetherConverge:          [skip, pass, pass,      skip,  skip,  skip,  skip,      skip,  skip,        skip,  skip,        FAIL,  FAIL,  FAIL,                        FAIL,  skip,  skip],
-    theSubstrateOutlivesItsInstances:          [skip, pass, pass,      skip,  skip,  skip,  skip,      skip,  skip,        skip,  skip,        pass,  pass,  FAIL,                        pass,  skip,  skip],
+    siblingsSeeEachOthersWrites:               [skip, pass, pass,      skip,  skip,  skip,  skip,      skip,  skip,        skip,  skip,  skip,        pass,  pass,  FAIL,                        pass,  skip,  skip],
+    siblingsStartingTogetherConverge:          [skip, pass, pass,      skip,  skip,  skip,  skip,      skip,  skip,        skip,  skip,  skip,        FAIL,  FAIL,  FAIL,                        FAIL,  skip,  skip],
+    theSubstrateOutlivesItsInstances:          [skip, pass, pass,      skip,  skip,  skip,  skip,      skip,  skip,        skip,  skip,  skip,        pass,  pass,  FAIL,                        pass,  skip,  skip],
 
-    onlyCurrentEntriesEverComeOut:             [pass, pass, pass,      FAIL,  FAIL,  FAIL,  pass,      FAIL,  pass,        FAIL,  pass,        pass,  pass,  FAIL,                        FAIL,  pass,  FAIL],
+    onlyCurrentEntriesEverComeOut:             [pass, pass, pass,      FAIL,  FAIL,  FAIL,  pass,      FAIL,  pass,        FAIL,  pass,  pass,        pass,  pass,  FAIL,                        FAIL,  pass,  FAIL],
 };
 
 

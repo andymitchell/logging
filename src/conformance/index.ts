@@ -22,7 +22,7 @@ export type * from "./harness-types.ts";
  * dec-newer-format-left-alone               stored-entries    newerRecordsAreLeftAlone
  * dec-clean-up-migrates-or-purges           stored-entries    cleanUpRemovesJunkAndAgedEntries, cleanUpRemovesUnmigratableEntries, startUpCleanUpPrecedesTheFirstRead
  * dec-migration-is-one-pure-map             stored-entries    cleanUpUpgradesUnversionedEntries
- * dec-unversioned-is-v1                     stored-entries    unversionedEntriesAgeLikeCurrentOnes
+ * dec-unversioned-is-v1                     stored-entries    unversionedEntriesAgeLikeCurrentOnes, oldTraceReadsBackAfterUpgrade
  * dec-start-up-clean-up-before-first-answer stored-entries    startUpCleanUpPrecedesTheFirstRead, callsMadeDuringStartUpAreHeld
  * dec-clean-up-is-idempotent                stored-entries    cleanUpIsIdempotent
  * dec-store-may-discard-instead-of-migrate  stored-entries    discardingStoresLeaveNoOldEntries

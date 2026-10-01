@@ -9,6 +9,9 @@ import { currentEntry, junkRecords, newerRecord, unmigratableEntry, unversionedE
 import { unlessMigrating, unlessObservable, unlessShared } from "../../helpers/gates.ts";
 import { readyInstance } from "../../helpers/ready-instance.ts";
 import { expectSubstrateHolds, identities, identitiesByUlid, rawOf, survivingUpgrades, ulidsOf } from "../../helpers/records.ts";
+import { unversionedTrace, unversionedTraceId } from "../../helpers/unversioned-trace.ts";
+// Read through the entry apps use to view traces, as an app would.
+import { TraceViewer } from "../../../index-get-traces.ts";
 
 
 // A read returns the current entries on the substrate, however they got there.
@@ -165,6 +168,23 @@ export const cleanUpRemovesUnmigratableEntries: ConformanceClaim = {
 
         await expectSubstrateHolds(raw, [kept]);
         expect(ulidsOf(entriesOf(await store.get()))).toEqual([kept.ulid]);
+    },
+};
+
+// A trace recorded before entries were versioned reads back, once clean-up has upgraded it, as the same trace: every field of every entry kept.
+export const oldTraceReadsBackAfterUpgrade: ConformanceClaim = {
+    name: 'reads back a trace recorded before entries were versioned as the same trace, once it has cleaned up [dec-unversioned-is-v1]',
+    skipReason: harness => unlessObservable(harness) ?? unlessMigrating(harness),
+    async check(harness) {
+        const store = await readyInstance(harness);
+        await rawOf(harness).writeAll(unversionedTrace);
+
+        expect(await store.forceClearOldEntries()).toEqual({ ok: true });
+
+        const read = await new TraceViewer(store).getTraces();
+        expect(read.ok).toBe(true);
+        expect(read.traces.map(trace => trace.id)).toEqual([unversionedTraceId]);
+        expect(read.traces[0]?.logs).toEqual(unversionedTrace.map(record => expect.objectContaining({ ...record, format_version: LOG_ENTRY_FORMAT_VERSION })));
     },
 };
 

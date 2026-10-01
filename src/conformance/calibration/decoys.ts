@@ -114,6 +114,25 @@ class PurgesNewerRecordsDecoy extends RawMemoryLogStorage {
 }
 
 
+/**
+ * Breaks the clean-up door, but only for entries that carry span data: writes each upgraded entry back without
+ * its `meta`. The entry stays valid, so only a check on an older entry that held `meta` can catch it.
+ */
+class DropsMetaWhenUpgradingDecoy extends RawMemoryLogStorage {
+    protected override async clearOldEntries(): Promise<LoggingResult> {
+        const isWithinMaxAge = createMaxAgeTest(this.maxAge);
+        this._log = this._log.flatMap(record => {
+            const decision = decideCleanUp(record, isWithinMaxAge);
+            if( decision.action === 'delete' ) return [];
+            if( decision.action === 'keep' ) return [record];
+            const { meta: _dropped, ...upgradedWithoutMeta } = decision.entry;
+            return [upgradedWithoutMeta];
+        });
+        return ok();
+    }
+}
+
+
 // --- Instances over a shared substrate ---
 
 /** Breaks start-up convergence: adds each upgrade beside the record it upgrades, instead of rewriting that record. */
@@ -181,6 +200,7 @@ export const CALIBRATION_HARNESSES = {
     cleansUpOnRead: privateMemoryHarnessFactory((namespace, options) => new CleansUpOnReadDecoy(namespace, options)),
     neverPurges: privateMemoryHarnessFactory((namespace, options) => new NeverPurgesDecoy(namespace, options)),
     purgesNewerRecords: privateMemoryHarnessFactory((namespace, options) => new PurgesNewerRecordsDecoy(namespace, options)),
+    dropsMetaWhenUpgrading: privateMemoryHarnessFactory((namespace, options) => new DropsMetaWhenUpgradingDecoy(namespace, options)),
     duplicatingCleanUp: sharedMemoryHarnessFactory((namespace, substrate, options) => new DuplicatingCleanUpDecoy(namespace, substrate, options)),
     answersBeforeCleanUp: sharedMemoryHarnessFactory((namespace, substrate, options) => new AnswersBeforeCleanUpDecoy(namespace, substrate, options)),
     snapshotOnConstruct: sharedMemoryHarnessFactory((namespace, substrate, options) => new SnapshotOnConstructDecoy(namespace, substrate, options)),
