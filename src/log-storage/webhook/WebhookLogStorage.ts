@@ -32,6 +32,12 @@ export type PostBody = {
  * store makes on its own has no caller, so it is not reported; the next write's result says how delivery is
  * going. A failure never quotes the webhook's answer, which can echo the data that was sent.
  *
+ * Each failed delivery also prints one console line, saying only what happened and, when the webhook answered,
+ * its HTTP status (e.g. `WebhookLogStorage: Could not reach the webhook. Backing off.`). It never carries the
+ * webhook's URL (a Slack or Discord URL holds its token in the path), the caught error, or the answer's body.
+ * The store reads only the status of an answer and releases its body unread, so a long or never-ending body
+ * neither delays the write nor holds a connection open.
+ *
  * Entries are sent on, not kept: `get` resolves `{ ok: true, entries: [] }`, and `reset` and
  * `forceClearOldEntries` resolve `{ ok: true }`.
  *
@@ -210,6 +216,7 @@ export class WebhookLogStorage extends BaseLogStorage implements ILogStorage {
                 body: JSON.stringify(postBody),
                 signal: controller.signal
             });
+            releaseBody(response);
 
             if (response.ok) return { kind: 'sent' };
 
@@ -221,14 +228,14 @@ export class WebhookLogStorage extends BaseLogStorage implements ILogStorage {
 
             // PERMANENT FAILURE: Log the error and discard the batch to unblock the queue.
             console.error(`WebhookLogStorage: Received non-retryable status ${response.status}. Discarding batch.`);
-            try {
-                const errorBody = await response.text();
-                console.error(`WebhookLogStorage: Error response body: ${errorBody}`);
-            } catch { /* Ignore if body can't be read */ }
             return { kind: 'refused', status: response.status };
 
-        } catch (error) {
-            console.error(`WebhookLogStorage: Fetch failed for URL ${this.#postUrl}. Backing off.`, error);
+        } catch {
+            // Neither the URL (a Slack or Discord URL holds its token in the path) nor the caught error (which can
+            // quote the URL) is printed: console output is often collected where secrets must not go.
+            console.error(timedOut
+                ? 'WebhookLogStorage: The webhook did not answer in time. Backing off.'
+                : 'WebhookLogStorage: Could not reach the webhook. Backing off.');
             return { kind: timedOut ? 'timed_out' : 'unreachable' };
         } finally {
             clearTimeout(timer);
@@ -313,6 +320,27 @@ const TEMPORARY_ERROR = 'The webhook answered with a temporary error. The entry 
 const REFUSED = 'The webhook refused the entry, so it was discarded.';
 const HELD_BACK = 'The entry is waiting to be sent while the webhook retries a failed delivery.';
 const NOT_JSON = 'Could not turn the entry into JSON, so it was not sent.';
+
+/**
+ * Let go of a webhook's answer without reading its body.
+ *
+ * The store acts on the status alone. A body that is never read or cancelled holds its connection open, and in
+ * Node keeps the process running, so every answer's body is cancelled as soon as it arrives.
+ *
+ * @param response The webhook's answer. Its body may be absent (e.g. a 204).
+ *
+ * @remarks
+ * Never throws and never waits: a body that is slow to cancel cannot delay the write, and one that refuses to
+ * cancel leaves no unhandled rejection. A connection whose body was still arriving is closed rather than reused.
+ */
+function releaseBody(response: Response): void {
+    try {
+        // Not awaited: a body that is slow to cancel must not delay the write.
+        response.body?.cancel().catch(() => {});
+    } catch {
+        // A body that is already locked or released holds nothing more to let go of.
+    }
+}
 
 function isSendableAsJson(entry: LogEntry): boolean {
     try {

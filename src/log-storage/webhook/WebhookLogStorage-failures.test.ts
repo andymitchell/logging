@@ -189,3 +189,112 @@ describe('an app writing an entry that cannot be sent as JSON', () => {
         expect(sent).toEqual([later.entry?.ulid]);
     });
 });
+
+
+describe('an app whose webhook URL holds a secret, watching the console while delivery fails', () => {
+
+    // A Slack or Discord webhook URL carries its token in the path. Assembled at run time, so the source never
+    // holds anything shaped like a real one.
+    const SECRET_URL = ['https://hooks.example.com/services', 'T0AB', 'B0CD', 'x'.repeat(24)].join('/');
+
+    /** Everything the store printed to the console, as one string. */
+    function printed(): string {
+        return [...vi.mocked(console.warn).mock.calls, ...vi.mocked(console.error).mock.calls].flat().map(String).join('\n');
+    }
+
+    function expectNothingPrintedOf(...secrets: string[]): void {
+        const text = printed();
+        for( const secret of [SECRET_URL, new URL(SECRET_URL).host, new URL(SECRET_URL).pathname, ...secrets] ) {
+            expect(text).not.toContain(secret);
+        }
+    }
+
+    it('prints only that the webhook could not be reached, not the URL or the error [dec-webhook-write-answers-for-its-own-entry]', async () => {
+        const errorMessage = `getaddrinfo ENOTFOUND while connecting to ${SECRET_URL}`;
+        interceptor.simulateNetworkError(errorMessage);
+        const storage = new WebhookLogStorage('my-app', SECRET_URL);
+
+        await storage.add({ type: 'error', message: 'payment failed' });
+
+        expect(vi.mocked(console.error).mock.calls).toEqual([['WebhookLogStorage: Could not reach the webhook. Backing off.']]);
+        expectNothingPrintedOf(errorMessage);
+    });
+
+    it('prints only that the webhook did not answer in time, not the URL or the error [dec-webhook-write-answers-for-its-own-entry]', async () => {
+        interceptor.simulateNoAnswer();
+        const storage = new WebhookLogStorage('my-app', SECRET_URL);
+
+        const pending = storage.add({ type: 'error', message: 'payment failed' });
+        await vi.advanceTimersByTimeAsync(WebhookLogStorage.TIMEOUT_MS);
+        await pending;
+
+        expect(vi.mocked(console.error).mock.calls).toEqual([['WebhookLogStorage: The webhook did not answer in time. Backing off.']]);
+        expectNothingPrintedOf('AbortError');
+    });
+
+    it('prints only the status of a refusal, not the answer that echoes the entry [dec-webhook-write-answers-for-its-own-entry]', async () => {
+        interceptor.setResponse({ status: 400, body: { error: 'invalid payload: {"email":"bob@example.com"}' } });
+        const storage = new WebhookLogStorage('my-app', SECRET_URL);
+
+        await storage.add({ type: 'error', message: 'payment failed', context: { email: 'bob@example.com' } });
+
+        expect(vi.mocked(console.error).mock.calls).toEqual([['WebhookLogStorage: Received non-retryable status 400. Discarding batch.']]);
+        expectNothingPrintedOf('bob@example.com', 'invalid payload');
+    });
+
+    it('prints only the status of a temporary error, not the answer [dec-webhook-write-answers-for-its-own-entry]', async () => {
+        interceptor.setResponse({ status: 503, body: { error: 'overloaded while storing {"email":"bob@example.com"}' } });
+        const storage = new WebhookLogStorage('my-app', SECRET_URL);
+
+        await storage.add({ type: 'error', message: 'payment failed', context: { email: 'bob@example.com' } });
+
+        expect(vi.mocked(console.warn).mock.calls).toEqual([['WebhookLogStorage: Received retryable status 503. Backing off.']]);
+        expect(vi.mocked(console.error).mock.calls).toEqual([]);
+        expectNothingPrintedOf('bob@example.com', 'overloaded');
+    });
+});
+
+
+describe('an app whose webhook answers with a body that never finishes', () => {
+
+    // An unread body holds its connection open, and in Node keeps the process running.
+
+    it.each([200, 503, 400])('answers the write on the status alone (%i), and releases the body unread [dec-webhook-write-answers-for-its-own-entry]', async status => {
+        let released = false;
+        const neverFinishes = new ReadableStream<Uint8Array>({
+            start(controller) { controller.enqueue(new TextEncoder().encode('{"partial":')); },
+            cancel() { released = true; },
+        });
+        vi.stubGlobal('fetch', async () => new Response(neverFinishes, { status }));
+        const storage = new WebhookLogStorage('my-app', POST_URL);
+
+        const result = await storage.add({ type: 'info', message: 'x' });
+
+        expect(result.ok).toBe(status === 200);
+        expect(released).toBe(true);
+    });
+
+    it('answers the write and leaves nothing unhandled when the body refuses to be released [dec-webhook-write-answers-for-its-own-entry]', async () => {
+        const unhandled = recordUnhandledRejections();
+        onTestFinished(unhandled.stop);
+        const refusesRelease = new ReadableStream<Uint8Array>({
+            cancel() { throw new Error('the body will not be released'); },
+        });
+        vi.stubGlobal('fetch', async () => new Response(refusesRelease, { status: 200 }));
+        const storage = new WebhookLogStorage('my-app', POST_URL);
+
+        const result = await storage.add({ type: 'info', message: 'x' });
+
+        expect(result.ok).toBe(true);
+        expect(await unhandled.settled()).toEqual([]);
+    });
+
+    it('answers the write when the answer has no body at all [dec-webhook-write-answers-for-its-own-entry]', async () => {
+        vi.stubGlobal('fetch', async () => new Response(null, { status: 204 }));
+        const storage = new WebhookLogStorage('my-app', POST_URL);
+
+        const result = await storage.add({ type: 'info', message: 'x' });
+
+        expect(result.ok).toBe(true);
+    });
+});

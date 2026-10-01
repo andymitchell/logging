@@ -744,7 +744,11 @@ therefore records the outcome of each entry a write is waiting on, and each writ
   The next write's result says how delivery is going.
 - An entry that `JSON.stringify` cannot handle (a bigint in `meta`) is refused at write time and never joins
   the buffer.
-- The console lines the store prints on each failed delivery are unchanged.
+- The console line the store prints for a failed delivery says only what happened and, when the webhook
+  answered, its HTTP status. It never carries the webhook's URL (a Slack or Discord URL holds its token in the
+  path), the caught error, or the response body (dec-failure-records-carry-no-pii).
+- The store reads only the status of the webhook's answer, and releases the body unread. An answer whose body
+  is long, or never finishes, neither delays the write nor holds a connection open.
 
 **Example — averted false success:** two writes land in one batch that the webhook refuses with 400. If each
 write answered from its own flush, the second would answer `ok: true`, because its flush found the buffer
@@ -753,6 +757,10 @@ already empty. Instead both answer the refusal with `{ status: 400 }`.
 **Example — averted poison batch:** an entry with a bigint in `meta` made `JSON.stringify` throw for every
 batch it was in, and was retried forever, holding back every entry behind it. Now that write fails with
 "Could not turn the entry into JSON", and later entries are sent.
+
+**Example — averted leak:** a Slack webhook that is unreachable. The line printed was `Fetch failed for URL
+https://hooks.slack.com/services/T…/B…/<token>`, handing the token to anything that collects console output.
+It is now `Could not reach the webhook. Backing off.`
 
 ### dec-channels-isolate-channels
 **One channel's filter, transform or store failure never stops the others.**
