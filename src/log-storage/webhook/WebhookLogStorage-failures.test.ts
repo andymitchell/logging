@@ -42,6 +42,11 @@ const writeFailure = (message: string, details?: LoggingFailure['details']): Log
 });
 
 const UNREACHABLE = 'Could not reach the webhook. The entry is kept and will be retried.';
+const TEMPORARY_ERROR = 'The webhook answered with a temporary error. The entry is kept and will be retried.';
+const HELD_BACK = 'The entry is waiting to be sent while the webhook retries a failed delivery.';
+
+/** One entry, written more than once with the same ulid (a replay, or two channels routing it to one store). */
+const REPLAYED = { type: 'info' as const, message: 'replayed', ulid: '01J9ZZZZZZZZZZZZZZZZZZZZZZ' };
 
 
 describe('an app whose webhook cannot be reached', () => {
@@ -161,6 +166,46 @@ describe('an app whose webhook answers with an error', () => {
 });
 
 
+describe('an app whose entry is sent again after a failed attempt', () => {
+
+    /** The `meta` of every entry the webhook has been sent, in order, counting each attempt. */
+    function recordSentMeta(): unknown[] {
+        const metas: unknown[] = [];
+        interceptor.on('post', payload => { metas.push(...payload.body.entries.map(entry => entry.meta)); });
+        return metas;
+    }
+
+    it('turns the entry into JSON once, however many attempts send it [dec-webhook-write-answers-for-its-own-entry]', async () => {
+        let stringified = 0;
+        const meta = { toJSON() { stringified++; return { note: 'x' }; } };
+        interceptor.setResponse({ status: 503 });
+        const storage = new WebhookLogStorage('my-app', POST_URL);
+        const sentMeta = recordSentMeta();
+
+        await storage.add({ type: 'info', message: 'x', meta });
+        interceptor.setResponse({ status: 200 });
+        await vi.advanceTimersByTimeAsync(2_001);
+
+        expect(stringified).toBe(1);
+        expect(sentMeta).toEqual([{ note: 'x' }, { note: 'x' }]);
+    });
+
+    it('sends the entry as it was written, even if the app has since changed the object [dec-webhook-write-answers-for-its-own-entry]', async () => {
+        const meta = { step: 'as written' };
+        interceptor.setResponse({ status: 503 });
+        const storage = new WebhookLogStorage('my-app', POST_URL);
+        const sentMeta = recordSentMeta();
+
+        await storage.add({ type: 'info', message: 'x', meta });
+        meta.step = 'changed afterwards';
+        interceptor.setResponse({ status: 200 });
+        await vi.advanceTimersByTimeAsync(2_001);
+
+        expect(sentMeta).toEqual([{ step: 'as written' }, { step: 'as written' }]);
+    });
+});
+
+
 describe('an app writing one entry twice at once (a replay, or two channels routing it to the same store)', () => {
 
     it('answers both writes with what became of the entry', async () => {
@@ -172,6 +217,64 @@ describe('an app writing one entry twice at once (a replay, or two channels rout
 
         expect(results.map(result => result.error)).toEqual([undefined, undefined]);
     });
+
+    it('sends the entry once, and answers both writes ok [dec-webhook-write-answers-for-its-own-entry]', async () => {
+        const storage = new WebhookLogStorage('my-app', POST_URL);
+        const sent = recordDeliveries();
+
+        const results = await Promise.all([storage.add(REPLAYED), storage.add(REPLAYED)]);
+
+        expect(sent).toEqual([REPLAYED.ulid]);
+        expect(results.map(result => result.ok)).toEqual([true, true]);
+    });
+
+    it('answers both writes with a temporary error, and sends the entry once per attempt [dec-webhook-write-answers-for-its-own-entry]', async () => {
+        interceptor.setResponse({ status: 503 });
+        const storage = new WebhookLogStorage('my-app', POST_URL);
+        const sent = recordDeliveries();
+
+        const results = await Promise.all([storage.add(REPLAYED), storage.add(REPLAYED)]);
+        interceptor.setResponse({ status: 200 });
+        await vi.advanceTimersByTimeAsync(2_001);
+
+        expect(results.map(result => result.error?.failures)).toEqual([
+            [writeFailure(TEMPORARY_ERROR, { status: 503 })],
+            [writeFailure(TEMPORARY_ERROR, { status: 503 })],
+        ]);
+        expect(sent).toEqual([REPLAYED.ulid, REPLAYED.ulid]);
+    });
+});
+
+
+describe('an app writing one entry again later', () => {
+
+    it('answers a write made while the store waits to retry as held back, and sends the entry once per attempt [dec-webhook-write-answers-for-its-own-entry]', async () => {
+        interceptor.setResponse({ status: 503 });
+        const storage = new WebhookLogStorage('my-app', POST_URL);
+        const sent = recordDeliveries();
+
+        const first = await storage.add(REPLAYED);
+        const second = await storage.add(REPLAYED);
+        const sentBeforeTheRetry = [...sent];
+        interceptor.setResponse({ status: 200 });
+        await vi.advanceTimersByTimeAsync(2_001);
+
+        expect(first.error?.failures).toEqual([writeFailure(TEMPORARY_ERROR, { status: 503 })]);
+        expect(second.error?.failures).toEqual([writeFailure(HELD_BACK)]);
+        expect(sentBeforeTheRetry).toEqual([REPLAYED.ulid]);
+        expect(sent).toEqual([REPLAYED.ulid, REPLAYED.ulid]);
+    });
+
+    it('sends the entry again when it is written again after it was sent: delivery is at least once [dec-webhook-write-answers-for-its-own-entry]', async () => {
+        const storage = new WebhookLogStorage('my-app', POST_URL);
+        const sent = recordDeliveries();
+
+        const first = await storage.add(REPLAYED);
+        const second = await storage.add(REPLAYED);
+
+        expect([first.ok, second.ok]).toEqual([true, true]);
+        expect(sent).toEqual([REPLAYED.ulid, REPLAYED.ulid]);
+    });
 });
 
 
@@ -182,6 +285,19 @@ describe('an app writing an entry that cannot be sent as JSON', () => {
         const sent = recordDeliveries();
 
         const unsendable = await storage.add({ type: 'info', message: 'counted', meta: { count: 10n } });
+        const later = await storage.add({ type: 'info', message: 'later' });
+
+        expect(unsendable.error?.failures).toEqual([writeFailure('Could not turn the entry into JSON, so it was not sent.')]);
+        expect(later.ok).toBe(true);
+        expect(sent).toEqual([later.entry?.ulid]);
+    });
+
+    it('answers the write with a failure without sending it when the entry turns itself into nothing [dec-webhook-write-answers-for-its-own-entry]', async () => {
+        const storage = new WebhookLogStorage('my-app', POST_URL);
+        const sent = recordDeliveries();
+        const turnsIntoNothing = { type: 'info' as const, message: 'x', toJSON: () => undefined };
+
+        const unsendable = await storage.add(turnsIntoNothing);
         const later = await storage.add({ type: 'info', message: 'later' });
 
         expect(unsendable.error?.failures).toEqual([writeFailure('Could not turn the entry into JSON, so it was not sent.')]);

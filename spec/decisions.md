@@ -749,6 +749,12 @@ therefore records the outcome of each entry a write is waiting on, and each writ
   path), the caught error, or the response body (dec-failure-records-carry-no-pii).
 - The store reads only the status of the webhook's answer, and releases the body unread. An answer whose body
   is long, or never finishes, neither delays the write nor holds a connection open.
+- An entry is turned into JSON once, when it is written. That text is what every attempt sends, so a retry
+  costs no more stringifying and sends what was written even if the caller has since changed the object.
+- An entry already waiting in the buffer (same ulid) is not buffered again: each attempt sends it once, and
+  every write waiting on it when the attempt is answered gets that answer. A write of it made while the store
+  waits to retry is told the entry is held back, like any write made then. An entry written again after it was
+  sent is sent again: delivery is at least once.
 
 **Example — averted false success:** two writes land in one batch that the webhook refuses with 400. If each
 write answered from its own flush, the second would answer `ok: true`, because its flush found the buffer
@@ -761,6 +767,9 @@ batch it was in, and was retried forever, holding back every entry behind it. No
 **Example — averted leak:** a Slack webhook that is unreachable. The line printed was `Fetch failed for URL
 https://hooks.slack.com/services/T…/B…/<token>`, handing the token to anything that collects console output.
 It is now `Could not reach the webhook. Backing off.`
+
+**Example — averted duplicate:** two channels of one facade route the same entry to one Webhook store. The
+webhook received it twice in one batch. It now receives it once, and both writes answer `ok`.
 
 ### dec-channels-isolate-channels
 **One channel's filter, transform or store failure never stops the others.**

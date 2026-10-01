@@ -8,8 +8,11 @@ import { createLoggingFailedResult, ok } from "../../failures/results.ts";
 
 
 
+/**
+ * The JSON body of each POST to the webhook: a batch of entries, and the id of the store instance that sent it.
+ */
 export type PostBody = {
-    entries: LogEntry[], 
+    entries: LogEntry[],
     instanceId: string
 }
 
@@ -31,6 +34,11 @@ export type PostBody = {
  * Except when refused or not JSON, the entry is kept and sent again once the back-off has passed. A retry the
  * store makes on its own has no caller, so it is not reported; the next write's result says how delivery is
  * going. A failure never quotes the webhook's answer, which can echo the data that was sent.
+ *
+ * Each entry is turned into JSON once, when it is written, and every attempt sends that text, so a retry sends
+ * the entry as it was written. An entry already waiting to be sent (same `ulid`) is not buffered again: a replay,
+ * or two channels routing one entry here, sends it once, and every write waiting on it gets that attempt's
+ * answer. An entry written again after it was sent is sent again: delivery is at least once.
  *
  * Each failed delivery also prints one console line, saying only what happened and, when the webhook answered,
  * its HTTP status (e.g. `WebhookLogStorage: Could not reach the webhook. Backing off.`). It never carries the
@@ -107,14 +115,20 @@ export class WebhookLogStorage extends BaseLogStorage implements ILogStorage {
 
 
     protected override async commitEntry(logEntry: LogEntry): Promise<LoggingResult> {
-        // Checked before the entry joins the buffer: one that cannot be sent as JSON would fail every batch it
-        // was in, holding back every entry behind it for good.
-        if( !isSendableAsJson(logEntry) ) return createLoggingFailedResult(this.#writeFailure(NOT_JSON));
+        // Turned into JSON before the entry joins the buffer, and only then: one that cannot be sent as JSON
+        // would fail every batch it was in, holding back every entry behind it for good. Every attempt sends
+        // this text, so a retry sends the entry as it was written.
+        const json = toJson(logEntry);
+        if( json===undefined ) return createLoggingFailedResult(this.#writeFailure(NOT_JSON));
 
+        // Registered and buffered in one turn, so whichever attempt sends the entry next answers this write too.
         const awaited: AwaitedDelivery = { ulid: logEntry.ulid };
         this.#awaitedDeliveries.add(awaited);
         try {
-            await this.#bufferStorage.add(logEntry);
+            this.#bufferStorage.add({ ulid: logEntry.ulid, json });
+            // Let the rest of this turn's writes join the buffer before flushing, so writes made together share
+            // a batch rather than the first being sent alone.
+            await Promise.resolve();
             await this.#flushBuffer();
             return awaited.result ?? createLoggingFailedResult(this.#writeFailure(HELD_BACK));
         } finally {
@@ -129,7 +143,7 @@ export class WebhookLogStorage extends BaseLogStorage implements ILogStorage {
     /**
      * Record what became of each entry in `batch` that a write is waiting on.
      */
-    #settle(batch: LogEntry[], delivery: Delivery): void {
+    #settle(batch: Buffered[], delivery: Delivery): void {
         const result = this.#resultOf(delivery);
         const tried = new Set(batch.map(entry => entry.ulid));
         for( const awaited of this.#awaitedDeliveries ) {
@@ -165,27 +179,30 @@ export class WebhookLogStorage extends BaseLogStorage implements ILogStorage {
     async #flushBuffer(): Promise<void> {
         // Flush the buffer to the endpoint 
         await this.#queue.enqueue(async () => {
-            const backOffUntil = await this.#bufferStorage.getBackOffUntil();
+            const backOffUntil = this.#bufferStorage.getBackOffUntil();
             if (Date.now() < backOffUntil.timestamp) {
-                await this.#requestFutureFlushBuffer();
+                this.#requestFutureFlushBuffer();
                 return;
             }
 
-            let buffer = await this.#bufferStorage.getBuffer();
+            let buffer = this.#bufferStorage.getBuffer();
 
             // Continue sending batches as long as there are items in the buffer
             while (buffer.length > 0) {
                 const batch = buffer.slice(0, WebhookLogStorage.MAX_BATCH_SIZE);
                 const delivery = await this.#send(batch);
+                // Settled and removed from the buffer in one turn. A write of one of these entries arriving in
+                // between would be skipped by the buffer (its ulid is still there), then removed unsent and
+                // never answered.
                 this.#settle(batch, delivery);
 
                 if (delivery.kind === 'sent' || delivery.kind === 'refused') {
                     // Sent, or discarded so a batch the webhook will never accept does not block the queue.
-                    await this.#bufferStorage.markComplete(batch.map(x => x.ulid));
+                    this.#bufferStorage.markComplete(batch.map(x => x.ulid));
                     buffer.splice(0, batch.length);
                 } else {
                     // Stop processing batches and wait for the backoff period.
-                    await this.#handleFailure();
+                    this.#handleFailure();
                     break;
                 }
             }
@@ -197,15 +214,14 @@ export class WebhookLogStorage extends BaseLogStorage implements ILogStorage {
      *
      * @returns What became of the batch. Never rejects.
      */
-    async #send(batch: LogEntry[]): Promise<Delivery> {
+    async #send(batch: Buffered[]): Promise<Delivery> {
         const controller = new AbortController();
         let timedOut = false;
         const timer = setTimeout(() => { timedOut = true; controller.abort(); }, WebhookLogStorage.TIMEOUT_MS);
         try {
-            const postBody:PostBody = {
-                entries: batch,
-                instanceId: this.instanceId
-            };
+            // A PostBody, written out from each entry's JSON rather than stringified again: the same text
+            // `JSON.stringify` gives `{ entries, instanceId }`.
+            const postBody = `{"entries":[${batch.map(entry => entry.json).join(',')}],"instanceId":${JSON.stringify(this.instanceId)}}`;
 
             const response = await fetch(this.#postUrl, {
                 method: 'POST',
@@ -213,7 +229,7 @@ export class WebhookLogStorage extends BaseLogStorage implements ILogStorage {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json'
                 },
-                body: JSON.stringify(postBody),
+                body: postBody,
                 signal: controller.signal
             });
             releaseBody(response);
@@ -246,8 +262,8 @@ export class WebhookLogStorage extends BaseLogStorage implements ILogStorage {
      * Handles a failure by calculating and setting an exponential backoff,
      * and scheduling a future flush attempt.
      */
-    async #handleFailure(): Promise<void> {
-        const currentBackOff = await this.#bufferStorage.getBackOffUntil();
+    #handleFailure(): void {
+        const currentBackOff = this.#bufferStorage.getBackOffUntil();
         const newAttempt = currentBackOff.attempt + 1;
 
         // Exponential backoff with jitter: 1s, 2s, 4s, 8s... + up to 1s random
@@ -262,15 +278,15 @@ export class WebhookLogStorage extends BaseLogStorage implements ILogStorage {
             attempt: newAttempt
         };
 
-        await this.#bufferStorage.setBackOffUntil(newBackOff);
-        await this.#requestFutureFlushBuffer();
+        this.#bufferStorage.setBackOffUntil(newBackOff);
+        this.#requestFutureFlushBuffer();
     }
 
     /**
-     * Set up a callback to flush buffer a tick after the next paused timestamp. 
+     * Set up a callback to flush buffer a tick after the next paused timestamp.
      */
-    async #requestFutureFlushBuffer() {
-        const backOffUntil = await this.#bufferStorage.getBackOffUntil();
+    #requestFutureFlushBuffer(): void {
+        const backOffUntil = this.#bufferStorage.getBackOffUntil();
 
         if (this.#callbackId) clearTimeout(this.#callbackId);
 
@@ -298,6 +314,11 @@ const RETRYABLE_STATUSES:Readonly<number[]> = [
     ];
 
 type BackOffUntil = { timestamp: number, attempt: number };
+
+/**
+ * An entry waiting in the buffer: its ulid, and the JSON text every attempt sends for it.
+ */
+type Buffered = { readonly ulid: string, readonly json: string };
 
 /**
  * A write waiting on its entry's delivery, and what became of the entry once its batch was tried.
@@ -342,49 +363,57 @@ function releaseBody(response: Response): void {
     }
 }
 
-function isSendableAsJson(entry: LogEntry): boolean {
+/**
+ * The entry as the JSON text a batch carries, or `undefined` if it cannot be turned into JSON.
+ *
+ * `JSON.stringify` throws on some values (a bigint, a circular reference) and gives `undefined`, not text, for
+ * an entry whose own `toJSON` returns nothing. Both count as "not JSON".
+ */
+function toJson(entry: LogEntry): string | undefined {
     try {
-        JSON.stringify(entry);
-        return true;
+        const json: unknown = JSON.stringify(entry);
+        return typeof json==='string'? json : undefined;
     } catch {
-        return false;
+        return undefined;
     }
 }
 
 /**
- * A storage mechanism for the items buffered to post. 
- * In theory it could have other implementations behind an interface, e.g. with more durable storage. 
+ * The entries waiting to be posted, at most one per ulid, and the back-off.
+ *
+ * Every method is synchronous. The store relies on a write being registered and buffered in one turn, and on a
+ * batch being settled and removed in one turn (see `#flushBuffer`), so nothing may happen in between.
  */
 class BufferStorage {
-    #buffer: LogEntry[] = []
+    #buffer: Buffered[] = []
 
     /**
-     * Track back offs 
+     * Track back offs
      */
     #backOffUntil: BackOffUntil = { timestamp: 0, attempt: 0 };
 
-    constructor() {
-
+    /**
+     * Buffer an entry, unless one with its ulid is already waiting: that copy is the one sent.
+     */
+    add(entry: Buffered): void {
+        if( this.#buffer.some(buffered => buffered.ulid===entry.ulid) ) return;
+        this.#buffer.push(entry);
     }
 
-    async add(logEntry: LogEntry): Promise<void> {
-        this.#buffer.push(logEntry);
-    }
-
-    async getBuffer(): Promise<LogEntry[]> {
+    getBuffer(): Buffered[] {
         return [...this.#buffer];
     }
 
-    async getBackOffUntil(): Promise<BackOffUntil> {
+    getBackOffUntil(): BackOffUntil {
         return structuredClone(this.#backOffUntil);
     }
 
 
-    async setBackOffUntil(backOff: BackOffUntil): Promise<void> {
+    setBackOffUntil(backOff: BackOffUntil): void {
         this.#backOffUntil = structuredClone(backOff);
     }
 
-    async markComplete(entryUlids: string[]): Promise<void> {
+    markComplete(entryUlids: string[]): void {
 
         const deleteIds = new Set(entryUlids);
         this.#buffer = this.#buffer.filter(x => !deleteIds.has(x.ulid));
