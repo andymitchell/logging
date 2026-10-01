@@ -131,9 +131,6 @@ export class WebhookLogStorage extends BaseLogStorage implements ILogStorage {
         this.#awaitedDeliveries.add(awaited);
         try {
             this.#bufferStorage.add({ ulid: logEntry.ulid, json });
-            // Let the rest of this turn's writes join the buffer before flushing, so writes made together share
-            // a batch rather than the first being sent alone.
-            await Promise.resolve();
             await this.#flushBuffer();
             return awaited.result ?? createLoggingFailedResult(this.#writeFailure(HELD_BACK));
         } finally {
@@ -183,6 +180,9 @@ export class WebhookLogStorage extends BaseLogStorage implements ILogStorage {
 
     /**
      * Send what the buffer holds, once every flush requested before this one has finished.
+     *
+     * A flush never starts in the turn that requested it. Writes made together are therefore all in the buffer
+     * before the first batch is cut, so they share a batch rather than the first being sent alone.
      *
      * @returns Resolves when this flush has finished. Rejects only if it threw, and then only to this caller.
      */
